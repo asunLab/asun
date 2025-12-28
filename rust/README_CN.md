@@ -1,4 +1,4 @@
-# ASON - Another Structured Object Notation
+# ASON - Array-Schema Object Notation
 
 [![Rust](https://img.shields.io/badge/rust-1.85+-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)

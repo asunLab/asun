@@ -1,4 +1,4 @@
-//! # ASON - Another Structured Object Notation
+//! # ASON - Array-Schema Object Notation
 //!
 //! A token-efficient data format that separates schema from data.
 //!

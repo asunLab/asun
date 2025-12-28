@@ -1,6 +1,6 @@
 # ASON Format Specification v1.0
 
-> **ASON** = Another Structured Object Notation
+> **ASON** = Array-Schema Object Notation
 
 ## 1. Design Philosophy
 
