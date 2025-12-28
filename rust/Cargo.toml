@@ -1,0 +1,14 @@
+[package]
+name = "ason"
+version = "0.1.0"
+authors = ["Athan Xiao <athanxiao@gmail.com>"]
+edition = "2024"
+description = "ASON (Another Structured Object Notation) - A token-efficient data format"
+license = "MIT"
+repository = "https://github.com/athxx/ason"
+keywords = ["ason", "serialization", "parser", "token-efficient"]
+categories = ["encoding", "parser-implementations"]
+
+[dependencies]
+indexmap = "2.12.1"
+serde = { version = "1.0.228", features = ["derive"] }
