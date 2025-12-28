@@ -1,4 +1,4 @@
-# ASON - Another Structured Object Notation
+# ASON - Array-Schema Object Notation
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
