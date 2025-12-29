@@ -1,163 +1,176 @@
 package ason
 
 import (
+	"strings"
 	"testing"
 )
 
-func TestValueTypes(t *testing.T) {
-	// Null
-	n := Null()
-	if !n.IsNull() {
-		t.Error("Expected null")
-	}
-
-	// Bool
-	b := Bool(true)
-	if !b.IsBool() || !b.AsBool() {
-		t.Error("Expected true")
-	}
-
-	// Integer
-	i := Integer(42)
-	if !i.IsInteger() || i.AsInteger() != 42 {
-		t.Error("Expected 42")
-	}
-
-	// Float
-	f := Float(3.14)
-	if !f.IsFloat() || f.AsFloat() != 3.14 {
-		t.Error("Expected 3.14")
-	}
-
-	// String
-	s := String("hello")
-	if !s.IsString() || s.AsString() != "hello" {
-		t.Error("Expected hello")
-	}
-
-	// Array
-	arr := Array(Integer(1), Integer(2), Integer(3))
-	if !arr.IsArray() || arr.Len() != 3 {
-		t.Error("Expected array with 3 elements")
-	}
-	if arr.Get(1).AsInteger() != 2 {
-		t.Error("Expected arr[1] = 2")
-	}
-
-	// Object
-	obj := Object()
-	obj.Set("name", String("Alice"))
-	obj.Set("age", Integer(30))
-	if !obj.IsObject() || obj.Len() != 2 {
-		t.Error("Expected object with 2 fields")
-	}
-	if obj.Field("name").AsString() != "Alice" {
-		t.Error("Expected name = Alice")
-	}
+type User struct {
+	Name string `json:"name"`
+	Age  int    `json:"age"`
 }
 
-func TestParseSimpleObject(t *testing.T) {
-	v, err := Parse("{name,age}:(Alice,30)")
+type Address struct {
+	City string `json:"city"`
+	Zip  int    `json:"zip"`
+}
+
+type Person struct {
+	Name string  `json:"name"`
+	Addr Address `json:"addr"`
+}
+
+type Order struct {
+	ID    string `json:"id"`
+	Items []Item `json:"items"`
+}
+
+type Item struct {
+	Name string `json:"name"`
+	Qty  int    `json:"qty"`
+}
+
+func TestMarshalSimple(t *testing.T) {
+	user := User{Name: "Alice", Age: 30}
+	s, err := Marshal(user)
 	if err != nil {
-		t.Fatalf("Parse error: %v", err)
+		t.Fatal(err)
 	}
-	if !v.IsObject() {
-		t.Fatal("Expected object")
-	}
-	if v.Field("name").AsString() != "Alice" {
-		t.Errorf("Expected name=Alice, got %s", v.Field("name").AsString())
-	}
-	if v.Field("age").AsInteger() != 30 {
-		t.Errorf("Expected age=30, got %d", v.Field("age").AsInteger())
+	expected := "{name,age}:(Alice,30)"
+	if s != expected {
+		t.Errorf("got %q, want %q", s, expected)
 	}
 }
 
-func TestParseMultipleObjects(t *testing.T) {
-	v, err := Parse("{name,age}:(Alice,30),(Bob,25)")
+func TestMarshalNested(t *testing.T) {
+	person := Person{Name: "Alice", Addr: Address{City: "NYC", Zip: 10001}}
+	s, err := Marshal(person)
 	if err != nil {
-		t.Fatalf("Parse error: %v", err)
+		t.Fatal(err)
 	}
-	if !v.IsArray() || v.Len() != 2 {
-		t.Fatal("Expected array with 2 objects")
-	}
-	if v.Get(0).Field("name").AsString() != "Alice" {
-		t.Error("Expected first name = Alice")
-	}
-	if v.Get(1).Field("name").AsString() != "Bob" {
-		t.Error("Expected second name = Bob")
+	expected := "{name,addr{city,zip}}:(Alice,(NYC,10001))"
+	if s != expected {
+		t.Errorf("got %q, want %q", s, expected)
 	}
 }
 
-func TestParseNestedObject(t *testing.T) {
-	v, err := Parse("{name,addr{city,zip}}:(Alice,(NYC,10001))")
+func TestMarshalSlice(t *testing.T) {
+	users := []User{
+		{Name: "Alice", Age: 30},
+		{Name: "Bob", Age: 25},
+	}
+	s, err := Marshal(users)
 	if err != nil {
-		t.Fatalf("Parse error: %v", err)
+		t.Fatal(err)
 	}
-	if v.Field("name").AsString() != "Alice" {
-		t.Error("Expected name = Alice")
-	}
-	addr := v.Field("addr")
-	if !addr.IsObject() {
-		t.Fatal("Expected addr to be object")
-	}
-	if addr.Field("city").AsString() != "NYC" {
-		t.Error("Expected city = NYC")
-	}
-	if addr.Field("zip").AsInteger() != 10001 {
-		t.Error("Expected zip = 10001")
+	expected := "{name,age}:(Alice,30),(Bob,25)"
+	if s != expected {
+		t.Errorf("got %q, want %q", s, expected)
 	}
 }
 
-func TestParseArrayField(t *testing.T) {
-	v, err := Parse("{name,scores[]}:(Alice,[90,85,95])")
+func TestUnmarshalSimple(t *testing.T) {
+	var user User
+	err := Unmarshal("{name,age}:(Alice,30)", &user)
 	if err != nil {
-		t.Fatalf("Parse error: %v", err)
+		t.Fatal(err)
 	}
-	scores := v.Field("scores")
-	if !scores.IsArray() || scores.Len() != 3 {
-		t.Fatal("Expected scores array with 3 elements")
-	}
-	if scores.Get(0).AsInteger() != 90 {
-		t.Error("Expected scores[0] = 90")
+	if user.Name != "Alice" || user.Age != 30 {
+		t.Errorf("got %+v", user)
 	}
 }
 
-func TestParseObjectArray(t *testing.T) {
-	v, err := Parse("{users[{id,name}]}:([(1,Alice),(2,Bob)])")
+func TestUnmarshalNested(t *testing.T) {
+	var person Person
+	err := Unmarshal("{name,addr{city,zip}}:(Alice,(NYC,10001))", &person)
 	if err != nil {
-		t.Fatalf("Parse error: %v", err)
+		t.Fatal(err)
 	}
-	users := v.Field("users")
-	if !users.IsArray() || users.Len() != 2 {
-		t.Fatal("Expected users array with 2 elements")
-	}
-	if users.Get(0).Field("id").AsInteger() != 1 {
-		t.Error("Expected users[0].id = 1")
-	}
-	if users.Get(1).Field("name").AsString() != "Bob" {
-		t.Error("Expected users[1].name = Bob")
+	if person.Name != "Alice" || person.Addr.City != "NYC" || person.Addr.Zip != 10001 {
+		t.Errorf("got %+v", person)
 	}
 }
 
-func TestSerialize(t *testing.T) {
-	obj := Object()
-	obj.Set("name", String("Alice"))
-	obj.Set("age", Integer(30))
-	
-	s := Serialize(obj)
-	if s != "(Alice,30)" {
-		t.Errorf("Expected (Alice,30), got %s", s)
+func TestUnmarshalSlice(t *testing.T) {
+	var users []User
+	err := Unmarshal("{name,age}:(Alice,30),(Bob,25)", &users)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(users) != 2 {
+		t.Fatalf("got %d users, want 2", len(users))
+	}
+	if users[0].Name != "Alice" || users[0].Age != 30 {
+		t.Errorf("users[0] = %+v", users[0])
+	}
+	if users[1].Name != "Bob" || users[1].Age != 25 {
+		t.Errorf("users[1] = %+v", users[1])
 	}
 }
 
-func TestSerializeWithSchema(t *testing.T) {
-	obj := Object()
-	obj.Set("name", String("Alice"))
-	obj.Set("age", Integer(30))
-	
-	s := SerializeWithSchema(obj)
-	if s != "{name,age}:(Alice,30)" {
-		t.Errorf("Expected {name,age}:(Alice,30), got %s", s)
+func TestRoundTrip(t *testing.T) {
+	tests := []interface{}{
+		User{Name: "Alice", Age: 30},
+		Person{Name: "Bob", Addr: Address{City: "LA", Zip: 90001}},
+	}
+
+	for _, orig := range tests {
+		s, err := Marshal(orig)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		switch v := orig.(type) {
+		case User:
+			var parsed User
+			if err := Unmarshal(s, &parsed); err != nil {
+				t.Fatal(err)
+			}
+			if parsed != v {
+				t.Errorf("round-trip failed: got %+v, want %+v", parsed, v)
+			}
+		case Person:
+			var parsed Person
+			if err := Unmarshal(s, &parsed); err != nil {
+				t.Fatal(err)
+			}
+			if parsed != v {
+				t.Errorf("round-trip failed: got %+v, want %+v", parsed, v)
+			}
+		}
 	}
 }
 
+func TestMarshalTypes(t *testing.T) {
+	type AllTypes struct {
+		B bool    `json:"b"`
+		I int     `json:"i"`
+		F float64 `json:"f"`
+		S string  `json:"s"`
+	}
+
+	v := AllTypes{B: true, I: 42, F: 3.14, S: "hello"}
+	s, err := Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := "{b,i,f,s}:(true,42,3.14,hello)"
+	if s != expected {
+		t.Errorf("got %q, want %q", s, expected)
+	}
+}
+
+func TestMarshalIndent(t *testing.T) {
+	user := User{Name: "Alice", Age: 30}
+	s, err := MarshalIndent(user, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Just check it contains newlines and indent
+	if !strings.Contains(s, "\n") {
+		t.Errorf("expected newlines in output: %q", s)
+	}
+	if !strings.Contains(s, "  ") {
+		t.Errorf("expected indentation in output: %q", s)
+	}
+}
