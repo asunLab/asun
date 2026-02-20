@@ -1,38 +1,10 @@
 use crate::error::{Error, Result};
+use crate::simd;
 use serde::ser::{self, Serialize};
 
 // ---------------------------------------------------------------------------
 // Lookup tables
 // ---------------------------------------------------------------------------
-
-/// Bytes that force a string to be wrapped in `"..."`.
-static NEEDS_QUOTE: [bool; 256] = {
-    let mut t = [false; 256];
-    let mut i = 0usize;
-    while i < 32 {
-        t[i] = true;
-        i += 1;
-    }
-    t[b',' as usize] = true;
-    t[b'(' as usize] = true;
-    t[b')' as usize] = true;
-    t[b'[' as usize] = true;
-    t[b']' as usize] = true;
-    t[b'"' as usize] = true;
-    t[b'\\' as usize] = true;
-    t
-};
-
-/// Escape replacement: `ESCAPE[b]` is the char after `\` for byte `b` inside
-/// a quoted string.  0 means the byte needs no escaping.
-static ESCAPE: [u8; 256] = {
-    let mut t = [0u8; 256];
-    t[b'"' as usize] = b'"';
-    t[b'\\' as usize] = b'\\';
-    t[b'\n' as usize] = b'n';
-    t[b'\t' as usize] = b't';
-    t
-};
 
 /// Two-digit lookup table for fast integer formatting (itoa-style).
 static DEC_DIGITS: &[u8; 200] = b"0001020304050607080910111213141516171819\
@@ -45,53 +17,22 @@ static DEC_DIGITS: &[u8; 200] = b"0001020304050607080910111213141516171819\
 // Stack-based number formatting (no heap allocation)
 // ---------------------------------------------------------------------------
 
+/// Write u64 — delegates to SIMD module's optimized version.
 #[inline(always)]
-fn write_u64(buf: &mut Vec<u8>, mut v: u64) {
-    if v < 10 {
-        buf.push(b'0' + v as u8);
-        return;
-    }
-    if v < 100 {
-        let idx = v as usize * 2;
-        buf.push(DEC_DIGITS[idx]);
-        buf.push(DEC_DIGITS[idx + 1]);
-        return;
-    }
-    let mut tmp = [0u8; 20];
-    let mut i = 20usize;
-    while v >= 100 {
-        let rem = (v % 100) as usize;
-        v /= 100;
-        i -= 2;
-        tmp[i] = DEC_DIGITS[rem * 2];
-        tmp[i + 1] = DEC_DIGITS[rem * 2 + 1];
-    }
-    if v >= 10 {
-        let idx = v as usize * 2;
-        i -= 2;
-        tmp[i] = DEC_DIGITS[idx];
-        tmp[i + 1] = DEC_DIGITS[idx + 1];
-    } else {
-        i -= 1;
-        tmp[i] = b'0' + v as u8;
-    }
-    buf.extend_from_slice(&tmp[i..]);
+fn write_u64(buf: &mut Vec<u8>, v: u64) {
+    simd::fast_write_u64(buf, v);
 }
 
+/// Write i64 — delegates to SIMD module's optimized version.
 #[inline(always)]
 fn write_i64(buf: &mut Vec<u8>, v: i64) {
-    if v < 0 {
-        buf.push(b'-');
-        write_u64(buf, (-(v as i128)) as u64);
-    } else {
-        write_u64(buf, v as u64);
-    }
+    simd::fast_write_i64(buf, v);
 }
 
-/// Write f64 to buffer.
+/// Write f64 to buffer using `ryu` for fast float formatting.
 /// - Integer-valued floats: fast path via write_i64 + ".0"
 /// - One-decimal floats (e.g. 50.5): fast path via integer arithmetic
-/// - General: core::fmt::Display directly into buffer
+/// - General: ryu (Ryū algorithm) for fast, accurate float-to-string
 #[inline]
 fn write_f64(buf: &mut Vec<u8>, v: f64) {
     if v.is_finite() && v.fract() == 0.0 {
@@ -99,7 +40,7 @@ fn write_f64(buf: &mut Vec<u8>, v: f64) {
             write_i64(buf, v as i64);
             buf.extend_from_slice(b".0");
         } else {
-            fmt_f64(buf, v);
+            ryu_f64(buf, v);
         }
         return;
     }
@@ -143,22 +84,15 @@ fn write_f64(buf: &mut Vec<u8>, v: f64) {
             return;
         }
     }
-    fmt_f64(buf, v);
+    ryu_f64(buf, v);
 }
 
-/// Fallback: format f64 using core::fmt::Display directly into the Vec.
-#[inline(never)]
-fn fmt_f64(buf: &mut Vec<u8>, v: f64) {
-    use core::fmt::Write;
-    struct W<'a>(&'a mut Vec<u8>);
-    impl core::fmt::Write for W<'_> {
-        #[inline]
-        fn write_str(&mut self, s: &str) -> core::fmt::Result {
-            self.0.extend_from_slice(s.as_bytes());
-            Ok(())
-        }
-    }
-    let _ = write!(W(buf), "{}", v);
+/// Fast float formatting using the Ryū algorithm (via `ryu` crate).
+#[inline]
+fn ryu_f64(buf: &mut Vec<u8>, v: f64) {
+    let mut b = ryu::Buffer::new();
+    let s = b.format(v);
+    buf.extend_from_slice(s.as_bytes());
 }
 
 // ---------------------------------------------------------------------------
@@ -166,6 +100,7 @@ fn fmt_f64(buf: &mut Vec<u8>, v: f64) {
 // ---------------------------------------------------------------------------
 
 /// Single-pass check: does `s` need to be wrapped in quotes?
+/// Uses SIMD to scan for special chars in 16-byte chunks.
 #[inline]
 fn needs_quoting(s: &str) -> bool {
     let bytes = s.as_bytes();
@@ -178,45 +113,33 @@ fn needs_quoting(s: &str) -> bool {
     if (bytes.len() == 4 && bytes == b"true") || (bytes.len() == 5 && bytes == b"false") {
         return true;
     }
-    // Single pass: detect special chars AND number-like patterns
-    let mut could_be_number = true;
-    let num_start = if bytes[0] == b'-' { 1 } else { 0 };
-    if num_start >= bytes.len() {
-        could_be_number = false;
+
+    // SIMD fast-path: check for ASON special chars in bulk
+    if simd::simd_has_special_chars(bytes) {
+        return true;
     }
-    for i in 0..bytes.len() {
-        let b = bytes[i];
-        if NEEDS_QUOTE[b as usize] {
+
+    // Check if it looks like a number (would be ambiguous as a bare value)
+    let num_start = if bytes[0] == b'-' { 1 } else { 0 };
+    if num_start < bytes.len() {
+        let mut could_be_number = true;
+        for i in num_start..bytes.len() {
+            if !bytes[i].is_ascii_digit() && bytes[i] != b'.' {
+                could_be_number = false;
+                break;
+            }
+        }
+        if could_be_number {
             return true;
         }
-        if could_be_number && i >= num_start && !b.is_ascii_digit() && b != b'.' {
-            could_be_number = false;
-        }
     }
-    could_be_number && bytes.len() > num_start
+    false
 }
 
-/// Write `s` wrapped in quotes with escaping. Bulk writes non-escaped runs.
+/// Write `s` wrapped in quotes with escaping using SIMD-accelerated scanning.
 #[inline]
 fn write_escaped(buf: &mut Vec<u8>, s: &str) {
-    buf.push(b'"');
-    let bytes = s.as_bytes();
-    let mut start = 0;
-    for i in 0..bytes.len() {
-        let esc = ESCAPE[bytes[i] as usize];
-        if esc != 0 {
-            if start < i {
-                buf.extend_from_slice(&bytes[start..i]);
-            }
-            buf.push(b'\\');
-            buf.push(esc);
-            start = i + 1;
-        }
-    }
-    if start < bytes.len() {
-        buf.extend_from_slice(&bytes[start..]);
-    }
-    buf.push(b'"');
+    simd::simd_write_escaped(buf, s.as_bytes());
 }
 
 // ---------------------------------------------------------------------------

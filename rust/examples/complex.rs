@@ -328,7 +328,7 @@ fn main() {
     }
     let n = Nums {
         a: -42,
-        b: -3.14,
+        b: -3.15,
         c: i64::MIN + 1,
     };
     let s = to_string(&n).unwrap();
@@ -351,7 +351,7 @@ fn main() {
         u16v: 65535,
         u32v: 4294967295,
         u64v: 18446744073709551615,
-        f32v: 3.14,
+        f32v: 3.15,
         f64v: 2.718281828459045,
         ch: 'Z',
         s: "hello, world (test) [arr]".into(),

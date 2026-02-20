@@ -1,6 +1,7 @@
 pub mod deserialize;
 pub mod error;
 pub mod serialize;
+pub mod simd;
 
 pub use deserialize::{from_str, from_str_vec};
 pub use error::{Error, Result};
@@ -474,7 +475,7 @@ mod tests {
             b: true,
             i: -42,
             u: 100,
-            f: 3.14,
+            f: 3.15,
             c: 'A',
             s: "hello".into(),
         };

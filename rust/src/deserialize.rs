@@ -1,4 +1,5 @@
 use crate::error::{Error, Result};
+use crate::simd;
 use serde::Deserialize;
 use serde::de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor};
 
@@ -104,6 +105,10 @@ impl<'de> Deserializer<'de> {
         }
     }
 
+    /// Inline scalar whitespace skipping — fastest for ASON's compact format
+    /// where values are separated by commas with no whitespace.
+    /// SIMD overhead (splat/compare/movemask) is too costly when the
+    /// common case is 0 whitespace bytes.
     #[inline(always)]
     fn skip_whitespace(&mut self) {
         while self.pos < self.input.len() {
@@ -217,6 +222,8 @@ impl<'de> Deserializer<'de> {
     }
 
     /// Parse a plain (unquoted) string value, stopping at delimiters.
+    /// Scalar loop — plain values are typically short (< 16 bytes),
+    /// so SIMD overhead is not beneficial here.
     /// Returns zerocopy borrowed str.
     #[inline]
     fn parse_plain_value(&mut self) -> Result<&'de str> {
@@ -235,29 +242,24 @@ impl<'de> Deserializer<'de> {
     }
 
     /// Parse a quoted string. Zerocopy when no escapes; allocates only when escapes present.
+    /// Uses SIMD to scan for `"` or `\` in 16-byte chunks.
     #[inline]
     fn parse_quoted_string_cow(&mut self) -> Result<CowStr<'de>> {
         // Skip opening quote
         self.pos += 1;
         let start = self.pos;
 
-        // Fast scan: look for the closing quote without any escape
-        let mut scan = self.pos;
-        while scan < self.input.len() {
-            match self.input[scan] {
-                b'"' => {
-                    // No escapes found — zerocopy path
-                    let s = unsafe { core::str::from_utf8_unchecked(&self.input[start..scan]) };
-                    self.pos = scan + 1;
-                    return Ok(CowStr::Borrowed(s));
-                }
-                b'\\' => break, // escape found, fall through to slow path
-                _ => scan += 1,
-            }
+        // SIMD fast scan: look for the closing quote or escape
+        let hit = simd::simd_find_quote_or_backslash(self.input, self.pos);
+        if hit < self.input.len() && self.input[hit] == b'"' {
+            // No escapes found — zerocopy path
+            let s = unsafe { core::str::from_utf8_unchecked(&self.input[start..hit]) };
+            self.pos = hit + 1;
+            return Ok(CowStr::Borrowed(s));
         }
 
         // Slow path: build owned string with escapes
-        // Copy what we scanned so far
+        let scan = hit;
         let mut result = String::with_capacity(scan - start + 16);
         if scan > start {
             let prefix = unsafe { core::str::from_utf8_unchecked(&self.input[start..scan]) };
@@ -307,8 +309,18 @@ impl<'de> Deserializer<'de> {
                     _ => return Err(Error::InvalidEscape(esc as char)),
                 }
             } else {
-                result.push(b as char);
-                self.pos += 1;
+                // After an escape sequence, SIMD scan for next quote/backslash
+                let next_hit = simd::simd_find_quote_or_backslash(self.input, self.pos);
+                // Bulk copy the safe run
+                if next_hit > self.pos {
+                    let chunk =
+                        unsafe { core::str::from_utf8_unchecked(&self.input[self.pos..next_hit]) };
+                    result.push_str(chunk);
+                    self.pos = next_hit;
+                } else {
+                    result.push(b as char);
+                    self.pos += 1;
+                }
             }
         }
     }
@@ -333,6 +345,7 @@ impl<'de> Deserializer<'de> {
     }
 
     /// Parse number directly without intermediate string::parse for integers.
+    /// Optimized loop with minimal branching.
     #[inline]
     fn parse_i64(&mut self) -> Result<i64> {
         let negative = self.pos < self.input.len() && self.input[self.pos] == b'-';
@@ -341,8 +354,12 @@ impl<'de> Deserializer<'de> {
         }
         let mut val: u64 = 0;
         let mut digits = 0u32;
-        while self.pos < self.input.len() && self.input[self.pos].is_ascii_digit() {
-            val = val * 10 + (self.input[self.pos] - b'0') as u64;
+        while self.pos < self.input.len() {
+            let d = self.input[self.pos].wrapping_sub(b'0');
+            if d > 9 {
+                break;
+            }
+            val = val.wrapping_mul(10).wrapping_add(d as u64);
             self.pos += 1;
             digits += 1;
         }
@@ -356,13 +373,17 @@ impl<'de> Deserializer<'de> {
         }
     }
 
-    /// Parse u64 directly.
+    /// Parse u64 directly. Optimized loop with wrapping_sub for digit check.
     #[inline]
     fn parse_u64(&mut self) -> Result<u64> {
         let mut val: u64 = 0;
         let mut digits = 0u32;
-        while self.pos < self.input.len() && self.input[self.pos].is_ascii_digit() {
-            val = val * 10 + (self.input[self.pos] - b'0') as u64;
+        while self.pos < self.input.len() {
+            let d = self.input[self.pos].wrapping_sub(b'0');
+            if d > 9 {
+                break;
+            }
+            val = val.wrapping_mul(10).wrapping_add(d as u64);
             self.pos += 1;
             digits += 1;
         }
@@ -372,9 +393,9 @@ impl<'de> Deserializer<'de> {
         Ok(val)
     }
 
-    /// Parse number string for float parsing (still needs str::parse for floats).
+    /// Parse f64 directly using fast-float for speed.
     #[inline]
-    fn parse_number_str(&mut self) -> Result<&'de str> {
+    fn parse_f64_direct(&mut self) -> Result<f64> {
         let start = self.pos;
         if self.pos < self.input.len() && self.input[self.pos] == b'-' {
             self.pos += 1;
@@ -388,10 +409,25 @@ impl<'de> Deserializer<'de> {
                 self.pos += 1;
             }
         }
+        // Handle scientific notation (e.g. 1.5e10)
+        if self.pos < self.input.len()
+            && (self.input[self.pos] == b'e' || self.input[self.pos] == b'E')
+        {
+            self.pos += 1;
+            if self.pos < self.input.len()
+                && (self.input[self.pos] == b'+' || self.input[self.pos] == b'-')
+            {
+                self.pos += 1;
+            }
+            while self.pos < self.input.len() && self.input[self.pos].is_ascii_digit() {
+                self.pos += 1;
+            }
+        }
         if self.pos == start || (self.pos == start + 1 && self.input[start] == b'-') {
             return Err(Error::InvalidNumber);
         }
-        Ok(unsafe { core::str::from_utf8_unchecked(&self.input[start..self.pos]) })
+        let s = &self.input[start..self.pos];
+        fast_float2::parse(s).map_err(|_| Error::InvalidNumber)
     }
 
     /// Peek ahead to determine value type without consuming
@@ -504,12 +540,29 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             ValueType::Null => visitor.visit_none(),
             ValueType::Bool => self.deserialize_bool(visitor),
             ValueType::Number => {
-                let s = self.parse_number_str()?;
-                if s.contains('.') {
-                    let f: f64 = s.parse().map_err(|_| Error::InvalidNumber)?;
+                // Parse integer directly; only fall back to float if we hit '.'
+                let negative = self.pos < self.input.len() && self.input[self.pos] == b'-';
+                let sign_pos = self.pos;
+                if negative {
+                    self.pos += 1;
+                }
+                let mut val: u64 = 0;
+                while self.pos < self.input.len() {
+                    let d = self.input[self.pos].wrapping_sub(b'0');
+                    if d > 9 {
+                        break;
+                    }
+                    val = val.wrapping_mul(10).wrapping_add(d as u64);
+                    self.pos += 1;
+                }
+                // Check if there's a decimal point → parse as float
+                if self.pos < self.input.len() && self.input[self.pos] == b'.' {
+                    // Reset and parse entire number as float with fast-float
+                    self.pos = sign_pos;
+                    let f = self.parse_f64_direct()?;
                     visitor.visit_f64(f)
                 } else {
-                    let i: i64 = s.parse().map_err(|_| Error::InvalidNumber)?;
+                    let i = if negative { -(val as i64) } else { val as i64 };
                     visitor.visit_i64(i)
                 }
             }
@@ -612,16 +665,14 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     #[inline]
     fn deserialize_f32<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         self.skip_whitespace_and_comments();
-        let s = self.parse_number_str()?;
-        let v: f32 = s.parse().map_err(|_| Error::InvalidNumber)?;
+        let v = self.parse_f64_direct()? as f32;
         visitor.visit_f32(v)
     }
 
     #[inline]
     fn deserialize_f64<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         self.skip_whitespace_and_comments();
-        let s = self.parse_number_str()?;
-        let v: f64 = s.parse().map_err(|_| Error::InvalidNumber)?;
+        let v = self.parse_f64_direct()?;
         visitor.visit_f64(v)
     }
 
