@@ -1,151 +1,151 @@
-//! ASON Basic Usage Examples
-//!
-//! Run: cargo run --example basic
-
-use ason::{from_str, to_string, to_string_pretty};
+use ason::{
+    Result, StructSchema, from_str, from_str_vec, to_string, to_string_typed, to_string_vec,
+    to_string_vec_typed,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 struct User {
+    id: i64,
     name: String,
-    age: i32,
+    active: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-struct Address {
-    city: String,
-    zip: i32,
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-struct Person {
-    name: String,
-    addr: Address,
+impl StructSchema for User {
+    fn field_names() -> &'static [&'static str] {
+        &["id", "name", "active"]
+    }
+    fn field_types() -> &'static [&'static str] {
+        &["int", "str", "bool"]
+    }
+    fn serialize_fields(&self, ser: &mut ason::serialize::Serializer) -> Result<()> {
+        use serde::Serialize;
+        self.id.serialize(&mut *ser)?;
+        self.name.serialize(&mut *ser)?;
+        self.active.serialize(&mut *ser)?;
+        Ok(())
+    }
 }
 
 fn main() {
     println!("=== ASON Basic Examples ===\n");
 
-    // 1. Simple struct
-    println!("1. Simple struct");
+    // 1. Serialize a single struct
     let user = User {
+        id: 1,
         name: "Alice".into(),
-        age: 30,
+        active: true,
     };
-    let s = to_string(&user).unwrap();
-    println!("   Serialized: {}", s);
+    let ason_str = to_string(&user).unwrap();
+    println!("Serialize single struct:");
+    println!("  {}\n", ason_str);
 
-    let parsed: User = from_str(&s).unwrap();
-    println!("   Parsed: {:?}", parsed);
-    assert_eq!(user, parsed);
-    println!();
+    // 2. Serialize with type annotations (to_string_typed)
+    let typed_str = to_string_typed(&user).unwrap();
+    println!("Serialize with type annotations:");
+    println!("  {}\n", typed_str);
+    assert!(typed_str.starts_with("{id:int,name:str,active:bool}:"));
 
-    // 2. Nested struct
-    println!("2. Nested struct");
-    let person = Person {
-        name: "Alice".into(),
-        addr: Address {
-            city: "NYC".into(),
-            zip: 10001,
-        },
-    };
-    let s = to_string(&person).unwrap();
-    println!("   Serialized: {}", s);
+    // 3. Deserialize from ASON (accepts both annotated and unannotated)
+    let input = "{id:int,name:str,active:bool}:(1,Alice,true)";
+    let user: User = from_str(input).unwrap();
+    println!("Deserialize single struct:");
+    println!("  {:?}\n", user);
 
-    let parsed: Person = from_str(&s).unwrap();
-    println!("   Parsed: {:?}", parsed);
-    println!();
-
-    // 3. Array of structs
-    println!("3. Array of structs");
+    // 4. Serialize a vec of structs (schema-driven)
     let users = vec![
         User {
+            id: 1,
             name: "Alice".into(),
-            age: 30,
+            active: true,
         },
         User {
+            id: 2,
             name: "Bob".into(),
-            age: 25,
+            active: false,
+        },
+        User {
+            id: 3,
+            name: "Carol Smith".into(),
+            active: true,
         },
     ];
-    let s = to_string(&users).unwrap();
-    println!("   Serialized: {}", s);
-    println!();
+    let ason_vec = to_string_vec(&users).unwrap();
+    println!("Serialize vec (schema-driven):");
+    println!("  {}\n", ason_vec);
 
-    // 4. Pretty print
-    println!("4. Pretty print");
-    let s = to_string_pretty(&person).unwrap();
-    println!("   Formatted:\n{}", s);
-    println!();
+    // 5. Serialize vec with type annotations (to_string_vec_typed)
+    let typed_vec = to_string_vec_typed(&users).unwrap();
+    println!("Serialize vec with type annotations:");
+    println!("  {}\n", typed_vec);
+    assert!(typed_vec.starts_with("{id:int,name:str,active:bool}:"));
 
-    // 5. Pretty print
-    println!("5. Pretty print");
-    let persons = vec![
-        Person {
-            name: "Alice".into(),
-            addr: Address {
-                city: "NYC".into(),
-                zip: 10001,
-            },
-        },
-        Person {
-            name: "Bob".into(),
-            addr: Address {
-                city: "LA".into(),
-                zip: 90001,
-            },
-        },
-    ];
-    let s = to_string_pretty(&persons).unwrap();
-    println!("   Formatted:\n{}", s);
-    println!();
-
-    // 6. Parse without schema (using struct field names)
-    println!("6. Parse tuple format");
-    let input = "(Alice,30)";
-    let user: User = from_str(input).unwrap();
-    println!("   Input: {}", input);
-    println!("   Parsed: {:?}", user);
-    println!();
-
-    // 7. Struct with array field
-    println!("7. Struct with array field");
-    #[derive(Debug, Serialize, Deserialize)]
-    struct Company {
-        name: String,
-        employees: Vec<User>,
-        headquarters: Address,
+    // 6. Deserialize vec
+    let input =
+        "{id:int,name:str,active:bool}:(1,Alice,true),(2,Bob,false),(3,\"Carol Smith\",true)";
+    let users: Vec<User> = from_str_vec(input).unwrap();
+    println!("Deserialize vec:");
+    for u in &users {
+        println!("  {:?}", u);
     }
-    let company = Company {
-        name: "TechCorp".into(),
-        employees: vec![
-            User {
-                name: "Alice".into(),
-                age: 30,
-            },
-            User {
-                name: "Bob".into(),
-                age: 25,
-            },
-        ],
-        headquarters: Address {
-            city: "SF".into(),
-            zip: 94102,
-        },
+
+    // 7. Multiline format
+    println!("\nMultiline format:");
+    let multiline = "{id:int, name:str, active:bool}:
+  (1, Alice, true),
+  (2, Bob, false),
+  (3, \"Carol Smith\", true)";
+    let users: Vec<User> = from_str_vec(multiline).unwrap();
+    for u in &users {
+        println!("  {:?}", u);
+    }
+
+    // 8. Roundtrip
+    println!("\nRoundtrip test:");
+    let original = User {
+        id: 42,
+        name: "Test User".into(),
+        active: true,
     };
-    let s = to_string(&company).unwrap();
-    println!("   Serialized: {}", s);
-    println!();
+    let serialized = to_string(&original).unwrap();
+    let deserialized: User = from_str(&serialized).unwrap();
+    println!("  original:     {:?}", original);
+    println!("  serialized:   {}", serialized);
+    println!("  deserialized: {:?}", deserialized);
+    assert_eq!(original, deserialized);
+    println!("  ✓ roundtrip OK");
 
-    // 8. HashMap
-    println!("8. HashMap");
-    use std::collections::HashMap;
-    let mut map: HashMap<String, i32> = HashMap::new();
-    map.insert("x".into(), 10);
-    map.insert("y".into(), 20);
-    let s = to_string(&map).unwrap();
-    println!("   Serialized: {}", s);
-    println!();
+    // 9. Optional fields
+    println!("\nOptional fields:");
+    #[derive(Debug, Deserialize)]
+    struct Item {
+        id: i64,
+        label: Option<String>,
+    }
+    let input = "{id,label}:(1,hello)";
+    let item: Item = from_str(input).unwrap();
+    println!("  with value: {:?}", item);
 
-    println!("=== Examples Complete ===");
+    let input = "{id,label}:(2,)";
+    let item: Item = from_str(input).unwrap();
+    println!("  with null:  {:?}", item);
+
+    // 10. Array fields
+    println!("\nArray fields:");
+    #[derive(Debug, Deserialize)]
+    struct Tagged {
+        name: String,
+        tags: Vec<String>,
+    }
+    let input = "{name,tags}:(Alice,[rust,go,python])";
+    let t: Tagged = from_str(input).unwrap();
+    println!("  {:?}", t);
+
+    // 11. Comments
+    println!("\nWith comments:");
+    let input = "/* user list */ {id,name,active}:(1,Alice,true)";
+    let user: User = from_str(input).unwrap();
+    println!("  {:?}", user);
+
+    println!("\n=== All examples passed! ===");
 }
