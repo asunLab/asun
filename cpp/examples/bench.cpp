@@ -373,6 +373,129 @@ std::vector<User> json_deserialize_users(const std::string& s) {
 }
 
 // ===========================================================================
+// JSON deep struct deserializers (for fair comparison)
+// ===========================================================================
+
+Task json_deserialize_task(const char*& p, const char* e) {
+    using namespace json_mini;
+    Task t;
+    expect(p, e, '{');
+    read_str(p, e); expect(p, e, ':'); t.id = read_i64(p, e); skip_comma(p, e);
+    read_str(p, e); expect(p, e, ':'); t.title = read_str(p, e); skip_comma(p, e);
+    read_str(p, e); expect(p, e, ':'); t.priority = read_i64(p, e); skip_comma(p, e);
+    read_str(p, e); expect(p, e, ':'); t.done = read_bool(p, e); skip_comma(p, e);
+    read_str(p, e); expect(p, e, ':'); t.hours = read_f64(p, e);
+    expect(p, e, '}');
+    return t;
+}
+
+Project json_deserialize_project(const char*& p, const char* e) {
+    using namespace json_mini;
+    Project proj;
+    expect(p, e, '{');
+    read_str(p, e); expect(p, e, ':'); proj.name = read_str(p, e); skip_comma(p, e);
+    read_str(p, e); expect(p, e, ':'); proj.budget = read_f64(p, e); skip_comma(p, e);
+    read_str(p, e); expect(p, e, ':'); proj.active = read_bool(p, e); skip_comma(p, e);
+    read_str(p, e); expect(p, e, ':'); // "tasks"
+    expect(p, e, '[');
+    while (true) {
+        skip_ws(p, e);
+        if (p >= e || *p == ']') break;
+        if (!proj.tasks.empty()) skip_comma(p, e);
+        proj.tasks.push_back(json_deserialize_task(p, e));
+    }
+    expect(p, e, ']');
+    expect(p, e, '}');
+    return proj;
+}
+
+Team json_deserialize_team(const char*& p, const char* e) {
+    using namespace json_mini;
+    Team team;
+    expect(p, e, '{');
+    read_str(p, e); expect(p, e, ':'); team.name = read_str(p, e); skip_comma(p, e);
+    read_str(p, e); expect(p, e, ':'); team.lead = read_str(p, e); skip_comma(p, e);
+    read_str(p, e); expect(p, e, ':'); team.size = read_i64(p, e); skip_comma(p, e);
+    read_str(p, e); expect(p, e, ':'); // "projects"
+    expect(p, e, '[');
+    while (true) {
+        skip_ws(p, e);
+        if (p >= e || *p == ']') break;
+        if (!team.projects.empty()) skip_comma(p, e);
+        team.projects.push_back(json_deserialize_project(p, e));
+    }
+    expect(p, e, ']');
+    expect(p, e, '}');
+    return team;
+}
+
+Division json_deserialize_division(const char*& p, const char* e) {
+    using namespace json_mini;
+    Division div;
+    expect(p, e, '{');
+    read_str(p, e); expect(p, e, ':'); div.name = read_str(p, e); skip_comma(p, e);
+    read_str(p, e); expect(p, e, ':'); div.location = read_str(p, e); skip_comma(p, e);
+    read_str(p, e); expect(p, e, ':'); div.headcount = read_i64(p, e); skip_comma(p, e);
+    read_str(p, e); expect(p, e, ':'); // "teams"
+    expect(p, e, '[');
+    while (true) {
+        skip_ws(p, e);
+        if (p >= e || *p == ']') break;
+        if (!div.teams.empty()) skip_comma(p, e);
+        div.teams.push_back(json_deserialize_team(p, e));
+    }
+    expect(p, e, ']');
+    expect(p, e, '}');
+    return div;
+}
+
+Company json_deserialize_company(const char*& p, const char* e) {
+    using namespace json_mini;
+    Company c;
+    expect(p, e, '{');
+    read_str(p, e); expect(p, e, ':'); c.name = read_str(p, e); skip_comma(p, e);
+    read_str(p, e); expect(p, e, ':'); c.founded = read_i64(p, e); skip_comma(p, e);
+    read_str(p, e); expect(p, e, ':'); c.revenue_m = read_f64(p, e); skip_comma(p, e);
+    read_str(p, e); expect(p, e, ':'); c.is_public = read_bool(p, e); skip_comma(p, e);
+    read_str(p, e); expect(p, e, ':'); // "divisions"
+    expect(p, e, '[');
+    while (true) {
+        skip_ws(p, e);
+        if (p >= e || *p == ']') break;
+        if (!c.divisions.empty()) skip_comma(p, e);
+        c.divisions.push_back(json_deserialize_division(p, e));
+    }
+    expect(p, e, ']');
+    skip_comma(p, e);
+    read_str(p, e); expect(p, e, ':'); // "tags"
+    expect(p, e, '[');
+    while (true) {
+        skip_ws(p, e);
+        if (p >= e || *p == ']') break;
+        if (!c.tags.empty()) skip_comma(p, e);
+        c.tags.push_back(read_str(p, e));
+    }
+    expect(p, e, ']');
+    expect(p, e, '}');
+    return c;
+}
+
+std::vector<Company> json_deserialize_companies(const std::string& s) {
+    const char* p = s.data();
+    const char* e = p + s.size();
+    using namespace json_mini;
+    std::vector<Company> companies;
+    expect(p, e, '[');
+    while (true) {
+        skip_ws(p, e);
+        if (p >= e || *p == ']') break;
+        if (!companies.empty()) skip_comma(p, e);
+        companies.push_back(json_deserialize_company(p, e));
+    }
+    return companies;
+}
+
+// ===========================================================================
 // Benchmark helpers
 // ===========================================================================
 
@@ -605,8 +728,13 @@ BenchResult bench_deep(size_t count, int iterations) {
     }
     double ason_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    // JSON deserialize: estimate
-    double json_de = json_ser * 1.5;
+    // JSON deserialize
+    t0 = Clock::now();
+    for (int iter = 0; iter < iterations; iter++) {
+        auto r = json_deserialize_companies(json_str);
+        assert(r.size() == count);
+    }
+    double json_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
     // ASON deserialize
     t0 = Clock::now();
@@ -662,6 +790,59 @@ std::pair<double, double> bench_deep_single_roundtrip(int iterations) {
     auto companies = generate_companies(1);
     auto& company = companies[0];
 
+    // Full JSON serialize for Company (reuse the same deep serializer)
+    auto json_ser_full = [](std::string& buf, const Company& c) {
+        buf.push_back('{');
+        buf.append("\"name\":"); json_mini::append_str(buf, c.name); buf.push_back(',');
+        buf.append("\"founded\":"); json_mini::append_i64(buf, c.founded); buf.push_back(',');
+        buf.append("\"revenue_m\":"); json_mini::append_f64(buf, c.revenue_m); buf.push_back(',');
+        buf.append("\"public\":"); buf.append(c.is_public ? "true" : "false"); buf.push_back(',');
+        buf.append("\"divisions\":[");
+        for (size_t d = 0; d < c.divisions.size(); d++) {
+            if (d > 0) buf.push_back(',');
+            auto& div = c.divisions[d]; buf.push_back('{');
+            buf.append("\"name\":"); json_mini::append_str(buf, div.name); buf.push_back(',');
+            buf.append("\"location\":"); json_mini::append_str(buf, div.location); buf.push_back(',');
+            buf.append("\"headcount\":"); json_mini::append_i64(buf, div.headcount); buf.push_back(',');
+            buf.append("\"teams\":[");
+            for (size_t t = 0; t < div.teams.size(); t++) {
+                if (t > 0) buf.push_back(',');
+                auto& team = div.teams[t]; buf.push_back('{');
+                buf.append("\"name\":"); json_mini::append_str(buf, team.name); buf.push_back(',');
+                buf.append("\"lead\":"); json_mini::append_str(buf, team.lead); buf.push_back(',');
+                buf.append("\"size\":"); json_mini::append_i64(buf, team.size); buf.push_back(',');
+                buf.append("\"projects\":[");
+                for (size_t p = 0; p < team.projects.size(); p++) {
+                    if (p > 0) buf.push_back(',');
+                    auto& proj = team.projects[p]; buf.push_back('{');
+                    buf.append("\"name\":"); json_mini::append_str(buf, proj.name); buf.push_back(',');
+                    buf.append("\"budget\":"); json_mini::append_f64(buf, proj.budget); buf.push_back(',');
+                    buf.append("\"active\":"); buf.append(proj.active ? "true" : "false"); buf.push_back(',');
+                    buf.append("\"tasks\":[");
+                    for (size_t tk = 0; tk < proj.tasks.size(); tk++) {
+                        if (tk > 0) buf.push_back(',');
+                        auto& task = proj.tasks[tk]; buf.push_back('{');
+                        buf.append("\"id\":"); json_mini::append_i64(buf, task.id); buf.push_back(',');
+                        buf.append("\"title\":"); json_mini::append_str(buf, task.title); buf.push_back(',');
+                        buf.append("\"priority\":"); json_mini::append_i64(buf, task.priority); buf.push_back(',');
+                        buf.append("\"done\":"); buf.append(task.done ? "true" : "false"); buf.push_back(',');
+                        buf.append("\"hours\":"); json_mini::append_f64(buf, task.hours);
+                        buf.push_back('}');
+                    }
+                    buf.push_back(']'); buf.push_back('}');
+                }
+                buf.push_back(']'); buf.push_back('}');
+            }
+            buf.push_back(']'); buf.push_back('}');
+        }
+        buf.append("],\"tags\":[");
+        for (size_t i = 0; i < c.tags.size(); i++) {
+            if (i > 0) buf.push_back(',');
+            json_mini::append_str(buf, c.tags[i]);
+        }
+        buf.append("]}");
+    };
+
     auto t0 = Clock::now();
     for (int i = 0; i < iterations; i++) {
         auto s = ason::dump(company);
@@ -670,21 +851,16 @@ std::pair<double, double> bench_deep_single_roundtrip(int iterations) {
     }
     double ason_ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    auto json_ser_company = [](std::string& buf, const Company& c) {
-        // simplified version
-        buf.push_back('{');
-        buf.append("\"name\":"); json_mini::append_str(buf, c.name);
-        buf.push_back('}');
-    };
-
     t0 = Clock::now();
     for (int i = 0; i < iterations; i++) {
         std::string s;
-        json_ser_company(s, company);
-        (void)s;
+        s.reserve(2048);
+        json_ser_full(s, company);
+        const char* p = s.data();
+        auto r = json_deserialize_company(p, p + s.size());
+        (void)r;
     }
     double json_ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
-    json_ms *= 10; // Adjust since we're only serializing name for JSON
 
     return {ason_ms, json_ms};
 }

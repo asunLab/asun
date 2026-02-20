@@ -684,17 +684,24 @@ inline std::string parse_string_value(const char*& pos, const char* end) {
     return parse_plain_value(pos, end);
 }
 
+// Stack-based schema result — zero heap allocation
+struct ParsedSchema {
+    static constexpr int MAX_FIELDS = 64;
+    std::string_view fields[MAX_FIELDS];
+    int count = 0;
+};
+
 // Parse schema: {field1,field2,...} or {field1:type1,...}
-// Returns field names (type annotations are skipped).
-inline std::vector<std::string> parse_schema(const char*& pos, const char* end) {
+// Returns field names as string_views (zero-copy, no heap allocation).
+inline ParsedSchema parse_schema(const char*& pos, const char* end) {
     if (pos >= end || *pos != '{') throw Error("expected '{'");
     pos++;
-    std::vector<std::string> fields;
+    ParsedSchema result;
     for (;;) {
         skip_whitespace(pos, end);
         if (pos >= end) throw Error("unexpected EOF in schema");
         if (*pos == '}') { pos++; break; }
-        if (!fields.empty()) {
+        if (result.count > 0) {
             if (*pos != ',') throw Error("expected ','");
             pos++;
             skip_whitespace(pos, end);
@@ -706,7 +713,9 @@ inline std::vector<std::string> parse_schema(const char*& pos, const char* end) 
             if (b == ',' || b == '}' || b == ':' || b == ' ' || b == '\t') break;
             pos++;
         }
-        fields.emplace_back(start, pos - start);
+        if (result.count < ParsedSchema::MAX_FIELDS) {
+            result.fields[result.count++] = std::string_view(start, pos - start);
+        }
         skip_whitespace(pos, end);
         // Skip optional type annotation after ':'
         if (pos < end && *pos == ':') {
@@ -747,7 +756,7 @@ inline std::vector<std::string> parse_schema(const char*& pos, const char* end) 
             }
         }
     }
-    return fields;
+    return result;
 }
 
 // Skip balanced delimiters
@@ -939,17 +948,19 @@ load_value(const char*& pos, const char* end, T& out) {
 
     // If starts with '{', it has an inline schema
     if (pos < end && *pos == '{') {
-        auto fields = detail::parse_schema(pos, end);
+        auto schema = detail::parse_schema(pos, end);
         detail::skip_whitespace_and_comments(pos, end);
         if (pos >= end || *pos != ':') throw Error("expected ':'");
         pos++;
         detail::skip_whitespace_and_comments(pos, end);
-        // Build field map: schema index -> struct field index
-        auto field_map = AsonFields<T>::build_field_map(fields);
+        // Build field map on stack: schema index -> struct field index
+        int field_map[detail::ParsedSchema::MAX_FIELDS];
+        for (int fi = 0; fi < schema.count; fi++)
+            field_map[fi] = AsonFields<T>::find_field(schema.fields[fi]);
         // Parse tuple
         if (pos >= end || *pos != '(') throw Error("expected '('");
         pos++;
-        for (size_t i = 0; i < field_map.size(); i++) {
+        for (int i = 0; i < schema.count; i++) {
             detail::skip_whitespace_and_comments(pos, end);
             if (pos < end && *pos == ')') break;
             if (i > 0) {
@@ -999,7 +1010,7 @@ template <typename T>
 std::string dump(const T& v) {
     static_assert(AsonFields<T>::defined, "ASON_FIELDS not defined for this type");
     std::string buf;
-    buf.reserve(128);
+    buf.reserve(256);
     // Schema
     buf.push_back('{');
     AsonFields<T>::write_schema(buf, false);
@@ -1017,7 +1028,7 @@ template <typename T>
 std::string dump_typed(const T& v) {
     static_assert(AsonFields<T>::defined, "ASON_FIELDS not defined for this type");
     std::string buf;
-    buf.reserve(128);
+    buf.reserve(256);
     buf.push_back('{');
     AsonFields<T>::write_schema(buf, true);
     buf.push_back('}');
@@ -1076,15 +1087,17 @@ T load(std::string_view input) {
     T result{};
     // Must start with '{'
     if (pos >= end || *pos != '{') throw Error("expected '{'");
-    auto fields = detail::parse_schema(pos, end);
+    auto schema = detail::parse_schema(pos, end);
     detail::skip_whitespace_and_comments(pos, end);
     if (pos >= end || *pos != ':') throw Error("expected ':'");
     pos++;
     detail::skip_whitespace_and_comments(pos, end);
-    auto field_map = AsonFields<T>::build_field_map(fields);
+    int field_map[detail::ParsedSchema::MAX_FIELDS];
+    for (int fi = 0; fi < schema.count; fi++)
+        field_map[fi] = AsonFields<T>::find_field(schema.fields[fi]);
     if (pos >= end || *pos != '(') throw Error("expected '('");
     pos++;
-    for (size_t i = 0; i < field_map.size(); i++) {
+    for (int i = 0; i < schema.count; i++) {
         detail::skip_whitespace_and_comments(pos, end);
         if (pos < end && *pos == ')') break;
         if (i > 0) {
@@ -1111,11 +1124,13 @@ std::vector<T> load_vec(std::string_view input) {
     const char* end = pos + input.size();
     detail::skip_whitespace_and_comments(pos, end);
     if (pos >= end || *pos != '{') throw Error("expected '{'");
-    auto fields = detail::parse_schema(pos, end);
+    auto schema = detail::parse_schema(pos, end);
     detail::skip_whitespace_and_comments(pos, end);
     if (pos >= end || *pos != ':') throw Error("expected ':'");
     pos++;
-    auto field_map = AsonFields<T>::build_field_map(fields);
+    int field_map[detail::ParsedSchema::MAX_FIELDS];
+    for (int fi = 0; fi < schema.count; fi++)
+        field_map[fi] = AsonFields<T>::find_field(schema.fields[fi]);
     std::vector<T> result;
     for (;;) {
         detail::skip_whitespace_and_comments(pos, end);
@@ -1123,7 +1138,7 @@ std::vector<T> load_vec(std::string_view input) {
         if (*pos != '(') break;
         pos++;
         T elem{};
-        for (size_t i = 0; i < field_map.size(); i++) {
+        for (int i = 0; i < schema.count; i++) {
             detail::skip_whitespace_and_comments(pos, end);
             if (pos < end && *pos == ')') break;
             if (i > 0) {
@@ -1241,11 +1256,9 @@ std::vector<T> load_vec(std::string_view input) {
             ASON_FOR_EACH(ASON_FIELDMAP_1, __VA_ARGS__) \
             return -1; \
         } \
-        static std::vector<int> build_field_map(const std::vector<std::string>& schema_fields) { \
-            std::vector<int> m(schema_fields.size()); \
-            for (size_t i = 0; i < schema_fields.size(); i++) \
-                m[i] = find_field(schema_fields[i]); \
-            return m; \
+        static void build_field_map(const ::ason::detail::ParsedSchema& schema, int* out) { \
+            for (int i = 0; i < schema.count; i++) \
+                out[i] = find_field(schema.fields[i]); \
         } \
         static void load_field(const char*& pos, const char* end, Self& out, int idx) { \
             switch (idx) { \
