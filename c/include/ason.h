@@ -610,17 +610,18 @@ ason_inline ason_err_t ason_parse_plain_value(const char** pos, const char* end,
                                                char** out, size_t* out_len) {
     const char* start = *pos;
     const char* p = start;
-    /* Scan to delimiter */
-    while (p < end && *p != ',' && *p != ')' && *p != ']') p++;
+    /* Scan to delimiter and check for backslash in one pass */
+    bool has_esc = false;
+    while (p < end) {
+        char c = *p;
+        if (c == ',' || c == ')' || c == ']') break;
+        if (c == '\\') has_esc = true;
+        p++;
+    }
     /* Trim trailing whitespace */
     const char* vend = p;
     while (vend > start && (vend[-1] == ' ' || vend[-1] == '\t' || vend[-1] == '\n' || vend[-1] == '\r')) vend--;
     size_t len = vend - start;
-    /* Unescape if contains backslash */
-    bool has_esc = false;
-    for (const char* c = start; c < vend; c++) {
-        if (*c == '\\') { has_esc = true; break; }
-    }
     if (has_esc) {
         char* buf = (char*)malloc(len + 1);
         size_t j = 0;
@@ -657,14 +658,19 @@ ason_inline ason_err_t ason_parse_string_value(const char** pos, const char* end
     ason_skip_ws(pos, end);
     *allocated = false;
     if (*pos < end && **pos == '"') {
+        const char* before = *pos;
         ason_err_t err = ason_parse_quoted_string(pos, end, out, out_len);
         if (err != ASON_OK) return err;
-        /* Check if this was the slow path (allocated) by seeing if out points into original */
-        /* We set allocated = true if the string needed escaping */
-        /* Actually, we'll always make a copy for ownership safety */
+        /* Detect if result was heap-allocated (slow path with escapes) */
+        /* Zero-copy returns pointer into input [before+1..*pos-1) */
+        *allocated = (*out < before || *out >= *pos);
         return ASON_OK;
     }
+    const char* before = *pos;
     ason_err_t err = ason_parse_plain_value(pos, end, out, out_len);
+    if (err != ASON_OK) return err;
+    /* Detect if result was heap-allocated (has_esc path) */
+    *allocated = (*out < before || *out >= *pos);
     return err;
 }
 
@@ -1204,11 +1210,15 @@ ason_err_t ason_load_struct(const char** pos, const char* end, void* obj, const 
                 else break; \
             } \
             first = false; \
-            StructType elem; \
-            memset(&elem, 0, sizeof(elem)); \
-            ason_err_t err = ason_load_struct(pos, end, &elem, &StructType##_ason_desc); \
+            /* Ensure capacity and load directly into vector slot */ \
+            if (v->len >= v->cap) { \
+                v->cap = v->cap ? v->cap * 2 : 4; \
+                v->data = (StructType*)realloc(v->data, v->cap * sizeof(StructType)); \
+            } \
+            memset(&v->data[v->len], 0, sizeof(StructType)); \
+            ason_err_t err = ason_load_struct(pos, end, &v->data[v->len], &StructType##_ason_desc); \
             if (err != ASON_OK) return err; \
-            ason_vec_##StructType##_push(v, elem); \
+            v->len++; \
         } \
         return ASON_OK; \
     }

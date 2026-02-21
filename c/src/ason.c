@@ -216,21 +216,11 @@ static ason_err_t load_u64_raw(const char** pos, const char* end, uint64_t* out)
 
 static ason_err_t load_f64_raw(const char** pos, const char* end, double* out) {
     ason_skip_ws(pos, end);
-    const char* start = *pos;
-    if (*pos < end && **pos == '-') (*pos)++;
-    while (*pos < end && **pos >= '0' && **pos <= '9') (*pos)++;
-    if (*pos < end && **pos == '.') {
-        (*pos)++;
-        while (*pos < end && **pos >= '0' && **pos <= '9') (*pos)++;
-    }
-    if (*pos < end && (**pos == 'e' || **pos == 'E')) {
-        (*pos)++;
-        if (*pos < end && (**pos == '+' || **pos == '-')) (*pos)++;
-        while (*pos < end && **pos >= '0' && **pos <= '9') (*pos)++;
-    }
-    if (*pos == start) return ASON_ERR_INVALID_NUMBER;
+    if (*pos >= end) return ASON_ERR_INVALID_NUMBER;
     char* endptr = NULL;
-    *out = strtod(start, &endptr);
+    *out = strtod(*pos, &endptr);
+    if (endptr == *pos) return ASON_ERR_INVALID_NUMBER;
+    *pos = endptr;
     return ASON_OK;
 }
 
@@ -323,12 +313,17 @@ ason_err_t ason_load_str(const char** pos, const char* end, void* base, size_t o
     bool allocated = false;
     ason_err_t err = ason_parse_string_value(pos, end, &out_str, &out_len, &allocated);
     if (err != ASON_OK) return err;
-    /* Always make an owned copy */
-    s->data = (char*)malloc(out_len + 1);
-    memcpy(s->data, out_str, out_len);
-    s->data[out_len] = '\0';
-    s->len = out_len;
-    if (allocated) free(out_str);
+    if (allocated) {
+        /* Take ownership of already-allocated buffer */
+        s->data = out_str;
+        s->len = out_len;
+    } else {
+        /* Make an owned copy of zero-copy result */
+        s->data = (char*)malloc(out_len + 1);
+        memcpy(s->data, out_str, out_len);
+        s->data[out_len] = '\0';
+        s->len = out_len;
+    }
     return ASON_OK;
 }
 
@@ -355,11 +350,15 @@ ason_err_t ason_load_opt_str(const char** pos, const char* end, void* base, size
     char* out_str = NULL; size_t out_len = 0; bool allocated = false;
     ason_err_t err = ason_parse_string_value(pos, end, &out_str, &out_len, &allocated);
     if (err != ASON_OK) return err;
-    opt->value.data = (char*)malloc(out_len + 1);
-    memcpy(opt->value.data, out_str, out_len);
-    opt->value.data[out_len] = '\0';
-    opt->value.len = out_len;
-    if (allocated) free(out_str);
+    if (allocated) {
+        opt->value.data = out_str;
+        opt->value.len = out_len;
+    } else {
+        opt->value.data = (char*)malloc(out_len + 1);
+        memcpy(opt->value.data, out_str, out_len);
+        opt->value.data[out_len] = '\0';
+        opt->value.len = out_len;
+    }
     return ASON_OK;
 }
 
@@ -462,11 +461,15 @@ ason_err_t ason_load_vec_str(const char** pos, const char* end, void* base, size
         ason_err_t e = ason_parse_string_value(pos, end, &out_str, &out_len, &allocated);
         if (e != ASON_OK) return e;
         ason_string_t s;
-        s.data = (char*)malloc(out_len + 1);
-        memcpy(s.data, out_str, out_len);
-        s.data[out_len] = '\0';
-        s.len = out_len;
-        if (allocated) free(out_str);
+        if (allocated) {
+            s.data = out_str;
+            s.len = out_len;
+        } else {
+            s.data = (char*)malloc(out_len + 1);
+            memcpy(s.data, out_str, out_len);
+            s.data[out_len] = '\0';
+            s.len = out_len;
+        }
         ason_vec_str_push(v, s);
     }
     return ASON_OK;
@@ -563,12 +566,16 @@ ason_err_t ason_load_map_si(const char** pos, const char* end, void* base, size_
         ason_skip_ws(pos, end);
         if (*pos < end && **pos == ')') (*pos)++;
         ason_map_si_entry_t entry;
-        entry.key.data = (char*)malloc(klen + 1);
-        memcpy(entry.key.data, kstr, klen);
-        entry.key.data[klen] = '\0';
-        entry.key.len = klen;
+        if (kall) {
+            entry.key.data = kstr;
+            entry.key.len = klen;
+        } else {
+            entry.key.data = (char*)malloc(klen + 1);
+            memcpy(entry.key.data, kstr, klen);
+            entry.key.data[klen] = '\0';
+            entry.key.len = klen;
+        }
         entry.val = val;
-        if (kall) free(kstr);
         ason_map_si_push(m, entry);
     }
     return ASON_OK;
@@ -604,12 +611,20 @@ ason_err_t ason_load_map_ss(const char** pos, const char* end, void* base, size_
         ason_skip_ws(pos, end);
         if (*pos < end && **pos == ')') (*pos)++;
         ason_map_ss_entry_t entry;
-        entry.key.data = (char*)malloc(klen + 1);
-        memcpy(entry.key.data, kstr, klen); entry.key.data[klen] = '\0'; entry.key.len = klen;
-        entry.val.data = (char*)malloc(vlen + 1);
-        memcpy(entry.val.data, vstr, vlen); entry.val.data[vlen] = '\0'; entry.val.len = vlen;
-        if (kall) free(kstr);
-        if (vall) free(vstr);
+        if (kall) {
+            entry.key.data = kstr;
+            entry.key.len = klen;
+        } else {
+            entry.key.data = (char*)malloc(klen + 1);
+            memcpy(entry.key.data, kstr, klen); entry.key.data[klen] = '\0'; entry.key.len = klen;
+        }
+        if (vall) {
+            entry.val.data = vstr;
+            entry.val.len = vlen;
+        } else {
+            entry.val.data = (char*)malloc(vlen + 1);
+            memcpy(entry.val.data, vstr, vlen); entry.val.data[vlen] = '\0'; entry.val.len = vlen;
+        }
         ason_map_ss_push(m, entry);
     }
     return ASON_OK;

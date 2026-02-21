@@ -279,6 +279,129 @@ static BUser* json_deserialize_users(const char* data, size_t len, size_t* out_n
     return arr;
 }
 
+/* JSON deep struct deserializers (for fair comparison) */
+
+static BTask json_deserialize_task(const char** p, const char* e) {
+    BTask t = {0};
+    json_expect(p, e, '{');
+    json_skip_key(p, e); t.id = json_read_i64(p, e); json_skip_comma(p, e);
+    json_skip_key(p, e); t.title = json_read_str(p, e); json_skip_comma(p, e);
+    json_skip_key(p, e); t.priority = json_read_i64(p, e); json_skip_comma(p, e);
+    json_skip_key(p, e); t.done = json_read_bool(p, e); json_skip_comma(p, e);
+    json_skip_key(p, e); t.hours = json_read_f64(p, e);
+    json_expect(p, e, '}');
+    return t;
+}
+
+static BProject json_deserialize_project(const char** p, const char* e) {
+    BProject proj = {0};
+    json_expect(p, e, '{');
+    json_skip_key(p, e); proj.name = json_read_str(p, e); json_skip_comma(p, e);
+    json_skip_key(p, e); proj.budget = json_read_f64(p, e); json_skip_comma(p, e);
+    json_skip_key(p, e); proj.active = json_read_bool(p, e); json_skip_comma(p, e);
+    json_skip_key(p, e); /* "tasks" */
+    json_expect(p, e, '[');
+    proj.tasks = ason_vec_BTask_new();
+    while (1) {
+        json_skip_ws(p, e);
+        if (*p >= e || **p == ']') break;
+        if (proj.tasks.len > 0) json_skip_comma(p, e);
+        ason_vec_BTask_push(&proj.tasks, json_deserialize_task(p, e));
+    }
+    json_expect(p, e, ']');
+    json_expect(p, e, '}');
+    return proj;
+}
+
+static BTeam json_deserialize_team(const char** p, const char* e) {
+    BTeam team = {0};
+    json_expect(p, e, '{');
+    json_skip_key(p, e); team.name = json_read_str(p, e); json_skip_comma(p, e);
+    json_skip_key(p, e); team.lead = json_read_str(p, e); json_skip_comma(p, e);
+    json_skip_key(p, e); team.size = json_read_i64(p, e); json_skip_comma(p, e);
+    json_skip_key(p, e); /* "projects" */
+    json_expect(p, e, '[');
+    team.projects = ason_vec_BProject_new();
+    while (1) {
+        json_skip_ws(p, e);
+        if (*p >= e || **p == ']') break;
+        if (team.projects.len > 0) json_skip_comma(p, e);
+        ason_vec_BProject_push(&team.projects, json_deserialize_project(p, e));
+    }
+    json_expect(p, e, ']');
+    json_expect(p, e, '}');
+    return team;
+}
+
+static BDivision json_deserialize_division(const char** p, const char* e) {
+    BDivision div = {0};
+    json_expect(p, e, '{');
+    json_skip_key(p, e); div.name = json_read_str(p, e); json_skip_comma(p, e);
+    json_skip_key(p, e); div.location = json_read_str(p, e); json_skip_comma(p, e);
+    json_skip_key(p, e); div.headcount = json_read_i64(p, e); json_skip_comma(p, e);
+    json_skip_key(p, e); /* "teams" */
+    json_expect(p, e, '[');
+    div.teams = ason_vec_BTeam_new();
+    while (1) {
+        json_skip_ws(p, e);
+        if (*p >= e || **p == ']') break;
+        if (div.teams.len > 0) json_skip_comma(p, e);
+        ason_vec_BTeam_push(&div.teams, json_deserialize_team(p, e));
+    }
+    json_expect(p, e, ']');
+    json_expect(p, e, '}');
+    return div;
+}
+
+static BCompany json_deserialize_company(const char** p, const char* e) {
+    BCompany c = {0};
+    json_expect(p, e, '{');
+    json_skip_key(p, e); c.name = json_read_str(p, e); json_skip_comma(p, e);
+    json_skip_key(p, e); c.founded = json_read_i64(p, e); json_skip_comma(p, e);
+    json_skip_key(p, e); c.revenue_m = json_read_f64(p, e); json_skip_comma(p, e);
+    json_skip_key(p, e); c.is_public = json_read_bool(p, e); json_skip_comma(p, e);
+    json_skip_key(p, e); /* "divisions" */
+    json_expect(p, e, '[');
+    c.divisions = ason_vec_BDivision_new();
+    while (1) {
+        json_skip_ws(p, e);
+        if (*p >= e || **p == ']') break;
+        if (c.divisions.len > 0) json_skip_comma(p, e);
+        ason_vec_BDivision_push(&c.divisions, json_deserialize_division(p, e));
+    }
+    json_expect(p, e, ']');
+    json_skip_comma(p, e);
+    json_skip_key(p, e); /* "tags" */
+    json_expect(p, e, '[');
+    c.tags = ason_vec_str_new();
+    while (1) {
+        json_skip_ws(p, e);
+        if (*p >= e || **p == ']') break;
+        if (c.tags.len > 0) json_skip_comma(p, e);
+        ason_vec_str_push(&c.tags, json_read_str(p, e));
+    }
+    json_expect(p, e, ']');
+    json_expect(p, e, '}');
+    return c;
+}
+
+static BCompany* json_deserialize_companies(const char* data, size_t len, size_t* out_n) {
+    const char* p = data;
+    const char* e = data + len;
+    size_t cap = 16, cnt = 0;
+    BCompany* arr = (BCompany*)malloc(cap * sizeof(BCompany));
+    json_expect(&p, e, '[');
+    while (1) {
+        json_skip_ws(&p, e);
+        if (p >= e || *p == ']') break;
+        if (cnt > 0) json_skip_comma(&p, e);
+        if (cnt >= cap) { cap *= 2; arr = (BCompany*)realloc(arr, cap * sizeof(BCompany)); }
+        arr[cnt++] = json_deserialize_company(&p, e);
+    }
+    *out_n = cnt;
+    return arr;
+}
+
 static void free_buser(BUser* u) {
     ason_string_free(&u->name); ason_string_free(&u->email);
     ason_string_free(&u->role); ason_string_free(&u->city);
@@ -663,8 +786,16 @@ static BenchResult bench_deep(size_t count, int iterations) {
     }
     double ason_ser = now_ms() - t0;
 
-    /* JSON deserialize: estimate */
-    double json_de = json_ser * 1.5;
+    /* JSON deserialize */
+    t0 = now_ms();
+    for (int iter = 0; iter < iterations; iter++) {
+        size_t n = 0;
+        BCompany* r = json_deserialize_companies(json_buf.data, json_buf.len, &n);
+        assert(n == count);
+        for (size_t i = 0; i < n; i++) free_bcompany(&r[i]);
+        free(r);
+    }
+    double json_de = now_ms() - t0;
 
     /* ASON deserialize */
     t0 = now_ms();
