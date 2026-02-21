@@ -104,7 +104,44 @@ b2, _ := ason.MarshalSliceTyped(users, []string{"int", "str", "bool"})
 var parsed []User
 ason.UnmarshalSlice(b, &parsed)
 ```
+## 二进制格式（ASON-BIN）
 
+ASON-BIN 是对任意 Go 值的紧凑二进制编码。它提供最大幅度的性能提升，非常适合内部服务通信、缓存和存储场景。
+
+### API
+
+```go
+import ason "github.com/example/ason"
+
+// 序列化任意值为字节
+b, err := ason.MarshalBinary(&user)
+
+// 从字节反序列化（字符串和 []byte 零拷贝）
+var u2 User
+err = ason.UnmarshalBinary(b, &u2)
+```
+
+### 零拷贝反序列化
+
+在反序列化 ASON-BIN 时，`string` 和 `[]byte` 字段使用零拷贝技术（`unsafe.String` 和切片重切片）创建。它们直接指向输入的字节切片，避免了堆分配和内存拷贝。
+
+### 性能测试数据（Apple M 系列芯片）
+
+**扁平结构体（8 字段）**
+
+| 测试 | JSON | ASON 文本 | ASON-BIN | BIN vs JSON |
+|---|---|---|---|---|
+| 序列化 × 1000 | 0.17 ms | 0.08 ms | **0.08 ms** | **快 2.3×** |
+| 反序列化 × 1000 | 0.83 ms | 0.21 ms | **0.07 ms** | **快 12.6×** |
+| 数据大小 × 1000 | 122,071 B | 57,112 B | **74,784 B** | 小 39% |
+
+**深层嵌套结构体（5 层嵌套，× 100）**
+
+| 测试 | JSON | ASON 文本 | ASON-BIN | BIN vs JSON |
+|---|---|---|---|---|
+| 序列化 × 100 | 0.35 ms | 0.20 ms | **0.05 ms** | **快 7.0×** |
+| 反序列化 × 100 | 1.20 ms | 0.45 ms | **0.08 ms** | **快 15.0×** |
+| 数据大小 × 100 | 43,811 B | 17,461 B | **22,543 B** | 小 49% |
 ## 支持的类型
 
 | 类型                        | ASON 表示           | 示例                         |

@@ -105,6 +105,45 @@ var parsed []User
 ason.UnmarshalSlice(b, &parsed)
 ```
 
+## Binary Format (ASON-BIN)
+
+ASON-BIN is a compact binary encoding of any Go value. It provides the largest performance gains, making it ideal for internal service communication, caches, and storage.
+
+### API
+
+```go
+import ason "github.com/example/ason"
+
+// Marshal any value to bytes
+b, err := ason.MarshalBinary(&user)
+
+// Unmarshal from bytes (zero-copy for strings and []byte)
+var u2 User
+err = ason.UnmarshalBinary(b, &u2)
+```
+
+### Zero-Copy Deserialization
+
+When unmarshaling ASON-BIN, `string` and `[]byte` fields are created using zero-copy techniques (`unsafe.String` and slice reslicing). They point directly into the input byte slice, avoiding heap allocations and memory copying.
+
+### Performance (Apple M-series)
+
+**Flat struct (8 fields)**
+
+| Test | JSON | ASON Text | ASON-BIN | BIN vs JSON |
+|---|---|---|---|---|
+| Serialize × 1000 | 0.17 ms | 0.08 ms | **0.08 ms** | **2.3× faster** |
+| Deserialize × 1000 | 0.83 ms | 0.21 ms | **0.07 ms** | **12.6× faster** |
+| Payload size × 1000 | 122,071 B | 57,112 B | **74,784 B** | 39% smaller |
+
+**Deep struct (5-level nested, × 100)**
+
+| Test | JSON | ASON Text | ASON-BIN | BIN vs JSON |
+|---|---|---|---|---|
+| Serialize × 100 | 0.35 ms | 0.20 ms | **0.05 ms** | **7.0× faster** |
+| Deserialize × 100 | 1.20 ms | 0.45 ms | **0.08 ms** | **15.0× faster** |
+| Payload size × 100 | 43,811 B | 17,461 B | **22,543 B** | 49% smaller |
+
 ## Supported Types
 
 | Type                            | ASON Representation | Example                      |
