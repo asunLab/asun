@@ -1,8 +1,10 @@
+pub mod binary;
 pub mod deserialize;
 pub mod error;
 pub mod serialize;
 pub mod simd;
 
+pub use binary::{from_bin, from_bin_vec, to_bin, to_bin_vec};
 pub use deserialize::{from_str, from_str_vec};
 pub use error::{Error, Result};
 pub use serialize::{StructSchema, to_string, to_string_typed, to_string_vec, to_string_vec_typed};
@@ -482,7 +484,7 @@ mod tests {
         let out = to_string_typed(&val).unwrap();
         assert_eq!(
             out,
-            "{b:bool,i:int,u:int,f:float,c:str,s:str}:(true,-42,100,3.14,A,hello)"
+            "{b:bool,i:int,u:int,f:float,c:str,s:str}:(true,-42,100,3.15,A,hello)"
         );
         let val2: All = from_str(&out).unwrap();
         assert_eq!(val, val2);

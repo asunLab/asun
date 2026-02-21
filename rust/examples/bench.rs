@@ -1,6 +1,6 @@
 use ason::{
-    Result, StructSchema, from_str, from_str_vec, to_string, to_string_typed, to_string_vec,
-    to_string_vec_typed,
+    Result, StructSchema, from_bin, from_bin_vec, from_str, from_str_vec, to_bin, to_bin_vec,
+    to_string, to_string_typed, to_string_vec, to_string_vec_typed,
 };
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
@@ -570,6 +570,170 @@ fn bench_deep_single_roundtrip(iterations: u32) -> (f64, f64) {
 }
 
 // ===========================================================================
+// Section 9: Binary Format (ASON-BIN) helpers
+// ===========================================================================
+
+struct BinBenchResult {
+    name: String,
+    json_ser_ms: f64,
+    ason_ser_ms: f64,
+    bin_ser_ms: f64,
+    json_de_ms: f64,
+    ason_de_ms: f64,
+    bin_de_ms: f64,
+    json_bytes: usize,
+    ason_bytes: usize,
+    bin_bytes: usize,
+}
+
+impl BinBenchResult {
+    fn print(&self) {
+        let ser_ason = self.json_ser_ms / self.ason_ser_ms;
+        let ser_bin = self.json_ser_ms / self.bin_ser_ms;
+        let de_ason = self.json_de_ms / self.ason_de_ms;
+        let de_bin = self.json_de_ms / self.bin_de_ms;
+        let j = self.json_bytes as f64;
+        let sv_a = (1.0 - self.ason_bytes as f64 / j) * 100.0;
+        let sv_b = (1.0 - self.bin_bytes as f64 / j) * 100.0;
+        println!("  {}", self.name);
+        println!(
+            "    Serialize:   JSON {:>8.2}ms | ASON {:>8.2}ms ({:.1}x) | BIN {:>8.2}ms ({:.1}x)",
+            self.json_ser_ms, self.ason_ser_ms, ser_ason, self.bin_ser_ms, ser_bin
+        );
+        println!(
+            "    Deserialize: JSON {:>8.2}ms | ASON {:>8.2}ms ({:.1}x) | BIN {:>8.2}ms ({:.1}x)",
+            self.json_de_ms, self.ason_de_ms, de_ason, self.bin_de_ms, de_bin
+        );
+        println!(
+            "    Size:  JSON {:>8} B | ASON {:>8} B ({:.0}% smaller) | BIN {:>8} B ({:.0}% smaller)",
+            self.json_bytes, self.ason_bytes, sv_a, self.bin_bytes, sv_b
+        );
+    }
+}
+
+fn bench_flat_bin(count: usize, iterations: u32) -> BinBenchResult {
+    let users = generate_users(count);
+
+    let mut json_str = String::new();
+    let start = Instant::now();
+    for _ in 0..iterations {
+        json_str = serde_json::to_string(&users).unwrap();
+    }
+    let json_ser = start.elapsed();
+
+    let mut ason_str = String::new();
+    let start = Instant::now();
+    for _ in 0..iterations {
+        ason_str = to_string_vec(&users).unwrap();
+    }
+    let ason_ser = start.elapsed();
+
+    let mut bin_buf: Vec<u8> = Vec::new();
+    let start = Instant::now();
+    for _ in 0..iterations {
+        bin_buf = to_bin_vec(&users).unwrap();
+    }
+    let bin_ser = start.elapsed();
+
+    let start = Instant::now();
+    for _ in 0..iterations {
+        let _: Vec<User> = serde_json::from_str(&json_str).unwrap();
+    }
+    let json_de = start.elapsed();
+
+    let start = Instant::now();
+    for _ in 0..iterations {
+        let _: Vec<User> = from_str_vec(&ason_str).unwrap();
+    }
+    let ason_de = start.elapsed();
+
+    let start = Instant::now();
+    for _ in 0..iterations {
+        let _: Vec<User> = from_bin_vec(&bin_buf).unwrap();
+    }
+    let bin_de = start.elapsed();
+
+    let decoded: Vec<User> = from_bin_vec(&bin_buf).unwrap();
+    assert_eq!(users, decoded, "bin flat {} roundtrip failed", count);
+
+    BinBenchResult {
+        name: format!("Flat struct × {} (8 fields)", count),
+        json_ser_ms: json_ser.as_secs_f64() * 1000.0,
+        ason_ser_ms: ason_ser.as_secs_f64() * 1000.0,
+        bin_ser_ms: bin_ser.as_secs_f64() * 1000.0,
+        json_de_ms: json_de.as_secs_f64() * 1000.0,
+        ason_de_ms: ason_de.as_secs_f64() * 1000.0,
+        bin_de_ms: bin_de.as_secs_f64() * 1000.0,
+        json_bytes: json_str.len(),
+        ason_bytes: ason_str.len(),
+        bin_bytes: bin_buf.len(),
+    }
+}
+
+fn bench_deep_bin(count: usize, iterations: u32) -> BinBenchResult {
+    let companies = generate_companies(count);
+
+    let mut json_str = String::new();
+    let start = Instant::now();
+    for _ in 0..iterations {
+        json_str = serde_json::to_string(&companies).unwrap();
+    }
+    let json_ser = start.elapsed();
+
+    // ASON: per-element serialize (Company has no StructSchema)
+    let mut ason_strs: Vec<String> = Vec::new();
+    let start = Instant::now();
+    for _ in 0..iterations {
+        ason_strs = companies.iter().map(|c| to_string(c).unwrap()).collect();
+    }
+    let ason_ser = start.elapsed();
+    let ason_total_bytes: usize = ason_strs.iter().map(|s| s.len()).sum();
+
+    let mut bin_buf: Vec<u8> = Vec::new();
+    let start = Instant::now();
+    for _ in 0..iterations {
+        bin_buf = to_bin_vec(&companies).unwrap();
+    }
+    let bin_ser = start.elapsed();
+
+    let start = Instant::now();
+    for _ in 0..iterations {
+        let _: Vec<Company> = serde_json::from_str(&json_str).unwrap();
+    }
+    let json_de = start.elapsed();
+
+    let start = Instant::now();
+    for _ in 0..iterations {
+        for s in &ason_strs {
+            let _: Company = from_str(s).unwrap();
+        }
+    }
+    let ason_de = start.elapsed();
+
+    let start = Instant::now();
+    for _ in 0..iterations {
+        let _: Vec<Company> = from_bin_vec(&bin_buf).unwrap();
+    }
+    let bin_de = start.elapsed();
+
+    let decoded: Vec<Company> = from_bin_vec(&bin_buf).unwrap();
+    assert_eq!(companies, decoded, "bin deep {} roundtrip failed", count);
+
+    BinBenchResult {
+        name: format!("Deep struct × {} (5-level nested)", count),
+        json_ser_ms: json_ser.as_secs_f64() * 1000.0,
+        ason_ser_ms: ason_ser.as_secs_f64() * 1000.0,
+        bin_ser_ms: bin_ser.as_secs_f64() * 1000.0,
+        json_de_ms: json_de.as_secs_f64() * 1000.0,
+        ason_de_ms: ason_de.as_secs_f64() * 1000.0,
+        bin_de_ms: bin_de.as_secs_f64() * 1000.0,
+        json_bytes: json_str.len(),
+        ason_bytes: ason_total_bytes,
+        bin_bytes: bin_buf.len(),
+    }
+}
+
+// ===========================================================================
 // Main
 // ===========================================================================
 
@@ -1066,6 +1230,69 @@ fn main() {
         "    Peak delta:   {}",
         format_bytes(rss_final.saturating_sub(rss_before))
     );
+
+    // ===================================================================
+    // Section 9: Binary Format (ASON-BIN)
+    // ===================================================================
+    println!("\n┌──────────────────────────────────────────────────────────────┐");
+    println!("│  Section 9: Binary Format (ASON-BIN) vs ASON text vs JSON   │");
+    println!("└──────────────────────────────────────────────────────────────┘");
+
+    println!("\n  ── Flat struct ──");
+    bench_flat_bin(100, 50).print();
+    bench_flat_bin(1000, 20).print();
+    bench_flat_bin(5000, 5).print();
+
+    println!("\n  ── Deep struct (5-level nested) ──");
+    bench_deep_bin(10, 50).print();
+    bench_deep_bin(100, 10).print();
+    bench_deep_bin(500, 3).print();
+
+    println!("\n  ── Single User roundtrip ──");
+    {
+        let user = User {
+            id: 42,
+            name: "Alice".into(),
+            email: "alice@example.com".into(),
+            age: 30,
+            score: 9.8,
+            active: true,
+            role: "admin".into(),
+            city: "Berlin".into(),
+        };
+        let iters: u32 = 100_000;
+
+        let start = Instant::now();
+        for _ in 0..iters {
+            let b = to_bin(&user).unwrap();
+            let _: User = from_bin(&b).unwrap();
+        }
+        let bin_ns = start.elapsed().as_nanos() as f64 / iters as f64;
+
+        let start = Instant::now();
+        for _ in 0..iters {
+            let s = to_string(&user).unwrap();
+            let _: User = from_str(&s).unwrap();
+        }
+        let ason_ns = start.elapsed().as_nanos() as f64 / iters as f64;
+
+        let start = Instant::now();
+        for _ in 0..iters {
+            let s = serde_json::to_string(&user).unwrap();
+            let _: User = serde_json::from_str(&s).unwrap();
+        }
+        let json_ns = start.elapsed().as_nanos() as f64 / iters as f64;
+
+        println!(
+            "    × {}: BIN {:>6.0}ns | ASON {:>6.0}ns | JSON {:>6.0}ns",
+            iters, bin_ns, ason_ns, json_ns
+        );
+        println!(
+            "    Speedup vs JSON: BIN {:.1}x faster | ASON {:.1}x faster",
+            json_ns / bin_ns,
+            json_ns / ason_ns
+        );
+    }
 
     println!("\n╔══════════════════════════════════════════════════════════════╗");
     println!("║                    Benchmark Complete                       ║");

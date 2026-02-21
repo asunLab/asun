@@ -502,6 +502,52 @@ pub fn simd_write_escaped(buf: &mut Vec<u8>, s: &[u8]) {
 }
 
 // ============================================================================
+// SIMD-accelerated bulk memory copy (used by binary serializer)
+// ============================================================================
+
+/// SIMD-accelerated bulk copy: append `src` bytes into `dst` Vec<u8>.
+///
+/// For payloads ≥ 32 bytes, copies 16 bytes per iteration using platform SIMD
+/// `load` + `store`, reducing loop overhead and enabling hardware memory
+/// bandwidth utilization. Falls back to `extend_from_slice` for small payloads
+/// where SIMD setup cost would outweigh benefits.
+///
+/// This is the primary SIMD contribution of the binary format:
+/// writing long string payloads (names, emails, descriptions) benefits from
+/// vectorized copies on both NEON (aarch64) and SSE2 (x86_64).
+#[inline]
+pub fn simd_bulk_extend(dst: &mut Vec<u8>, src: &[u8]) {
+    let n = src.len();
+    if n == 0 {
+        return;
+    }
+    // Small payload: standard path (LLVM auto-vectorizes short copies already)
+    if n < 32 {
+        dst.extend_from_slice(src);
+        return;
+    }
+    // Large payload: explicit SIMD loop — 16 bytes per iteration
+    dst.reserve(n);
+    let dst_start = dst.len();
+    unsafe {
+        let src_ptr = src.as_ptr();
+        let dst_ptr = dst.as_mut_ptr().add(dst_start);
+        let mut i = 0usize;
+        // Process 16 bytes at a time with SIMD load+store
+        while i + LANES <= n {
+            let chunk = load(src_ptr.add(i));
+            store(dst_ptr.add(i), chunk);
+            i += LANES;
+        }
+        // Handle remainder with scalar copy
+        if i < n {
+            core::ptr::copy_nonoverlapping(src_ptr.add(i), dst_ptr.add(i), n - i);
+        }
+        dst.set_len(dst_start + n);
+    }
+}
+
+// ============================================================================
 // SIMD-accelerated integer formatting
 // ============================================================================
 
