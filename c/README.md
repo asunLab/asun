@@ -427,6 +427,98 @@ make -j$(nproc)
 ./bench              # ASON vs JSON comprehensive benchmark
 ```
 
+## ASON Binary Format
+
+ASON-BIN is a compact binary serialization format that shares the same schema as ASON text. It uses little-endian fixed-width encoding with no field names — purely positional — for maximum throughput.
+
+### Wire Format
+
+| Type       | Encoding                              |
+| ---------- | ------------------------------------- |
+| `bool`     | 1 byte (0 or 1)                       |
+| `i8/u8`    | 1 byte                                |
+| `i16/u16`  | 2 bytes LE                            |
+| `i32/u32`  | 4 bytes LE                            |
+| `i64/u64`  | 8 bytes LE                            |
+| `f32`      | 4 bytes LE                            |
+| `f64`      | 8 bytes LE                            |
+| `str`      | u32 length (LE) + UTF-8 bytes         |
+| `vec<T>`   | u32 count (LE) + N × element encoding |
+| struct     | fields encoded sequentially           |
+
+### API
+
+Add `ASON_FIELDS_BIN(StructType, nfields)` right after `ASON_FIELDS(...)` to inject four functions:
+
+```c
+#include "ason.h"
+
+typedef struct { ason_string_t name; int64_t age; double score; bool active; } User;
+
+ASON_FIELDS(User, 4,
+    ASON_FIELD(User, name,   "name",   str),
+    ASON_FIELD(User, age,    "age",    i64),
+    ASON_FIELD(User, score,  "score",  f64),
+    ASON_FIELD(User, active, "active", bool))
+
+ASON_FIELDS_BIN(User, 4)   /* injects: */
+/*
+ *  ason_buf_t  ason_dump_bin_User(const User*)
+ *  ason_buf_t  ason_dump_bin_vec_User(const User*, size_t count)
+ *  ason_err_t  ason_load_bin_User(const char* data, size_t len, User* out)
+ *  ason_err_t  ason_load_bin_vec_User(const char* data, size_t len,
+ *                                     User** out_arr, size_t* out_count)
+ */
+```
+
+#### Serialize
+
+```c
+User u = { .name = ason_string_from_len("Alice", 5), .age = 30,
+           .score = 95.5, .active = true };
+
+ason_buf_t buf = ason_dump_bin_User(&u);
+/* use buf.data / buf.len for network/file I/O */
+ason_buf_free(&buf);
+ason_string_free(&u.name);
+```
+
+#### Deserialize
+
+```c
+ason_err_t err = ason_load_bin_User(buf.data, buf.len, &u2);
+assert(err == ASON_OK);
+/* free heap strings when done */
+ason_string_free(&u2.name);
+```
+
+#### Batch (array of structs)
+
+```c
+/* serialize */
+ason_buf_t batch = ason_dump_bin_vec_User(users, count);
+
+/* deserialize */
+User* out = NULL;  size_t n = 0;
+ason_load_bin_vec_User(batch.data, batch.len, &out, &n);
+for (size_t i = 0; i < n; i++) ason_string_free(&out[i].name);
+free(out);
+ason_buf_free(&batch);
+```
+
+### Performance (macOS arm64 NEON, 100 iterations)
+
+| Benchmark             | JSON Ser   | BIN Ser    | Ser Ratio | JSON De    | BIN De     | De Ratio | Size Saving |
+| --------------------- | ---------- | ---------- | --------- | ---------- | ---------- | -------- | ----------- |
+| Flat struct ×100      | 2.07 ms    | 0.30 ms    | **6.97x** | 8.86 ms    | 1.79 ms    | **4.96x**| 38%         |
+| Flat struct ×1000     | 12.51 ms   | 2.31 ms    | **5.40x** | 58.84 ms   | 14.20 ms   | **4.14x**| 39%         |
+| Flat struct ×5000     | 64.04 ms   | 11.35 ms   | **5.64x** | 295.65 ms  | 67.99 ms   | **4.35x**| 39%         |
+| All-types ×100        | 1.41 ms    | 0.56 ms    | **2.51x** | 2.12 ms    | 1.72 ms    | **1.23x**| 31%         |
+| 5-level deep ×100     | 36.11 ms   | 26.11 ms   | **1.38x** | 114.91 ms  | 58.34 ms   | **1.97x**| 61%         |
+| Large payload ×10k    | 12.74 ms   | 2.22 ms    | **5.73x** | 58.11 ms   | 13.67 ms   | **4.25x**| 39%         |
+
+> BIN is fastest for flat/homogeneous payloads. Deep nested hierarchies (5-level) still see **~2× deserialize speedup** with **61% size reduction**.
+
 ## ASON Format Specification
 
 See the full [ASON Spec](https://github.com/athxx/ason/blob/main/docs/ASON_SPEC_CN.md) for syntax rules, BNF grammar, escape rules, type system, and LLM integration best practices.

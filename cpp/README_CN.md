@@ -382,6 +382,76 @@ make -j$(nproc)
 ./build/bench              # ASON vs JSON 全面性能对比
 ```
 
+## ASON 二进制格式
+
+ASON-BIN 是一种紧凑的二进制序列化格式，与 ASON 文本共享相同的 Schema。采用小端固定宽度编码，无字段名称，纯位置式编码，追求极致吞吐量。
+
+### 编码格式
+
+| 类型               | 编码方式                                  |
+| ------------------ | ----------------------------------------- |
+| `bool`             | 1 字节（0 或 1）                         |
+| `int8/16/32/64`    | 1/2/4/8 字节小端                          |
+| `float/double`     | 4/8 字节小端（IEEE 754 位转换）           |
+| `string`           | u32 长度（小端）+ UTF-8 字节             |
+| `string_view`      | 同上——load 结果直接指向源缓冲区（零拷贝）|
+| `vector<T>`        | u32 元素数（小端）+ N × 元素编码         |
+| 结构体             | 各字段顺序编码                            |
+
+### API 用法
+
+```cpp
+#include "ason.hpp"
+
+struct User {
+    std::string name;
+    int64_t     age    = 0;
+    double      score  = 0.0;
+    bool        active = false;
+};
+ASON_FIELDS(User,
+    (name,   "name",   "str"),
+    (age,    "age",    "int"),
+    (score,  "score",  "float"),
+    (active, "active", "bool"))
+
+// 序列化为二进制
+std::string bin = ason::dump_bin(user);
+
+// 反序列化
+User user2 = ason::load_bin<User>(bin);
+
+// 批量（结构体 vector）
+std::vector<User> users = { ... };
+std::string batch = ason::dump_bin(users);
+auto users2 = ason::load_bin<std::vector<User>>(batch);
+```
+
+#### 零拷贝反序列化
+
+使用 `std::string_view` 字段避免字符串堆分配：
+
+```cpp
+const char* pos = bin.data();
+const char* end = bin.data() + bin.size();
+std::string_view id_view, payload_view;
+int64_t seq = 0;
+ason::load_bin_value(pos, end, id_view);      // 零拷贝——指向 bin 缓冲区
+ason::load_bin_value(pos, end, seq);
+ason::load_bin_value(pos, end, payload_view);
+```
+
+### 性能测试（macOS arm64 NEON，100 次迭代）
+
+| 测试场景        | JSON 序列化 | BIN 序列化 | 序列化倍速    | JSON 反序列化 | BIN 反序列化 | 反序列化倍速  | 体积节省 |
+| --------------- | ----------- | ---------- | ------------- | ------------- | ------------ | ------------- | -------- |
+| 扁平结构 ×100   | 2.28 ms     | 0.58 ms    | **3.90x**     | 2.25 ms       | 0.24 ms      | **9.35x**     | 38%      |
+| 扁平结构 ×1000  | 17.72 ms    | 4.73 ms    | **3.75x**     | 18.92 ms      | 2.07 ms      | **9.14x**     | 39%      |
+| 全类型结构 ×100 | 2.12 ms     | 1.10 ms    | **1.93x**     | 3.17 ms       | 0.80 ms      | **3.96x**     | 27%      |
+| 五层嵌套 ×100   | 60.30 ms    | 16.27 ms   | **3.71x**     | 86.88 ms      | 10.10 ms     | **8.60x**     | 48%      |
+
+> 深层嵌套结构体收益最大：反序列化最高快 **9 倍**。同质数值数组通过 bulk `memcpy` 隐式利用 SIMD 加速。
+
 ## ASON 格式规范
 
 完整规范见 [ASON Spec](https://github.com/athxx/ason/blob/main/docs/ASON_SPEC_CN.md)，包含语法规则、BNF 语法、转义规则、类型系统和 LLM 集成最佳实践。

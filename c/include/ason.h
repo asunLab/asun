@@ -1230,6 +1230,200 @@ ason_err_t ason_load_struct(const char** pos, const char* end, void* obj, const 
       (ason_dump_fn)ason_dump_vec_struct_##ElemType, \
       (ason_load_fn)ason_load_vec_struct_##ElemType }
 
+/* ============================================================================
+ * Binary serialization / deserialization (ASON-BIN)
+ * Little-endian fixed-width encoding, zero-copy string_view for reads.
+ * ============================================================================
+ */
+
+/* Binary write helpers — append into ason_buf_t */
+ason_inline void ason_bin_write_u8(ason_buf_t* buf, uint8_t v) {
+    ason_buf_push(buf, (char)v);
+}
+ason_inline void ason_bin_write_u16(ason_buf_t* buf, uint16_t v) {
+    uint8_t tmp[2]; memcpy(tmp, &v, 2); ason_buf_append(buf, (char*)tmp, 2);
+}
+ason_inline void ason_bin_write_u32(ason_buf_t* buf, uint32_t v) {
+    uint8_t tmp[4]; memcpy(tmp, &v, 4); ason_buf_append(buf, (char*)tmp, 4);
+}
+ason_inline void ason_bin_write_u64(ason_buf_t* buf, uint64_t v) {
+    uint8_t tmp[8]; memcpy(tmp, &v, 8); ason_buf_append(buf, (char*)tmp, 8);
+}
+ason_inline void ason_bin_write_f32(ason_buf_t* buf, float v) {
+    uint32_t u; memcpy(&u, &v, 4); ason_bin_write_u32(buf, u);
+}
+ason_inline void ason_bin_write_f64(ason_buf_t* buf, double v) {
+    uint64_t u; memcpy(&u, &v, 8); ason_bin_write_u64(buf, u);
+}
+ason_inline void ason_bin_write_str(ason_buf_t* buf, const char* s, size_t len) {
+    ason_bin_write_u32(buf, (uint32_t)len);
+    ason_buf_append(buf, s, len);
+}
+ason_inline void ason_bin_write_ason_string(ason_buf_t* buf, const ason_string_t* s) {
+    if (s && s->data) {
+        ason_bin_write_str(buf, s->data, s->len);
+    } else {
+        ason_bin_write_u32(buf, 0);
+    }
+}
+
+/* Binary read helpers — reads from cursor, advances pos, zero-alloc for strings */
+ason_inline ason_err_t ason_bin_read_u8(const char** pos, const char* end, uint8_t* out) {
+    if (*pos + 1 > end) return ASON_ERR_BUFFER_OVERFLOW;
+    *out = (uint8_t)**pos; (*pos)++;
+    return ASON_OK;
+}
+ason_inline ason_err_t ason_bin_read_u16(const char** pos, const char* end, uint16_t* out) {
+    if (*pos + 2 > end) return ASON_ERR_BUFFER_OVERFLOW;
+    memcpy(out, *pos, 2); (*pos) += 2;
+    return ASON_OK;
+}
+ason_inline ason_err_t ason_bin_read_u32(const char** pos, const char* end, uint32_t* out) {
+    if (*pos + 4 > end) return ASON_ERR_BUFFER_OVERFLOW;
+    memcpy(out, *pos, 4); (*pos) += 4;
+    return ASON_OK;
+}
+ason_inline ason_err_t ason_bin_read_u64(const char** pos, const char* end, uint64_t* out) {
+    if (*pos + 8 > end) return ASON_ERR_BUFFER_OVERFLOW;
+    memcpy(out, *pos, 8); (*pos) += 8;
+    return ASON_OK;
+}
+ason_inline ason_err_t ason_bin_read_f32(const char** pos, const char* end, float* out) {
+    uint32_t u;
+    if (*pos + 4 > end) return ASON_ERR_BUFFER_OVERFLOW;
+    memcpy(&u, *pos, 4); (*pos) += 4;
+    memcpy(out, &u, 4);
+    return ASON_OK;
+}
+ason_inline ason_err_t ason_bin_read_f64(const char** pos, const char* end, double* out) {
+    uint64_t u;
+    if (*pos + 8 > end) return ASON_ERR_BUFFER_OVERFLOW;
+    memcpy(&u, *pos, 8); (*pos) += 8;
+    memcpy(out, &u, 8);
+    return ASON_OK;
+}
+/* Zero-copy: points directly into the source buffer — caller must keep source alive */
+ason_inline ason_err_t ason_bin_read_str_view(const char** pos, const char* end,
+                                               const char** out_data, size_t* out_len) {
+    uint32_t len;
+    if (*pos + 4 > end) return ASON_ERR_BUFFER_OVERFLOW;
+    memcpy(&len, *pos, 4); (*pos) += 4;
+    if (*pos + len > end) return ASON_ERR_BUFFER_OVERFLOW;
+    *out_data = *pos;
+    *out_len = len;
+    (*pos) += len;
+    return ASON_OK;
+}
+/* Heap-allocating variant — caller must free */
+ason_inline ason_err_t ason_bin_read_str_alloc(const char** pos, const char* end,
+                                                char** out) {
+    const char* d; size_t l;
+    ason_err_t e = ason_bin_read_str_view(pos, end, &d, &l);
+    if (e != ASON_OK) return e;
+    char* s = (char*)malloc(l + 1);
+    if (!s) return ASON_ERR_ALLOC;
+    memcpy(s, d, l); s[l] = '\0';
+    *out = s;
+    return ASON_OK;
+}
+/* Read into ason_string_t — zero-copy (points into source buffer) */
+ason_inline ason_err_t ason_bin_read_ason_string(const char** pos, const char* end,
+                                                  ason_string_t* out) {
+    const char* d; size_t l;
+    ason_err_t e = ason_bin_read_str_view(pos, end, &d, &l);
+    if (e != ASON_OK) return e;
+    out->data = (char*)(uintptr_t)d;   /* cast away const: zero-copy, caller keeps source alive */
+    out->len = l;
+    return ASON_OK;
+}
+
+/* Type-specific binary dump field helpers — same signature as ason_dump_fn */
+void ason_bin_dump_bool  (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_dump_i8    (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_dump_i16   (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_dump_i32   (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_dump_i64   (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_dump_u8    (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_dump_u16   (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_dump_u32   (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_dump_u64   (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_dump_f32   (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_dump_f64   (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_dump_str   (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_dump_vec_i64  (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_dump_vec_u64  (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_dump_vec_f64  (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_dump_vec_str  (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_dump_vec_bool (ason_buf_t* buf, const void* base, size_t off);
+
+ason_err_t ason_bin_load_bool  (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_load_i8    (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_load_i16   (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_load_i32   (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_load_i64   (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_load_u8    (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_load_u16   (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_load_u32   (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_load_u64   (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_load_f32   (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_load_f64   (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_load_str   (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_load_vec_i64  (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_load_vec_u64  (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_load_vec_f64  (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_load_vec_str  (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_load_vec_bool (const char** pos, const char* end, void* base, size_t off);
+
+/* Generic struct binary dump/load using the existing descriptor */
+void       ason_bin_dump_struct(ason_buf_t* buf, const void* obj, const ason_desc_t* desc);
+ason_err_t ason_bin_load_struct(const char** pos, const char* end, void* obj, const ason_desc_t* desc);
+
+/* Convenience binary-fn selectors (mirrors ASON_DUMP_FN / ASON_LOAD_FN) */
+#define ASON_BIN_DUMP_FN(t) ason_bin_dump_##t
+#define ASON_BIN_LOAD_FN(t) ason_bin_load_##t
+#define ason_bin_dump__Bool ason_bin_dump_bool
+#define ason_bin_load__Bool ason_bin_load_bool
+
+/* ASON_FIELDS_BIN adds binary dump/load to an already-declared ASON_FIELDS struct.
+ * Use after ASON_FIELDS to inject ason_dump_bin_<T>, ason_load_bin_<T>, etc. */
+#define ASON_FIELDS_BIN(StructType, nfields) \
+    static inline ason_buf_t ason_dump_bin_##StructType(const StructType* obj) { \
+        ason_buf_t buf = ason_buf_new(nfields * 16); \
+        ason_bin_dump_struct(&buf, obj, &StructType##_ason_desc); \
+        return buf; \
+    } \
+    static inline ason_buf_t ason_dump_bin_vec_##StructType(const StructType* arr, size_t count) { \
+        ason_buf_t buf = ason_buf_new(count * nfields * 16 + 8); \
+        uint32_t n = (uint32_t)count; \
+        ason_bin_write_u32(&buf, n); \
+        for (size_t i = 0; i < count; i++) { \
+            ason_bin_dump_struct(&buf, &arr[i], &StructType##_ason_desc); \
+        } \
+        return buf; \
+    } \
+    static inline ason_err_t ason_load_bin_##StructType(const char* data, size_t len, StructType* out) { \
+        const char* pos = data; \
+        const char* end = data + len; \
+        return ason_bin_load_struct(&pos, end, out, &StructType##_ason_desc); \
+    } \
+    static inline ason_err_t ason_load_bin_vec_##StructType(const char* data, size_t len, \
+                                                              StructType** out_arr, size_t* out_count) { \
+        const char* pos = data; \
+        const char* end = data + len; \
+        uint32_t count; \
+        ason_err_t err = ason_bin_read_u32(&pos, end, &count); \
+        if (err != ASON_OK) return err; \
+        StructType* arr = (StructType*)calloc(count, sizeof(StructType)); \
+        if (!arr) return ASON_ERR_ALLOC; \
+        for (uint32_t i = 0; i < count; i++) { \
+            err = ason_bin_load_struct(&pos, end, &arr[i], &StructType##_ason_desc); \
+            if (err != ASON_OK) { free(arr); return err; } \
+        } \
+        *out_arr = arr; \
+        *out_count = count; \
+        return ASON_OK; \
+    }
+
 #ifdef __cplusplus
 }
 #endif

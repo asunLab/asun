@@ -382,6 +382,83 @@ make -j$(nproc)
 ./bench              # ASON vs JSON comprehensive benchmark
 ```
 
+## ASON Binary Format
+
+ASON-BIN is a compact binary serialization format that shares the same schema as ASON text. It uses little-endian fixed-width encoding with no field names — purely positional — for maximum throughput.
+
+### Wire Format
+
+| Type            | Encoding                              |
+| --------------- | ------------------------------------- |
+| `bool`          | 1 byte (0 or 1)                       |
+| `int8/16/32/64` | 1/2/4/8 bytes LE                      |
+| `float/double`  | 4/8 bytes LE (IEEE 754 bit-cast)      |
+| `string`        | u32 length (LE) + UTF-8 bytes         |
+| `string_view`   | same — load points into source buffer |
+| `vector<T>`     | u32 count (LE) + N × element encoding |
+| struct          | fields encoded sequentially           |
+
+### API
+
+```cpp
+#include "ason.hpp"
+
+struct User {
+    std::string name;
+    int64_t     age    = 0;
+    double      score  = 0.0;
+    bool        active = false;
+};
+ASON_FIELDS(User,
+    (name,   "name",   "str"),
+    (age,    "age",    "int"),
+    (score,  "score",  "float"),
+    (active, "active", "bool"))
+
+// Serialize to binary
+std::string bin = ason::dump_bin(user);
+
+// Deserialize
+User user2 = ason::load_bin<User>(bin);
+
+// Batch (vector of structs)
+std::vector<User> users = { ... };
+std::string batch = ason::dump_bin(users);
+auto users2 = ason::load_bin<std::vector<User>>(batch);
+```
+
+#### Zero-Copy Deserialization
+
+Use `std::string_view` fields to avoid heap allocation for strings:
+
+```cpp
+struct Packet {
+    std::string_view id;
+    int64_t          seq = 0;
+    std::string_view payload;
+};
+// (ASON_FIELDS for parsing; for binary-only zero-copy use load_bin_value directly)
+
+const char* pos = bin.data();
+const char* end = bin.data() + bin.size();
+std::string_view id_view, payload_view;
+int64_t seq = 0;
+ason::load_bin_value(pos, end, id_view);      // zero-copy — points into `bin`
+ason::load_bin_value(pos, end, seq);
+ason::load_bin_value(pos, end, payload_view);
+```
+
+### Performance (macOS arm64 NEON, 100 iterations)
+
+| Benchmark             | JSON Ser   | BIN Ser    | Ser Ratio  | JSON De    | BIN De     | De Ratio  | Size Saving |
+| --------------------- | ---------- | ---------- | ---------- | ---------- | ---------- | --------- | ----------- |
+| Flat struct ×100      | 2.28 ms    | 0.58 ms    | **3.90x**  | 2.25 ms    | 0.24 ms    | **9.35x** | 38%         |
+| Flat struct ×1000     | 17.72 ms   | 4.73 ms    | **3.75x**  | 18.92 ms   | 2.07 ms    | **9.14x** | 39%         |
+| All-types ×100        | 2.12 ms    | 1.10 ms    | **1.93x**  | 3.17 ms    | 0.80 ms    | **3.96x** | 27%         |
+| 5-level deep ×100     | 60.30 ms   | 16.27 ms   | **3.71x**  | 86.88 ms   | 10.10 ms   | **8.60x** | 48%         |
+
+> Deep nested structs see the largest gains: up to **9× faster** deserialization. Trivial numeric arrays use bulk `memcpy` via SIMD implicitly.
+
 ## ASON Format Specification
 
 See the full [ASON Spec](https://github.com/athxx/ason/blob/main/docs/ASON_SPEC_CN.md) for syntax rules, BNF grammar, escape rules, type system, and LLM integration best practices.

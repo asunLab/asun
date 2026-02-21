@@ -742,3 +742,275 @@ ason_err_t ason_load_struct(const char** pos, const char* end, void* obj, const 
 
     return ASON_ERR_SYNTAX;
 }
+
+/* ===========================================================================
+ * ASON Binary Format Implementation
+ * Wire format: little-endian fixed-width, no field names, positional.
+ * Strings: u32 length prefix + bytes (no null terminator).
+ * Arrays: u32 count prefix + elements.
+ * Boolean: 1 byte (0 or 1).
+ * =========================================================================== */
+
+/* ---- scalar dump ---- */
+void ason_bin_dump_bool(ason_buf_t* buf, const void* base, size_t off) {
+    bool v; memcpy(&v, (const char*)base + off, sizeof(v));
+    ason_bin_write_u8(buf, v ? 1 : 0);
+}
+void ason_bin_dump_i8(ason_buf_t* buf, const void* base, size_t off) {
+    int8_t v; memcpy(&v, (const char*)base + off, 1);
+    ason_bin_write_u8(buf, (uint8_t)v);
+}
+void ason_bin_dump_i16(ason_buf_t* buf, const void* base, size_t off) {
+    int16_t v; memcpy(&v, (const char*)base + off, 2);
+    ason_bin_write_u16(buf, (uint16_t)v);
+}
+void ason_bin_dump_i32(ason_buf_t* buf, const void* base, size_t off) {
+    int32_t v; memcpy(&v, (const char*)base + off, 4);
+    ason_bin_write_u32(buf, (uint32_t)v);
+}
+void ason_bin_dump_i64(ason_buf_t* buf, const void* base, size_t off) {
+    int64_t v; memcpy(&v, (const char*)base + off, 8);
+    ason_bin_write_u64(buf, (uint64_t)v);
+}
+void ason_bin_dump_u8(ason_buf_t* buf, const void* base, size_t off) {
+    uint8_t v; memcpy(&v, (const char*)base + off, 1);
+    ason_bin_write_u8(buf, v);
+}
+void ason_bin_dump_u16(ason_buf_t* buf, const void* base, size_t off) {
+    uint16_t v; memcpy(&v, (const char*)base + off, 2);
+    ason_bin_write_u16(buf, v);
+}
+void ason_bin_dump_u32(ason_buf_t* buf, const void* base, size_t off) {
+    uint32_t v; memcpy(&v, (const char*)base + off, 4);
+    ason_bin_write_u32(buf, v);
+}
+void ason_bin_dump_u64(ason_buf_t* buf, const void* base, size_t off) {
+    uint64_t v; memcpy(&v, (const char*)base + off, 8);
+    ason_bin_write_u64(buf, v);
+}
+void ason_bin_dump_f32(ason_buf_t* buf, const void* base, size_t off) {
+    float v; memcpy(&v, (const char*)base + off, 4);
+    ason_bin_write_f32(buf, v);
+}
+void ason_bin_dump_f64(ason_buf_t* buf, const void* base, size_t off) {
+    double v; memcpy(&v, (const char*)base + off, 8);
+    ason_bin_write_f64(buf, v);
+}
+void ason_bin_dump_str(ason_buf_t* buf, const void* base, size_t off) {
+    ason_string_t s; memcpy(&s, (const char*)base + off, sizeof(s));
+    ason_bin_write_ason_string(buf, &s);
+}
+
+/* ---- vector dump ---- */
+void ason_bin_dump_vec_i64(ason_buf_t* buf, const void* base, size_t off) {
+    ason_vec_i64 v; memcpy(&v, (const char*)base + off, sizeof(v));
+    ason_bin_write_u32(buf, (uint32_t)v.len);
+    if (v.len) ason_buf_append(buf, (const char*)v.data, v.len * sizeof(int64_t));
+}
+void ason_bin_dump_vec_u64(ason_buf_t* buf, const void* base, size_t off) {
+    ason_vec_u64 v; memcpy(&v, (const char*)base + off, sizeof(v));
+    ason_bin_write_u32(buf, (uint32_t)v.len);
+    if (v.len) ason_buf_append(buf, (const char*)v.data, v.len * sizeof(uint64_t));
+}
+void ason_bin_dump_vec_f64(ason_buf_t* buf, const void* base, size_t off) {
+    ason_vec_f64 v; memcpy(&v, (const char*)base + off, sizeof(v));
+    ason_bin_write_u32(buf, (uint32_t)v.len);
+    if (v.len) ason_buf_append(buf, (const char*)v.data, v.len * sizeof(double));
+}
+void ason_bin_dump_vec_str(ason_buf_t* buf, const void* base, size_t off) {
+    ason_vec_str v; memcpy(&v, (const char*)base + off, sizeof(v));
+    ason_bin_write_u32(buf, (uint32_t)v.len);
+    for (size_t i = 0; i < v.len; i++) ason_bin_write_ason_string(buf, &v.data[i]);
+}
+void ason_bin_dump_vec_bool(ason_buf_t* buf, const void* base, size_t off) {
+    ason_vec_bool v; memcpy(&v, (const char*)base + off, sizeof(v));
+    ason_bin_write_u32(buf, (uint32_t)v.len);
+    for (size_t i = 0; i < v.len; i++) ason_bin_write_u8(buf, v.data[i] ? 1 : 0);
+}
+
+/* ---- scalar load ---- */
+ason_err_t ason_bin_load_bool(const char** pos, const char* end, void* base, size_t off) {
+    uint8_t v; ason_err_t e = ason_bin_read_u8(pos, end, &v);
+    if (e) return e;
+    bool b = v != 0; memcpy((char*)base + off, &b, sizeof(b)); return ASON_OK;
+}
+ason_err_t ason_bin_load_i8(const char** pos, const char* end, void* base, size_t off) {
+    uint8_t v; ason_err_t e = ason_bin_read_u8(pos, end, &v);
+    if (e) return e; memcpy((char*)base + off, &v, 1); return ASON_OK;
+}
+ason_err_t ason_bin_load_i16(const char** pos, const char* end, void* base, size_t off) {
+    uint16_t v; ason_err_t e = ason_bin_read_u16(pos, end, &v);
+    if (e) return e; memcpy((char*)base + off, &v, 2); return ASON_OK;
+}
+ason_err_t ason_bin_load_i32(const char** pos, const char* end, void* base, size_t off) {
+    uint32_t v; ason_err_t e = ason_bin_read_u32(pos, end, &v);
+    if (e) return e; memcpy((char*)base + off, &v, 4); return ASON_OK;
+}
+ason_err_t ason_bin_load_i64(const char** pos, const char* end, void* base, size_t off) {
+    uint64_t v; ason_err_t e = ason_bin_read_u64(pos, end, &v);
+    if (e) return e; memcpy((char*)base + off, &v, 8); return ASON_OK;
+}
+ason_err_t ason_bin_load_u8(const char** pos, const char* end, void* base, size_t off) {
+    uint8_t v; ason_err_t e = ason_bin_read_u8(pos, end, &v);
+    if (e) return e; memcpy((char*)base + off, &v, 1); return ASON_OK;
+}
+ason_err_t ason_bin_load_u16(const char** pos, const char* end, void* base, size_t off) {
+    uint16_t v; ason_err_t e = ason_bin_read_u16(pos, end, &v);
+    if (e) return e; memcpy((char*)base + off, &v, 2); return ASON_OK;
+}
+ason_err_t ason_bin_load_u32(const char** pos, const char* end, void* base, size_t off) {
+    uint32_t v; ason_err_t e = ason_bin_read_u32(pos, end, &v);
+    if (e) return e; memcpy((char*)base + off, &v, 4); return ASON_OK;
+}
+ason_err_t ason_bin_load_u64(const char** pos, const char* end, void* base, size_t off) {
+    uint64_t v; ason_err_t e = ason_bin_read_u64(pos, end, &v);
+    if (e) return e; memcpy((char*)base + off, &v, 8); return ASON_OK;
+}
+ason_err_t ason_bin_load_f32(const char** pos, const char* end, void* base, size_t off) {
+    float v; ason_err_t e = ason_bin_read_f32(pos, end, &v);
+    if (e) return e; memcpy((char*)base + off, &v, 4); return ASON_OK;
+}
+ason_err_t ason_bin_load_f64(const char** pos, const char* end, void* base, size_t off) {
+    double v; ason_err_t e = ason_bin_read_f64(pos, end, &v);
+    if (e) return e; memcpy((char*)base + off, &v, 8); return ASON_OK;
+}
+ason_err_t ason_bin_load_str(const char** pos, const char* end, void* base, size_t off) {
+    uint32_t len;
+    ason_err_t e = ason_bin_read_u32(pos, end, &len);
+    if (e) return e;
+    if ((size_t)(end - *pos) < len) return ASON_ERR_BUFFER_OVERFLOW;
+    char* buf = (char*)malloc(len + 1);
+    if (!buf) return ASON_ERR_ALLOC;
+    if (len) memcpy(buf, *pos, len);
+    buf[len] = '\0';
+    *pos += len;
+    ason_string_t s = {buf, len};
+    memcpy((char*)base + off, &s, sizeof(s));
+    return ASON_OK;
+}
+
+/* ---- vector load ---- */
+ason_err_t ason_bin_load_vec_i64(const char** pos, const char* end, void* base, size_t off) {
+    uint32_t n; ason_err_t e = ason_bin_read_u32(pos, end, &n); if (e) return e;
+    if ((size_t)(end - *pos) < (size_t)n * 8) return ASON_ERR_BUFFER_OVERFLOW;
+    int64_t* arr = (int64_t*)malloc((size_t)n * sizeof(int64_t));
+    if (!arr && n) return ASON_ERR_ALLOC;
+    memcpy(arr, *pos, (size_t)n * 8); *pos += (size_t)n * 8;
+    ason_vec_i64 v = {arr, n, n}; memcpy((char*)base + off, &v, sizeof(v)); return ASON_OK;
+}
+ason_err_t ason_bin_load_vec_u64(const char** pos, const char* end, void* base, size_t off) {
+    uint32_t n; ason_err_t e = ason_bin_read_u32(pos, end, &n); if (e) return e;
+    if ((size_t)(end - *pos) < (size_t)n * 8) return ASON_ERR_BUFFER_OVERFLOW;
+    uint64_t* arr = (uint64_t*)malloc((size_t)n * sizeof(uint64_t));
+    if (!arr && n) return ASON_ERR_ALLOC;
+    memcpy(arr, *pos, (size_t)n * 8); *pos += (size_t)n * 8;
+    ason_vec_u64 v = {arr, n, n}; memcpy((char*)base + off, &v, sizeof(v)); return ASON_OK;
+}
+ason_err_t ason_bin_load_vec_f64(const char** pos, const char* end, void* base, size_t off) {
+    uint32_t n; ason_err_t e = ason_bin_read_u32(pos, end, &n); if (e) return e;
+    if ((size_t)(end - *pos) < (size_t)n * 8) return ASON_ERR_BUFFER_OVERFLOW;
+    double* arr = (double*)malloc((size_t)n * sizeof(double));
+    if (!arr && n) return ASON_ERR_ALLOC;
+    memcpy(arr, *pos, (size_t)n * 8); *pos += (size_t)n * 8;
+    ason_vec_f64 v = {arr, n, n}; memcpy((char*)base + off, &v, sizeof(v)); return ASON_OK;
+}
+ason_err_t ason_bin_load_vec_str(const char** pos, const char* end, void* base, size_t off) {
+    uint32_t n; ason_err_t e = ason_bin_read_u32(pos, end, &n); if (e) return e;
+    ason_string_t* arr = (ason_string_t*)malloc((size_t)n * sizeof(ason_string_t));
+    if (!arr && n) return ASON_ERR_ALLOC;
+    for (uint32_t i = 0; i < n; i++) {
+        uint32_t slen;
+        e = ason_bin_read_u32(pos, end, &slen); if (e) { free(arr); return e; }
+        if ((size_t)(end - *pos) < slen) { free(arr); return ASON_ERR_BUFFER_OVERFLOW; }
+        char* sbuf = (char*)malloc(slen + 1);
+        if (!sbuf && slen) { free(arr); return ASON_ERR_ALLOC; }
+        if (slen) memcpy(sbuf, *pos, slen);
+        if (sbuf) sbuf[slen] = '\0';
+        *pos += slen;
+        arr[i].data = sbuf ? sbuf : (char*)"";
+        arr[i].len  = slen;
+    }
+    ason_vec_str v = {arr, n, n}; memcpy((char*)base + off, &v, sizeof(v)); return ASON_OK;
+}
+ason_err_t ason_bin_load_vec_bool(const char** pos, const char* end, void* base, size_t off) {
+    uint32_t n; ason_err_t e = ason_bin_read_u32(pos, end, &n); if (e) return e;
+    bool* arr = (bool*)malloc((size_t)n * sizeof(bool));
+    if (!arr && n) return ASON_ERR_ALLOC;
+    for (uint32_t i = 0; i < n; i++) {
+        uint8_t b; e = ason_bin_read_u8(pos, end, &b); if (e) { free(arr); return e; }
+        arr[i] = b != 0;
+    }
+    ason_vec_bool v = {arr, n, n}; memcpy((char*)base + off, &v, sizeof(v)); return ASON_OK;
+}
+
+/* ---- type dispatch ---- */
+static void ason_bin_select_dump(ason_buf_t* buf, const ason_field_t* f, const void* base) {
+    switch (f->type) {
+        case ASON_BOOL:       ason_bin_dump_bool    (buf, base, f->offset); break;
+        case ASON_I8:         ason_bin_dump_i8      (buf, base, f->offset); break;
+        case ASON_I16:        ason_bin_dump_i16     (buf, base, f->offset); break;
+        case ASON_I32:        ason_bin_dump_i32     (buf, base, f->offset); break;
+        case ASON_I64:        ason_bin_dump_i64     (buf, base, f->offset); break;
+        case ASON_U8:         ason_bin_dump_u8      (buf, base, f->offset); break;
+        case ASON_U16:        ason_bin_dump_u16     (buf, base, f->offset); break;
+        case ASON_U32:        ason_bin_dump_u32     (buf, base, f->offset); break;
+        case ASON_U64:        ason_bin_dump_u64     (buf, base, f->offset); break;
+        case ASON_F32:        ason_bin_dump_f32     (buf, base, f->offset); break;
+        case ASON_F64:        ason_bin_dump_f64     (buf, base, f->offset); break;
+        case ASON_STR:        ason_bin_dump_str     (buf, base, f->offset); break;
+        case ASON_VEC_I64:    ason_bin_dump_vec_i64 (buf, base, f->offset); break;
+        case ASON_VEC_U64:    ason_bin_dump_vec_u64 (buf, base, f->offset); break;
+        case ASON_VEC_F64:    ason_bin_dump_vec_f64 (buf, base, f->offset); break;
+        case ASON_VEC_STR:    ason_bin_dump_vec_str (buf, base, f->offset); break;
+        case ASON_VEC_BOOL:   ason_bin_dump_vec_bool(buf, base, f->offset); break;
+        case ASON_STRUCT:
+            if (f->dump_fn) f->dump_fn(buf, base, f->offset);
+            else ason_bin_dump_struct(buf, (const char*)base + f->offset,
+                                      (const ason_desc_t*)f->sub_desc);
+            break;
+        default: break;
+    }
+}
+
+static ason_err_t ason_bin_select_load(const char** pos, const char* end,
+                                        const ason_field_t* f, void* base) {
+    switch (f->type) {
+        case ASON_BOOL:       return ason_bin_load_bool    (pos, end, base, f->offset);
+        case ASON_I8:         return ason_bin_load_i8      (pos, end, base, f->offset);
+        case ASON_I16:        return ason_bin_load_i16     (pos, end, base, f->offset);
+        case ASON_I32:        return ason_bin_load_i32     (pos, end, base, f->offset);
+        case ASON_I64:        return ason_bin_load_i64     (pos, end, base, f->offset);
+        case ASON_U8:         return ason_bin_load_u8      (pos, end, base, f->offset);
+        case ASON_U16:        return ason_bin_load_u16     (pos, end, base, f->offset);
+        case ASON_U32:        return ason_bin_load_u32     (pos, end, base, f->offset);
+        case ASON_U64:        return ason_bin_load_u64     (pos, end, base, f->offset);
+        case ASON_F32:        return ason_bin_load_f32     (pos, end, base, f->offset);
+        case ASON_F64:        return ason_bin_load_f64     (pos, end, base, f->offset);
+        case ASON_STR:        return ason_bin_load_str     (pos, end, base, f->offset);
+        case ASON_VEC_I64:    return ason_bin_load_vec_i64 (pos, end, base, f->offset);
+        case ASON_VEC_U64:    return ason_bin_load_vec_u64 (pos, end, base, f->offset);
+        case ASON_VEC_F64:    return ason_bin_load_vec_f64 (pos, end, base, f->offset);
+        case ASON_VEC_STR:    return ason_bin_load_vec_str (pos, end, base, f->offset);
+        case ASON_VEC_BOOL:   return ason_bin_load_vec_bool(pos, end, base, f->offset);
+        case ASON_STRUCT:
+            if (f->load_fn) return f->load_fn(pos, end, base, f->offset);
+            return ason_bin_load_struct(pos, end, (char*)base + f->offset,
+                                        (const ason_desc_t*)f->sub_desc);
+        default: return ASON_OK;
+    }
+}
+
+/* ---- struct dump / load ---- */
+void ason_bin_dump_struct(ason_buf_t* buf, const void* obj, const ason_desc_t* desc) {
+    for (int i = 0; i < desc->field_count; i++)
+        ason_bin_select_dump(buf, &desc->fields[i], obj);
+}
+
+ason_err_t ason_bin_load_struct(const char** pos, const char* end,
+                                  void* obj, const ason_desc_t* desc) {
+    for (int i = 0; i < desc->field_count; i++) {
+        ason_err_t e = ason_bin_select_load(pos, end, &desc->fields[i], obj);
+        if (e != ASON_OK) return e;
+    }
+    return ASON_OK;
+}

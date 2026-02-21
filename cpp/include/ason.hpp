@@ -435,6 +435,14 @@ template <typename T>
 std::enable_if_t<AsonFields<T>::defined, void>
 load_value(const char*& pos, const char* end, T& out);
 
+template <typename T>
+std::enable_if_t<AsonFields<T>::defined, void>
+dump_bin_value(std::string& buf, const T& v);
+
+template <typename T>
+std::enable_if_t<AsonFields<T>::defined, void>
+load_bin_value(const char*& pos, const char* end, T& out);
+
 // ============================================================================
 // dump_value specializations
 // ============================================================================
@@ -1002,6 +1010,149 @@ load_value(const char*& pos, const char* end, T& out) {
 }
 
 // ============================================================================
+// Binary dump_bin_value / load_bin_value specializations
+// ============================================================================
+
+template <typename T>
+inline std::enable_if_t<std::is_arithmetic_v<T>, void>
+dump_bin_value(std::string& buf, const T& v) {
+    if constexpr (std::is_same_v<T, bool>) {
+        buf.push_back(v ? 1 : 0);
+    } else {
+        buf.append(reinterpret_cast<const char*>(&v), sizeof(T));
+    }
+}
+
+template <typename T>
+inline std::enable_if_t<std::is_arithmetic_v<T>, void>
+load_bin_value(const char*& pos, const char* end, T& out) {
+    if constexpr (std::is_same_v<T, bool>) {
+        out = (*pos != 0);
+        pos += 1;
+    } else {
+        std::memcpy(&out, pos, sizeof(T));
+        pos += sizeof(T);
+    }
+}
+
+inline void dump_bin_value(std::string& buf, const std::string& v) {
+    uint32_t len = v.size();
+    buf.append(reinterpret_cast<const char*>(&len), 4);
+    buf.append(v);
+}
+
+inline void dump_bin_value(std::string& buf, std::string_view v) {
+    uint32_t len = v.size();
+    buf.append(reinterpret_cast<const char*>(&len), 4);
+    buf.append(v);
+}
+
+inline void load_bin_value(const char*& pos, const char* end, std::string& out) {
+    uint32_t len;
+    std::memcpy(&len, pos, 4);
+    pos += 4;
+    out.assign(pos, len);
+    pos += len;
+}
+
+inline void load_bin_value(const char*& pos, const char* end, std::string_view& out) {
+    uint32_t len;
+    std::memcpy(&len, pos, 4);
+    pos += 4;
+    out = std::string_view(pos, len);
+    pos += len;
+}
+
+template <typename T>
+inline void dump_bin_value(std::string& buf, const std::vector<T>& v) {
+    uint32_t len = v.size();
+    buf.append(reinterpret_cast<const char*>(&len), 4);
+    if constexpr (std::is_arithmetic_v<T> && !std::is_same_v<T, bool>) {
+        buf.append(reinterpret_cast<const char*>(v.data()), len * sizeof(T));
+    } else {
+        for (const auto& item : v) {
+            dump_bin_value(buf, item);
+        }
+    }
+}
+
+template <typename T>
+inline void load_bin_value(const char*& pos, const char* end, std::vector<T>& out) {
+    uint32_t len;
+    std::memcpy(&len, pos, 4);
+    pos += 4;
+    out.resize(len);
+    if constexpr (std::is_arithmetic_v<T> && !std::is_same_v<T, bool>) {
+        std::memcpy(out.data(), pos, len * sizeof(T));
+        pos += len * sizeof(T);
+    } else {
+        for (uint32_t i = 0; i < len; i++) {
+            load_bin_value(pos, end, out[i]);
+        }
+    }
+}
+
+template <typename T>
+inline void dump_bin_value(std::string& buf, const std::optional<T>& v) {
+    if (v.has_value()) {
+        buf.push_back(1);
+        dump_bin_value(buf, *v);
+    } else {
+        buf.push_back(0);
+    }
+}
+
+template <typename T>
+inline void load_bin_value(const char*& pos, const char* end, std::optional<T>& out) {
+    uint8_t has_val = *pos++;
+    if (has_val) {
+        T inner{};
+        load_bin_value(pos, end, inner);
+        out = std::move(inner);
+    } else {
+        out = std::nullopt;
+    }
+}
+
+template <typename K, typename V>
+inline void dump_bin_value(std::string& buf, const std::unordered_map<K, V>& m) {
+    uint32_t len = m.size();
+    buf.append(reinterpret_cast<const char*>(&len), 4);
+    for (const auto& [k, v] : m) {
+        dump_bin_value(buf, k);
+        dump_bin_value(buf, v);
+    }
+}
+
+template <typename K, typename V>
+inline void load_bin_value(const char*& pos, const char* end, std::unordered_map<K, V>& out) {
+    uint32_t len;
+    std::memcpy(&len, pos, 4);
+    pos += 4;
+    out.clear();
+    out.reserve(len);
+    for (uint32_t i = 0; i < len; i++) {
+        K k;
+        load_bin_value(pos, end, k);
+        V v;
+        load_bin_value(pos, end, v);
+        out.emplace(std::move(k), std::move(v));
+    }
+}
+
+template <typename T>
+inline std::enable_if_t<AsonFields<T>::defined, void>
+dump_bin_value(std::string& buf, const T& v) {
+    AsonFields<T>::dump_bin_fields(buf, v);
+}
+
+template <typename T>
+inline std::enable_if_t<AsonFields<T>::defined, void>
+load_bin_value(const char*& pos, const char* end, T& out) {
+    AsonFields<T>::load_bin_fields(pos, end, out);
+}
+
+// ============================================================================
 // Public API
 // ============================================================================
 
@@ -1166,6 +1317,25 @@ std::vector<T> load_vec(std::string_view input) {
     return result;
 }
 
+// dump_bin: struct -> ASON-BIN string
+template <typename T>
+std::string dump_bin(const T& v) {
+    std::string buf;
+    buf.reserve(256);
+    dump_bin_value(buf, v);
+    return buf;
+}
+
+// load_bin: ASON-BIN string -> struct
+template <typename T>
+T load_bin(std::string_view input) {
+    T result{};
+    const char* pos = input.data();
+    const char* end = pos + input.size();
+    load_bin_value(pos, end, result);
+    return result;
+}
+
 // ============================================================================
 // ASON_FIELDS macro — reflection for structs
 // ============================================================================
@@ -1197,9 +1367,17 @@ std::vector<T> load_vec(std::string_view input) {
 #define ASON_DUMP_ITEM_1(idx, f) \
     if (idx > 0) buf.push_back(','); ::ason::dump_value(buf, v.ASON_FIELD_MEMBER f);
 
+// Per-field binary dump
+#define ASON_DUMP_BIN_ITEM_1(idx, f) \
+    ::ason::dump_bin_value(buf, v.ASON_FIELD_MEMBER f);
+
 // Per-field load dispatch
 #define ASON_LOAD_CASE_1(idx, f) \
     case idx: ::ason::load_value(pos, end, out.ASON_FIELD_MEMBER f); break;
+
+// Per-field binary load
+#define ASON_LOAD_BIN_ITEM_1(idx, f) \
+    ::ason::load_bin_value(pos, end, out.ASON_FIELD_MEMBER f);
 
 // Per-field name match
 #define ASON_FIELDMAP_1(idx, f) \
@@ -1252,6 +1430,9 @@ std::vector<T> load_vec(std::string_view input) {
         static void dump_fields(std::string& buf, const Self& v) { \
             ASON_FOR_EACH(ASON_DUMP_ITEM_1, __VA_ARGS__) \
         } \
+        static void dump_bin_fields(std::string& buf, const Self& v) { \
+            ASON_FOR_EACH(ASON_DUMP_BIN_ITEM_1, __VA_ARGS__) \
+        } \
         static int find_field(std::string_view name) { \
             ASON_FOR_EACH(ASON_FIELDMAP_1, __VA_ARGS__) \
             return -1; \
@@ -1265,6 +1446,9 @@ std::vector<T> load_vec(std::string_view input) {
                 ASON_FOR_EACH(ASON_LOAD_CASE_1, __VA_ARGS__) \
                 default: ::ason::detail::skip_value(pos, end); break; \
             } \
+        } \
+        static void load_bin_fields(const char*& pos, const char* end, Self& out) { \
+            ASON_FOR_EACH(ASON_LOAD_BIN_ITEM_1, __VA_ARGS__) \
         } \
     };
 

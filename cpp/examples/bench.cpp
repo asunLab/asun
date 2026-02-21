@@ -505,29 +505,36 @@ struct BenchResult {
     std::string name;
     double json_ser_ms = 0;
     double ason_ser_ms = 0;
+    double ason_bin_ser_ms = 0;
     double json_de_ms = 0;
     double ason_de_ms = 0;
+    double ason_bin_de_ms = 0;
     size_t json_bytes = 0;
     size_t ason_bytes = 0;
+    size_t ason_bin_bytes = 0;
 
     void print() const {
         double ser_ratio = json_ser_ms / ason_ser_ms;
         double de_ratio = json_de_ms / ason_de_ms;
+        double bin_ser_ratio = json_ser_ms / ason_bin_ser_ms;
+        double bin_de_ratio = json_de_ms / ason_bin_de_ms;
         double saving = (1.0 - (double)ason_bytes / (double)json_bytes) * 100.0;
+        double bin_saving = (1.0 - (double)ason_bin_bytes / (double)json_bytes) * 100.0;
 
         std::cout << "  " << name << "\n";
         std::cout << std::fixed << std::setprecision(2);
         std::cout << "    Serialize:   JSON " << std::setw(8) << json_ser_ms
                   << "ms | ASON " << std::setw(8) << ason_ser_ms
-                  << "ms | ratio " << ser_ratio << "x"
-                  << (ser_ratio >= 1.0 ? " ✓ ASON faster" : "") << "\n";
+                  << "ms | BIN " << std::setw(8) << ason_bin_ser_ms
+                  << "ms | ratio " << bin_ser_ratio << "x\n";
         std::cout << "    Deserialize: JSON " << std::setw(8) << json_de_ms
                   << "ms | ASON " << std::setw(8) << ason_de_ms
-                  << "ms | ratio " << de_ratio << "x"
-                  << (de_ratio >= 1.0 ? " ✓ ASON faster" : "") << "\n";
+                  << "ms | BIN " << std::setw(8) << ason_bin_de_ms
+                  << "ms | ratio " << bin_de_ratio << "x\n";
         std::cout << "    Size:        JSON " << std::setw(8) << json_bytes
                   << " B | ASON " << std::setw(8) << ason_bytes
-                  << " B | saving " << std::setprecision(0) << saving << "%\n";
+                  << " B | BIN " << std::setw(8) << ason_bin_bytes
+                  << " B | saving " << std::setprecision(0) << bin_saving << "%\n";
     }
 };
 
@@ -558,6 +565,12 @@ BenchResult bench_flat(size_t count, int iterations) {
     for (int i = 0; i < iterations; i++) ason_str = ason::dump_vec(users);
     double ason_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
+    // ASON-BIN serialize
+    std::string ason_bin_str;
+    t0 = Clock::now();
+    for (int i = 0; i < iterations; i++) ason_bin_str = ason::dump_bin(users);
+    double ason_bin_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+
     // JSON deserialize
     t0 = Clock::now();
     for (int i = 0; i < iterations; i++) {
@@ -574,6 +587,14 @@ BenchResult bench_flat(size_t count, int iterations) {
     }
     double ason_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
+    // ASON-BIN deserialize
+    t0 = Clock::now();
+    for (int i = 0; i < iterations; i++) {
+        auto r = ason::load_bin<std::vector<User>>(ason_bin_str);
+        assert(r.size() == count);
+    }
+    double ason_bin_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+
     // Verify
     auto decoded = ason::load_vec<User>(ason_str);
     assert(decoded.size() == count);
@@ -581,8 +602,8 @@ BenchResult bench_flat(size_t count, int iterations) {
 
     return BenchResult{
         "Flat struct × " + std::to_string(count) + " (8 fields)",
-        json_ser, ason_ser, json_de, ason_de,
-        json_str.size(), ason_str.size()
+        json_ser, ason_ser, ason_bin_ser, json_de, ason_de, ason_bin_de,
+        json_str.size(), ason_str.size(), ason_bin_str.size()
     };
 }
 
@@ -626,6 +647,16 @@ BenchResult bench_all_types(size_t count, int iterations) {
     }
     double ason_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
+    // ASON-BIN serialize individually
+    std::vector<std::string> ason_bin_strs;
+    t0 = Clock::now();
+    for (int iter = 0; iter < iterations; iter++) {
+        ason_bin_strs.clear();
+        ason_bin_strs.reserve(items.size());
+        for (auto& item : items) ason_bin_strs.push_back(ason::dump_bin(item));
+    }
+    double ason_bin_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+
     // JSON deserialize: skip (mini JSON doesn't support AllTypes)
     double json_de = json_ser * 1.5; // estimate
 
@@ -639,13 +670,25 @@ BenchResult bench_all_types(size_t count, int iterations) {
     }
     double ason_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
+    // ASON-BIN deserialize
+    t0 = Clock::now();
+    for (int iter = 0; iter < iterations; iter++) {
+        for (auto& s : ason_bin_strs) {
+            auto r = ason::load_bin<AllTypes>(s);
+            (void)r;
+        }
+    }
+    double ason_bin_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+
     size_t ason_total = 0;
     for (auto& s : ason_strs) ason_total += s.size();
+    size_t ason_bin_total = 0;
+    for (auto& s : ason_bin_strs) ason_bin_total += s.size();
 
     return BenchResult{
         "All-types struct × " + std::to_string(count) + " (16 fields, per-struct)",
-        json_ser, ason_ser, json_de, ason_de,
-        json_str.size(), ason_total
+        json_ser, ason_ser, ason_bin_ser, json_de, ason_de, ason_bin_de,
+        json_str.size(), ason_total, ason_bin_total
     };
 }
 
@@ -728,6 +771,16 @@ BenchResult bench_deep(size_t count, int iterations) {
     }
     double ason_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
+    // ASON-BIN serialize
+    std::vector<std::string> ason_bin_strs;
+    t0 = Clock::now();
+    for (int iter = 0; iter < iterations; iter++) {
+        ason_bin_strs.clear();
+        ason_bin_strs.reserve(companies.size());
+        for (auto& c : companies) ason_bin_strs.push_back(ason::dump_bin(c));
+    }
+    double ason_bin_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+
     // JSON deserialize
     t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
@@ -746,6 +799,16 @@ BenchResult bench_deep(size_t count, int iterations) {
     }
     double ason_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
+    // ASON-BIN deserialize
+    t0 = Clock::now();
+    for (int iter = 0; iter < iterations; iter++) {
+        for (auto& s : ason_bin_strs) {
+            auto c = ason::load_bin<Company>(s);
+            (void)c;
+        }
+    }
+    double ason_bin_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+
     // Verify
     for (size_t i = 0; i < ason_strs.size(); i++) {
         auto c2 = ason::load<Company>(ason_strs[i]);
@@ -754,11 +817,13 @@ BenchResult bench_deep(size_t count, int iterations) {
 
     size_t ason_total = 0;
     for (auto& s : ason_strs) ason_total += s.size();
+    size_t ason_bin_total = 0;
+    for (auto& s : ason_bin_strs) ason_bin_total += s.size();
 
     return BenchResult{
         "5-level deep × " + std::to_string(count) + " (Company>Division>Team>Project>Task)",
-        json_ser, ason_ser, json_de, ason_de,
-        json_str.size(), ason_total
+        json_ser, ason_ser, ason_bin_ser, json_de, ason_de, ason_bin_de,
+        json_str.size(), ason_total, ason_bin_total
     };
 }
 

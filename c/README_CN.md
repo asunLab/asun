@@ -444,6 +444,98 @@ make -j$(nproc)
 | 空字符串 | —                           | `""`                |
 | 注释     | —                           | `/* ... */`         |
 
+## ASON 二进制格式
+
+ASON-BIN 是一种紧凑的二进制序列化格式，与 ASON 文本共享相同的 Schema。采用小端固定宽度编码，无字段名称，纯位置式编码，追求极致吞吐量。
+
+### 编码格式
+
+| 类型       | 编码方式                              |
+| ---------- | ------------------------------------- |
+| `bool`     | 1 字节（0 或 1）                     |
+| `i8/u8`    | 1 字节                                |
+| `i16/u16`  | 2 字节小端                            |
+| `i32/u32`  | 4 字节小端                            |
+| `i64/u64`  | 8 字节小端                            |
+| `f32`      | 4 字节小端                            |
+| `f64`      | 8 字节小端                            |
+| `str`      | u32 长度（小端）+ UTF-8 字节          |
+| `vec<T>`   | u32 元素数（小端）+ N × 元素编码     |
+| 结构体     | 各字段顺序编码                        |
+
+### API 用法
+
+在 `ASON_FIELDS(...)` 之后紧接 `ASON_FIELDS_BIN(结构体类型, 字段数)` 即可自动注入四个函数：
+
+```c
+#include "ason.h"
+
+typedef struct { ason_string_t name; int64_t age; double score; bool active; } User;
+
+ASON_FIELDS(User, 4,
+    ASON_FIELD(User, name,   "name",   str),
+    ASON_FIELD(User, age,    "age",    i64),
+    ASON_FIELD(User, score,  "score",  f64),
+    ASON_FIELD(User, active, "active", bool))
+
+ASON_FIELDS_BIN(User, 4)   /* 自动注入：*/
+/*
+ *  ason_buf_t  ason_dump_bin_User(const User*)
+ *  ason_buf_t  ason_dump_bin_vec_User(const User*, size_t count)
+ *  ason_err_t  ason_load_bin_User(const char* data, size_t len, User* out)
+ *  ason_err_t  ason_load_bin_vec_User(const char* data, size_t len,
+ *                                     User** out_arr, size_t* out_count)
+ */
+```
+
+#### 序列化
+
+```c
+User u = { .name = ason_string_from_len("Alice", 5), .age = 30,
+           .score = 95.5, .active = true };
+
+ason_buf_t buf = ason_dump_bin_User(&u);
+/* 使用 buf.data / buf.len 进行网络/文件 I/O */
+ason_buf_free(&buf);
+ason_string_free(&u.name);
+```
+
+#### 反序列化
+
+```c
+ason_err_t err = ason_load_bin_User(buf.data, buf.len, &u2);
+assert(err == ASON_OK);
+/* 使用完毕后释放堆字符串 */
+ason_string_free(&u2.name);
+```
+
+#### 批量（结构体数组）
+
+```c
+/* 序列化 */
+ason_buf_t batch = ason_dump_bin_vec_User(users, count);
+
+/* 反序列化 */
+User* out = NULL;  size_t n = 0;
+ason_load_bin_vec_User(batch.data, batch.len, &out, &n);
+for (size_t i = 0; i < n; i++) ason_string_free(&out[i].name);
+free(out);
+ason_buf_free(&batch);
+```
+
+### 性能测试（macOS arm64 NEON，100 次迭代）
+
+| 测试场景            | JSON 序列化 | BIN 序列化  | 序列化倍速    | JSON 反序列化 | BIN 反序列化 | 反序列化倍速  | 体积节省 |
+| ------------------- | ----------- | ----------- | ------------- | ------------- | ------------ | ------------- | -------- |
+| 扁平结构 ×100       | 2.07 ms     | 0.30 ms     | **6.97x**     | 8.86 ms       | 1.79 ms      | **4.96x**     | 38%      |
+| 扁平结构 ×1000      | 12.51 ms    | 2.31 ms     | **5.40x**     | 58.84 ms      | 14.20 ms     | **4.14x**     | 39%      |
+| 扁平结构 ×5000      | 64.04 ms    | 11.35 ms    | **5.64x**     | 295.65 ms     | 67.99 ms     | **4.35x**     | 39%      |
+| 全类型结构 ×100     | 1.41 ms     | 0.56 ms     | **2.51x**     | 2.12 ms       | 1.72 ms      | **1.23x**     | 31%      |
+| 五层嵌套 ×100       | 36.11 ms    | 26.11 ms    | **1.38x**     | 114.91 ms     | 58.34 ms     | **1.97x**     | 61%      |
+| 大数据量 ×10000     | 12.74 ms    | 2.22 ms     | **5.73x**     | 58.11 ms      | 13.67 ms     | **4.25x**     | 39%      |
+
+> BIN 格式对扁平/同构载荷最快。即使是五层深度嵌套结构，反序列化仍快 **约 2 倍**，体积减少 **61%**。
+
 ## 许可证
 
 MIT
