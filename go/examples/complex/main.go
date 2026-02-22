@@ -175,19 +175,19 @@ func main() {
 	// 1. Nested struct
 	fmt.Println("1. Nested struct:")
 	var emp Employee
-	if err := ason.Unmarshal([]byte("{id,name,dept:{title},skills,active}:(1,Alice,(Manager),[rust],true)"), &emp); err != nil {
+	if err := ason.Decode([]byte("{id,name,dept:{title},skills,active}:(1,Alice,(Manager),[rust],true)"), &emp); err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("   %+v\n\n", emp)
 
 	// 2. Vec with nested structs
 	fmt.Println("2. Vec with nested structs:")
-	input2 := []byte(`{id:int,name:str,dept:{title:str},skills:[str],active:bool}:
+	input2 := []byte(`[{id:int,name:str,dept:{title:str},skills:[str],active:bool}]:
   (1, Alice, (Manager), [Rust, Go], true),
   (2, Bob, (Engineer), [Python], false),
   (3, "Carol Smith", (Director), [Leadership, Strategy], true)`)
 	var employees []Employee
-	if err := ason.UnmarshalSlice(input2, &employees); err != nil {
+	if err := ason.Decode(input2, &employees); err != nil {
 		log.Fatal(err)
 	}
 	for _, e := range employees {
@@ -197,7 +197,7 @@ func main() {
 	// 3. Map/Dict field
 	fmt.Println("\n3. Map/Dict field:")
 	var wm WithMap
-	if err := ason.Unmarshal([]byte("{name,attrs}:(Alice,[(age,30),(score,95)])"), &wm); err != nil {
+	if err := ason.Decode([]byte("{name,attrs}:(Alice,[(age,30),(score,95)])"), &wm); err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("   %+v\n", wm)
@@ -205,13 +205,13 @@ func main() {
 	// 4. Nested struct roundtrip
 	fmt.Println("\n4. Nested struct roundtrip:")
 	nested := Nested{Name: "Alice", Addr: Address{City: "NYC", Zip: 10001}}
-	s, err := ason.Marshal(&nested)
+	s, err := ason.Encode(&nested)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("   serialized:   %s\n", s)
 	var nested2 Nested
-	if err := ason.Unmarshal(s, &nested2); err != nil {
+	if err := ason.Decode(s, &nested2); err != nil {
 		log.Fatal(err)
 	}
 	if nested != nested2 {
@@ -225,13 +225,13 @@ func main() {
 		Text string `ason:"text"`
 	}
 	note := Note{Text: "say \"hi\", then (wave)\tnewline\nend"}
-	s, err = ason.Marshal(&note)
+	s, err = ason.Encode(&note)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("   serialized:   %s\n", s)
 	var note2 Note
-	if err := ason.Unmarshal(s, &note2); err != nil {
+	if err := ason.Decode(s, &note2); err != nil {
 		log.Fatal(err)
 	}
 	if note != note2 {
@@ -247,13 +247,13 @@ func main() {
 		Label string  `ason:"label"`
 	}
 	m := Measurement{ID: 2, Value: 95.0, Label: "score"}
-	s, err = ason.Marshal(&m)
+	s, err = ason.Encode(&m)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("   serialized: %s\n", s)
 	var m2 Measurement
-	if err := ason.Unmarshal(s, &m2); err != nil {
+	if err := ason.Decode(s, &m2); err != nil {
 		log.Fatal(err)
 	}
 	if m != m2 {
@@ -269,13 +269,13 @@ func main() {
 		C int64   `ason:"c"`
 	}
 	n := Nums{A: -42, B: -3.14, C: -9223372036854775807}
-	s, err = ason.Marshal(&n)
+	s, err = ason.Encode(&n)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("   serialized:   %s\n", s)
 	var n2 Nums
-	if err := ason.Unmarshal(s, &n2); err != nil {
+	if err := ason.Decode(s, &n2); err != nil {
 		log.Fatal(err)
 	}
 	if n != n2 {
@@ -297,14 +297,14 @@ func main() {
 		VecStr:    []string{"alpha", "beta gamma", "delta"},
 		NestedVec: [][]int64{{1, 2}, {3, 4, 5}},
 	}
-	s, err = ason.Marshal(&all)
+	s, err = ason.Encode(&all)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("   serialized (%d bytes):\n", len(s))
 	fmt.Printf("   %s\n", s)
 	var all2 AllTypes
-	if err := ason.Unmarshal(s, &all2); err != nil {
+	if err := ason.Decode(s, &all2); err != nil {
 		log.Fatal(err)
 	}
 	if all.B != all2.B || all.I64v != all2.I64v || all.U64v != all2.U64v || all.S != all2.S {
@@ -353,7 +353,7 @@ func main() {
 			}},
 		},
 	}
-	s, err = ason.Marshal(&country)
+	s, err = ason.Encode(&country)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -364,7 +364,7 @@ func main() {
 	}
 	fmt.Printf("   first 200 chars: %s\n", preview)
 	var country2 Country
-	if err := ason.Unmarshal(s, &country2); err != nil {
+	if err := ason.Decode(s, &country2); err != nil {
 		log.Fatal(err)
 	}
 	if country.Name != country2.Name || country.Population != country2.Population {
@@ -373,12 +373,12 @@ func main() {
 	fmt.Println("   ✓ 5-level ASON-text roundtrip OK")
 
 	// ASON binary roundtrip
-	binBytes, err := ason.MarshalBinary(&country)
+	binBytes, err := ason.EncodeBinary(&country)
 	if err != nil {
 		log.Fatal(err)
 	}
 	var country3 Country
-	if err := ason.UnmarshalBinary(binBytes, &country3); err != nil {
+	if err := ason.DecodeBinary(binBytes, &country3); err != nil {
 		log.Fatal(err)
 	}
 	if country.Name != country3.Name || country.Population != country3.Population {
@@ -424,13 +424,13 @@ func main() {
 			}},
 		}},
 	}
-	s, err = ason.Marshal(&universe)
+	s, err = ason.Encode(&universe)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("   serialized (%d bytes)\n", len(s))
 	var universe2 Universe
-	if err := ason.Unmarshal(s, &universe2); err != nil {
+	if err := ason.Decode(s, &universe2); err != nil {
 		log.Fatal(err)
 	}
 	if universe.Name != universe2.Name {
@@ -439,12 +439,12 @@ func main() {
 	fmt.Println("   ✓ 7-level ASON-text roundtrip OK")
 
 	// ASON binary roundtrip
-	uniBin, err := ason.MarshalBinary(&universe)
+	uniBin, err := ason.EncodeBinary(&universe)
 	if err != nil {
 		log.Fatal(err)
 	}
 	var universe3 Universe
-	if err := ason.UnmarshalBinary(uniBin, &universe3); err != nil {
+	if err := ason.DecodeBinary(uniBin, &universe3); err != nil {
 		log.Fatal(err)
 	}
 	if universe.Name != universe3.Name {
@@ -473,14 +473,14 @@ func main() {
 			"SECRET_KEY":   "abc123!@#",
 		},
 	}
-	s, err = ason.Marshal(&config)
+	s, err = ason.Encode(&config)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("   serialized (%d bytes):\n", len(s))
 	fmt.Printf("   %s\n", s)
 	var config2 ServiceConfig
-	if err := ason.Unmarshal(s, &config2); err != nil {
+	if err := ason.Decode(s, &config2); err != nil {
 		log.Fatal(err)
 	}
 	if config.Name != config2.Name || config.Db.Port != config2.Db.Port {
@@ -491,12 +491,12 @@ func main() {
 	fmt.Printf("   ASON text: %d B | JSON: %d B | TEXT vs JSON: %.0f%% smaller\n",
 		len(s), len(jsonBytes), (1.0-float64(len(s))/float64(len(jsonBytes)))*100.0)
 	// Binary roundtrip
-	cfgBin, err := ason.MarshalBinary(&config)
+	cfgBin, err := ason.EncodeBinary(&config)
 	if err != nil {
 		log.Fatal(err)
 	}
 	var config3 ServiceConfig
-	if err := ason.UnmarshalBinary(cfgBin, &config3); err != nil {
+	if err := ason.DecodeBinary(cfgBin, &config3); err != nil {
 		log.Fatal(err)
 	}
 	if config.Name != config3.Name || config.Db.Port != config3.Db.Port {
@@ -538,12 +538,12 @@ func main() {
 	}
 	totalASON, totalJSON, totalBIN := 0, 0, 0
 	for i := range countries {
-		as, _ := ason.Marshal(&countries[i])
+		as, _ := ason.Encode(&countries[i])
 		js, _ := json.Marshal(&countries[i])
-		bs, _ := ason.MarshalBinary(&countries[i])
+		bs, _ := ason.EncodeBinary(&countries[i])
 		// Verify text roundtrip
 		var c2 Country
-		if err := ason.Unmarshal(as, &c2); err != nil {
+		if err := ason.Decode(as, &c2); err != nil {
 			log.Fatalf("country %d roundtrip failed: %v", i, err)
 		}
 		if countries[i].Name != c2.Name {
@@ -551,7 +551,7 @@ func main() {
 		}
 		// Verify binary roundtrip
 		var c3 Country
-		if err := ason.UnmarshalBinary(bs, &c3); err != nil {
+		if err := ason.DecodeBinary(bs, &c3); err != nil {
 			log.Fatalf("country %d binary roundtrip failed: %v", i, err)
 		}
 		if countries[i].Name != c3.Name {
@@ -574,7 +574,7 @@ func main() {
 	fmt.Println("\n13. Deserialize with nested schema type hints:")
 	deepInput := []byte("{name:str,code:str,population:int,gdp_trillion:float,regions:[{name:str,cities:[{name:str,population:int,area_km2:float,districts:[{name:str,population:int,streets:[{name:str,length_km:float,buildings:[{name:str,floors:int,residential:bool,height_m:float}]}]}]}]}]}:(TestLand,TL,1000000,0.5,[(TestRegion,[(TestCity,500000,100.0,[(Central,250000,[(Main St,2.5,[(HQ,10,false,45.0)])])])])])")
 	var dc Country
-	if err := ason.Unmarshal(deepInput, &dc); err != nil {
+	if err := ason.Decode(deepInput, &dc); err != nil {
 		log.Fatal(err)
 	}
 	if dc.Name != "TestLand" {
@@ -590,13 +590,13 @@ func main() {
 	// 14. Typed serialization
 	fmt.Println("\n14. Typed serialization (MarshalTyped):")
 	empForTyped := Employee{ID: 1, Name: "Alice", Dept: Department{Title: "Engineering"}, Skills: []string{"Rust", "Go"}, Active: true}
-	typedBytes, err := ason.MarshalTyped(&empForTyped)
+	typedBytes, err := ason.EncodeTyped(&empForTyped)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("   nested struct: %s\n", typedBytes)
 	var empBack Employee
-	if err := ason.Unmarshal(typedBytes, &empBack); err != nil {
+	if err := ason.Decode(typedBytes, &empBack); err != nil {
 		log.Fatal(err)
 	}
 	if empBack.Name != "Alice" {
@@ -604,7 +604,7 @@ func main() {
 	}
 	fmt.Println("   ✓ typed nested struct roundtrip OK")
 
-	allTyped, err := ason.MarshalTyped(&all)
+	allTyped, err := ason.EncodeTyped(&all)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -615,7 +615,7 @@ func main() {
 	}
 	fmt.Printf("   all-types (%d bytes): %s...\n", len(allTyped), p)
 	var allBack AllTypes
-	if err := ason.Unmarshal(allTyped, &allBack); err != nil {
+	if err := ason.Decode(allTyped, &allBack); err != nil {
 		log.Fatal(err)
 	}
 	if allBack.S != all.S || allBack.B != all.B {
@@ -623,7 +623,7 @@ func main() {
 	}
 	fmt.Println("   ✓ typed all-types roundtrip OK")
 
-	configTyped, err := ason.MarshalTyped(&config)
+	configTyped, err := ason.EncodeTyped(&config)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -634,14 +634,14 @@ func main() {
 	}
 	fmt.Printf("   config (%d bytes): %s...\n", len(configTyped), p)
 	var configBack ServiceConfig
-	if err := ason.Unmarshal(configTyped, &configBack); err != nil {
+	if err := ason.Decode(configTyped, &configBack); err != nil {
 		log.Fatal(err)
 	}
 	if configBack.Name != config.Name {
 		log.Fatal("typed config roundtrip mismatch")
 	}
 	fmt.Println("   ✓ typed config roundtrip OK")
-	untyped, _ := ason.Marshal(&config)
+	untyped, _ := ason.Encode(&config)
 	fmt.Printf("   untyped: %d bytes | typed: %d bytes | overhead: %d bytes\n",
 		len(untyped), len(configTyped), len(configTyped)-len(untyped))
 
@@ -651,10 +651,10 @@ func main() {
 		Items []int64 `ason:"items"`
 	}
 	wv := WithVec{Items: []int64{}}
-	s, _ = ason.Marshal(&wv)
+	s, _ = ason.Encode(&wv)
 	fmt.Printf("   empty vec: %s\n", s)
 	var wv2 WithVec
-	if err := ason.Unmarshal(s, &wv2); err != nil {
+	if err := ason.Decode(s, &wv2); err != nil {
 		log.Fatal(err)
 	}
 
@@ -662,10 +662,10 @@ func main() {
 		Val string `ason:"val"`
 	}
 	sp := Special{Val: "tabs\there, newlines\nhere, quotes\"and\\backslash"}
-	s, _ = ason.Marshal(&sp)
+	s, _ = ason.Encode(&sp)
 	fmt.Printf("   special chars: %s\n", s)
 	var sp2 Special
-	if err := ason.Unmarshal(s, &sp2); err != nil {
+	if err := ason.Decode(s, &sp2); err != nil {
 		log.Fatal(err)
 	}
 	if sp != sp2 {
@@ -673,19 +673,19 @@ func main() {
 	}
 
 	sp3 := Special{Val: "true"}
-	s, _ = ason.Marshal(&sp3)
+	s, _ = ason.Encode(&sp3)
 	fmt.Printf("   bool-like string: %s\n", s)
 	var sp4 Special
-	ason.Unmarshal(s, &sp4)
+	ason.Decode(s, &sp4)
 	if sp3 != sp4 {
 		log.Fatal("bool-like string roundtrip mismatch")
 	}
 
 	sp5 := Special{Val: "12345"}
-	s, _ = ason.Marshal(&sp5)
+	s, _ = ason.Encode(&sp5)
 	fmt.Printf("   number-like string: %s\n", s)
 	var sp6 Special
-	ason.Unmarshal(s, &sp6)
+	ason.Decode(s, &sp6)
 	if sp5 != sp6 {
 		log.Fatal("number-like string roundtrip mismatch")
 	}
@@ -697,10 +697,10 @@ func main() {
 		Data [][][]int64 `ason:"data"`
 	}
 	m3 := Matrix3D{Data: [][][]int64{{{1, 2}, {3, 4}}, {{5, 6, 7}, {8}}}}
-	s, _ = ason.Marshal(&m3)
+	s, _ = ason.Encode(&m3)
 	fmt.Printf("   %s\n", s)
 	var m3b Matrix3D
-	if err := ason.Unmarshal(s, &m3b); err != nil {
+	if err := ason.Decode(s, &m3b); err != nil {
 		log.Fatal(err)
 	}
 	if len(m3b.Data) != 2 || len(m3b.Data[0]) != 2 || m3b.Data[0][0][0] != 1 {
@@ -711,7 +711,7 @@ func main() {
 	// 17. Comments
 	fmt.Println("\n17. Comments:")
 	var empComment Employee
-	if err := ason.Unmarshal([]byte("{id,name,dept:{title},skills,active}:/* inline */ (1,Alice,(HR),[rust],true)"), &empComment); err != nil {
+	if err := ason.Decode([]byte("{id,name,dept:{title},skills,active}:/* inline */ (1,Alice,(HR),[rust],true)"), &empComment); err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("   with inline comment: %+v\n", empComment)

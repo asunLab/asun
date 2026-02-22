@@ -37,7 +37,7 @@ type Row struct {
 
 func TestSerializeStruct(t *testing.T) {
 	u := User{ID: 1, Name: "Alice", Active: true}
-	got, err := Marshal(u)
+	got, err := Encode(u)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestSerializeStruct(t *testing.T) {
 func TestDeserializeStructWithSchema(t *testing.T) {
 	input := "{id,name,active}:(1,Alice,true)"
 	var u User
-	if err := Unmarshal([]byte(input), &u); err != nil {
+	if err := Decode([]byte(input), &u); err != nil {
 		t.Fatal(err)
 	}
 	if u.ID != 1 || u.Name != "Alice" || !u.Active {
@@ -61,7 +61,7 @@ func TestDeserializeStructWithSchema(t *testing.T) {
 func TestDeserializeStructWithTypedSchema(t *testing.T) {
 	input := "{id:int,name:str,active:bool}:(1,Alice,true)"
 	var u User
-	if err := Unmarshal([]byte(input), &u); err != nil {
+	if err := Decode([]byte(input), &u); err != nil {
 		t.Fatal(err)
 	}
 	if u.ID != 1 || u.Name != "Alice" || !u.Active {
@@ -71,12 +71,12 @@ func TestDeserializeStructWithTypedSchema(t *testing.T) {
 
 func TestRoundtrip(t *testing.T) {
 	u := User{ID: 42, Name: "Bob", Active: false}
-	data, err := Marshal(u)
+	data, err := Encode(u)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var u2 User
-	if err := Unmarshal(data, &u2); err != nil {
+	if err := Decode(data, &u2); err != nil {
 		t.Fatal(err)
 	}
 	if u != u2 {
@@ -85,9 +85,9 @@ func TestRoundtrip(t *testing.T) {
 }
 
 func TestVecDeserialize(t *testing.T) {
-	input := "{id:int,name:str,active:bool}:(1,Alice,true),(2,Bob,false)"
+	input := "[{id:int,name:str,active:bool}]:(1,Alice,true),(2,Bob,false)"
 	var users []User
-	if err := UnmarshalSlice([]byte(input), &users); err != nil {
+	if err := Decode([]byte(input), &users); err != nil {
 		t.Fatal(err)
 	}
 	if len(users) != 2 {
@@ -99,9 +99,9 @@ func TestVecDeserialize(t *testing.T) {
 }
 
 func TestMultiline(t *testing.T) {
-	input := "{id:int,name:str,active:bool}:\n  (1, Alice, true),\n  (2, Bob, false)"
+	input := "[{id:int,name:str,active:bool}]:\n  (1, Alice, true),\n  (2, Bob, false)"
 	var users []User
-	if err := UnmarshalSlice([]byte(input), &users); err != nil {
+	if err := Decode([]byte(input), &users); err != nil {
 		t.Fatal(err)
 	}
 	if len(users) != 2 {
@@ -112,7 +112,7 @@ func TestMultiline(t *testing.T) {
 func TestQuotedString(t *testing.T) {
 	input := `{id,name,active}:(1,"Carol Smith",true)`
 	var u User
-	if err := Unmarshal([]byte(input), &u); err != nil {
+	if err := Decode([]byte(input), &u); err != nil {
 		t.Fatal(err)
 	}
 	if u.Name != "Carol Smith" {
@@ -123,7 +123,7 @@ func TestQuotedString(t *testing.T) {
 func TestOptionalField(t *testing.T) {
 	input := "{id,label}:(1,)"
 	var item Item
-	if err := Unmarshal([]byte(input), &item); err != nil {
+	if err := Decode([]byte(input), &item); err != nil {
 		t.Fatal(err)
 	}
 	if item.ID != 1 || item.Label != nil {
@@ -134,7 +134,7 @@ func TestOptionalField(t *testing.T) {
 func TestArrayField(t *testing.T) {
 	input := "{name,tags}:(Alice,[rust,go])"
 	var tg Tagged
-	if err := Unmarshal([]byte(input), &tg); err != nil {
+	if err := Decode([]byte(input), &tg); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(tg.Tags, []string{"rust", "go"}) {
@@ -152,7 +152,7 @@ func TestNestedStruct(t *testing.T) {
 	}
 	input := "{name,dept:{title}}:(Alice,(Manager))"
 	var e Employee
-	if err := Unmarshal([]byte(input), &e); err != nil {
+	if err := Decode([]byte(input), &e); err != nil {
 		t.Fatal(err)
 	}
 	if e.Name != "Alice" || e.Dept.Title != "Manager" {
@@ -162,11 +162,11 @@ func TestNestedStruct(t *testing.T) {
 
 func TestSerializeVec(t *testing.T) {
 	rows := []Row{{ID: 1, Name: "Alice"}, {ID: 2, Name: "Bob"}}
-	got, err := MarshalSlice(rows)
+	got, err := Encode(rows)
 	if err != nil {
 		t.Fatal(err)
 	}
-	expect := "{id,name}:(1,Alice),(2,Bob)"
+	expect := "[{id,name}]:(1,Alice),(2,Bob)"
 	if string(got) != expect {
 		t.Fatalf("got %q, want %q", got, expect)
 	}
@@ -174,12 +174,12 @@ func TestSerializeVec(t *testing.T) {
 
 func TestEscapeRoundtrip(t *testing.T) {
 	note := Note{Text: "hello, world (test)"}
-	data, err := Marshal(note)
+	data, err := Encode(note)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var note2 Note
-	if err := Unmarshal(data, &note2); err != nil {
+	if err := Decode(data, &note2); err != nil {
 		t.Fatal(err)
 	}
 	if note != note2 {
@@ -188,9 +188,9 @@ func TestEscapeRoundtrip(t *testing.T) {
 }
 
 func TestTrailingComma(t *testing.T) {
-	input := "{id:int,name:str,active:bool}:(1,Alice,true),(2,Bob,false),"
+	input := "[{id:int,name:str,active:bool}]:(1,Alice,true),(2,Bob,false),"
 	var users []User
-	if err := UnmarshalSlice([]byte(input), &users); err != nil {
+	if err := Decode([]byte(input), &users); err != nil {
 		t.Fatal(err)
 	}
 	if len(users) != 2 {
@@ -201,7 +201,7 @@ func TestTrailingComma(t *testing.T) {
 func TestCommentStripping(t *testing.T) {
 	input := "/* users */ {id,name,active}:(1,Alice,true)"
 	var u User
-	if err := Unmarshal([]byte(input), &u); err != nil {
+	if err := Decode([]byte(input), &u); err != nil {
 		t.Fatal(err)
 	}
 	if u.ID != 1 {
@@ -212,7 +212,7 @@ func TestCommentStripping(t *testing.T) {
 func TestFloatField(t *testing.T) {
 	input := "{id,value}:(1,95.5)"
 	var s Score
-	if err := Unmarshal([]byte(input), &s); err != nil {
+	if err := Decode([]byte(input), &s); err != nil {
 		t.Fatal(err)
 	}
 	if s.Value != 95.5 {
@@ -227,7 +227,7 @@ func TestMapField(t *testing.T) {
 	}
 	input := "{name,attrs}:(Alice,[(age,30),(score,95)])"
 	var item MapItem
-	if err := Unmarshal([]byte(input), &item); err != nil {
+	if err := Decode([]byte(input), &item); err != nil {
 		t.Fatal(err)
 	}
 	if item.Attrs["age"] != 30 || item.Attrs["score"] != 95 {
@@ -239,10 +239,10 @@ func TestAnnotatedSimpleStruct(t *testing.T) {
 	typed := "{id:int,name:str,active:bool}:(42,Bob,false)"
 	untyped := "{id,name,active}:(42,Bob,false)"
 	var u1, u2 User
-	if err := Unmarshal([]byte(typed), &u1); err != nil {
+	if err := Decode([]byte(typed), &u1); err != nil {
 		t.Fatal(err)
 	}
-	if err := Unmarshal([]byte(untyped), &u2); err != nil {
+	if err := Decode([]byte(untyped), &u2); err != nil {
 		t.Fatal(err)
 	}
 	if u1 != u2 {
@@ -254,13 +254,13 @@ func TestAnnotatedSimpleStruct(t *testing.T) {
 }
 
 func TestAnnotatedVec(t *testing.T) {
-	typed := "{id:int,name:str,active:bool}:(1,Alice,true),(2,Bob,false)"
-	untyped := "{id,name,active}:(1,Alice,true),(2,Bob,false)"
+	typed := "[{id:int,name:str,active:bool}]:(1,Alice,true),(2,Bob,false)"
+	untyped := "[{id,name,active}]:(1,Alice,true),(2,Bob,false)"
 	var v1, v2 []User
-	if err := UnmarshalSlice([]byte(typed), &v1); err != nil {
+	if err := Decode([]byte(typed), &v1); err != nil {
 		t.Fatal(err)
 	}
-	if err := UnmarshalSlice([]byte(untyped), &v2); err != nil {
+	if err := Decode([]byte(untyped), &v2); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(v1, v2) || len(v1) != 2 {
@@ -282,10 +282,10 @@ func TestAnnotatedNestedStruct(t *testing.T) {
 	typed := "{name:str,age:int,dept:{title:str,budget:float},active:bool}:(Alice,30,(Engineering,50000.5),true)"
 	untyped := "{name,age,dept:{title,budget},active}:(Alice,30,(Engineering,50000.5),true)"
 	var e1, e2 Employee
-	if err := Unmarshal([]byte(typed), &e1); err != nil {
+	if err := Decode([]byte(typed), &e1); err != nil {
 		t.Fatal(err)
 	}
-	if err := Unmarshal([]byte(untyped), &e2); err != nil {
+	if err := Decode([]byte(untyped), &e2); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(e1, e2) {
@@ -305,10 +305,10 @@ func TestAnnotatedWithArrays(t *testing.T) {
 	typed := "{name:str,scores:[int],tags:[str]}:(Alice,[90,85,92],[rust,go])"
 	untyped := "{name,scores,tags}:(Alice,[90,85,92],[rust,go])"
 	var p1, p2 Profile
-	if err := Unmarshal([]byte(typed), &p1); err != nil {
+	if err := Decode([]byte(typed), &p1); err != nil {
 		t.Fatal(err)
 	}
-	if err := Unmarshal([]byte(untyped), &p2); err != nil {
+	if err := Decode([]byte(untyped), &p2); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(p1, p2) {
@@ -327,10 +327,10 @@ func TestAnnotatedWithMap(t *testing.T) {
 	typed := "{name:str,attrs:map[str,int]}:(server,[(port,8080),(timeout,30)])"
 	untyped := "{name,attrs}:(server,[(port,8080),(timeout,30)])"
 	var c1, c2 Config
-	if err := Unmarshal([]byte(typed), &c1); err != nil {
+	if err := Decode([]byte(typed), &c1); err != nil {
 		t.Fatal(err)
 	}
-	if err := Unmarshal([]byte(untyped), &c2); err != nil {
+	if err := Decode([]byte(untyped), &c2); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(c1, c2) {
@@ -350,10 +350,10 @@ func TestAnnotatedWithOptional(t *testing.T) {
 	typed := "{id:int,label:str,score:float}:(1,hello,95.5)"
 	untyped := "{id,label,score}:(1,hello,95.5)"
 	var r1, r2 Record
-	if err := Unmarshal([]byte(typed), &r1); err != nil {
+	if err := Decode([]byte(typed), &r1); err != nil {
 		t.Fatal(err)
 	}
-	if err := Unmarshal([]byte(untyped), &r2); err != nil {
+	if err := Decode([]byte(untyped), &r2); err != nil {
 		t.Fatal(err)
 	}
 	if *r1.Label != *r2.Label || *r1.Score != *r2.Score {
@@ -362,10 +362,10 @@ func TestAnnotatedWithOptional(t *testing.T) {
 	typedNone := "{id:int,label:str,score:float}:(2,,)"
 	untypedNone := "{id,label,score}:(2,,)"
 	var r3, r4 Record
-	if err := Unmarshal([]byte(typedNone), &r3); err != nil {
+	if err := Decode([]byte(typedNone), &r3); err != nil {
 		t.Fatal(err)
 	}
-	if err := Unmarshal([]byte(untypedNone), &r4); err != nil {
+	if err := Decode([]byte(untypedNone), &r4); err != nil {
 		t.Fatal(err)
 	}
 	if r3.Label != nil || r3.Score != nil {
@@ -394,10 +394,10 @@ func TestAnnotatedDeepNesting(t *testing.T) {
 	typed := "{name:str,revenue:float,team:{lead:str,projects:[{name:str,tasks:[{title:str,done:bool}]}]}}:(Acme,500.5,(Alice,[(API,[(Design,true),(Code,false)])]))"
 	untyped := "{name,revenue,team:{lead,projects:[{name,tasks:[{title,done}]}]}}:(Acme,500.5,(Alice,[(API,[(Design,true),(Code,false)])]))"
 	var c1, c2 Company
-	if err := Unmarshal([]byte(typed), &c1); err != nil {
+	if err := Decode([]byte(typed), &c1); err != nil {
 		t.Fatal(err)
 	}
-	if err := Unmarshal([]byte(untyped), &c2); err != nil {
+	if err := Decode([]byte(untyped), &c2); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(c1, c2) {
@@ -425,13 +425,13 @@ func TestAnnotatedMixedPartial(t *testing.T) {
 	full := "{id:int,name:str,score:float,active:bool}:(1,Alice,95.5,true)"
 	none := "{id,name,score,active}:(1,Alice,95.5,true)"
 	var m1, m2, m3 Mixed
-	if err := Unmarshal([]byte(partial), &m1); err != nil {
+	if err := Decode([]byte(partial), &m1); err != nil {
 		t.Fatal(err)
 	}
-	if err := Unmarshal([]byte(full), &m2); err != nil {
+	if err := Decode([]byte(full), &m2); err != nil {
 		t.Fatal(err)
 	}
-	if err := Unmarshal([]byte(none), &m3); err != nil {
+	if err := Decode([]byte(none), &m3); err != nil {
 		t.Fatal(err)
 	}
 	if m1 != m2 || m2 != m3 {
@@ -441,7 +441,7 @@ func TestAnnotatedMixedPartial(t *testing.T) {
 
 func TestSerializerOutputIsUnannotated(t *testing.T) {
 	u := User{ID: 1, Name: "Alice", Active: true}
-	data, err := Marshal(u)
+	data, err := Encode(u)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -451,9 +451,9 @@ func TestSerializerOutputIsUnannotated(t *testing.T) {
 	}
 }
 
-func TestMarshalTypedSimple(t *testing.T) {
+func TestEncodeTypedSimple(t *testing.T) {
 	u := User{ID: 1, Name: "Alice", Active: true}
-	got, err := MarshalTyped(u)
+	got, err := EncodeTyped(u)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -463,14 +463,14 @@ func TestMarshalTypedSimple(t *testing.T) {
 	}
 }
 
-func TestMarshalTypedRoundtrip(t *testing.T) {
+func TestEncodeTypedRoundtrip(t *testing.T) {
 	u := User{ID: 42, Name: "Bob", Active: false}
-	data, err := MarshalTyped(u)
+	data, err := EncodeTyped(u)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var u2 User
-	if err := Unmarshal(data, &u2); err != nil {
+	if err := Decode(data, &u2); err != nil {
 		t.Fatal(err)
 	}
 	if u != u2 {
@@ -478,14 +478,14 @@ func TestMarshalTypedRoundtrip(t *testing.T) {
 	}
 }
 
-func TestMarshalTypedFloats(t *testing.T) {
+func TestEncodeTypedFloats(t *testing.T) {
 	type ScoreF struct {
 		ID    int64   `ason:"id"`
 		Value float64 `ason:"value"`
 		Label string  `ason:"label"`
 	}
 	s := ScoreF{ID: 1, Value: 95.5, Label: "good"}
-	got, err := MarshalTyped(s)
+	got, err := EncodeTyped(s)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -495,7 +495,7 @@ func TestMarshalTypedFloats(t *testing.T) {
 	}
 }
 
-func TestMarshalTypedAllPrimitives(t *testing.T) {
+func TestEncodeTypedAllPrimitives(t *testing.T) {
 	type All struct {
 		B bool    `ason:"b"`
 		I int64   `ason:"i"`
@@ -504,7 +504,7 @@ func TestMarshalTypedAllPrimitives(t *testing.T) {
 		S string  `ason:"s"`
 	}
 	val := All{B: true, I: -42, U: 100, F: 3.14, S: "hello"}
-	got, err := MarshalTyped(val)
+	got, err := EncodeTyped(val)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -514,7 +514,7 @@ func TestMarshalTypedAllPrimitives(t *testing.T) {
 	}
 }
 
-func TestMarshalTypedOptional(t *testing.T) {
+func TestEncodeTypedOptional(t *testing.T) {
 	type Opt struct {
 		ID    int64    `ason:"id"`
 		Label *string  `ason:"label"`
@@ -523,7 +523,7 @@ func TestMarshalTypedOptional(t *testing.T) {
 	hello := "hello"
 	sc := 95.5
 	v1 := Opt{ID: 1, Label: &hello, Score: &sc}
-	out1, err := MarshalTyped(v1)
+	out1, err := EncodeTyped(v1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -531,7 +531,7 @@ func TestMarshalTypedOptional(t *testing.T) {
 		t.Fatalf("got %q", out1)
 	}
 	v2 := Opt{ID: 2, Label: nil, Score: nil}
-	out2, err := MarshalTyped(v2)
+	out2, err := EncodeTyped(v2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -540,7 +540,7 @@ func TestMarshalTypedOptional(t *testing.T) {
 	}
 }
 
-func TestMarshalTypedNestedStruct(t *testing.T) {
+func TestEncodeTypedNestedStruct(t *testing.T) {
 	type Dept struct {
 		Title string `ason:"title"`
 	}
@@ -550,7 +550,7 @@ func TestMarshalTypedNestedStruct(t *testing.T) {
 		Active bool   `ason:"active"`
 	}
 	e := Employee{Name: "Alice", Dept: Dept{Title: "Engineering"}, Active: true}
-	got, err := MarshalTyped(e)
+	got, err := EncodeTyped(e)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -560,7 +560,7 @@ func TestMarshalTypedNestedStruct(t *testing.T) {
 	}
 }
 
-func TestMarshalSliceTyped(t *testing.T) {
+func TestEncodeTypedVec(t *testing.T) {
 	type RowT struct {
 		ID    int64   `ason:"id"`
 		Name  string  `ason:"name"`
@@ -570,25 +570,25 @@ func TestMarshalSliceTyped(t *testing.T) {
 		{ID: 1, Name: "Alice", Score: 95.5},
 		{ID: 2, Name: "Bob", Score: 87.0},
 	}
-	untyped, err := MarshalSlice(rows)
+	untyped, err := Encode(rows)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(untyped) != "{id,name,score}:(1,Alice,95.5),(2,Bob,87.0)" {
+	if string(untyped) != "[{id,name,score}]:(1,Alice,95.5),(2,Bob,87.0)" {
 		t.Fatalf("got %q", untyped)
 	}
-	typed, err := MarshalSliceTyped(rows, []string{"int", "str", "float"})
+	typed, err := EncodeTyped(rows)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(typed) != "{id:int,name:str,score:float}:(1,Alice,95.5),(2,Bob,87.0)" {
+	if string(typed) != "[{id:int,name:str,score:float}]:(1,Alice,95.5),(2,Bob,87.0)" {
 		t.Fatalf("got %q", typed)
 	}
 	var r1, r2 []RowT
-	if err := UnmarshalSlice(untyped, &r1); err != nil {
+	if err := Decode(untyped, &r1); err != nil {
 		t.Fatal(err)
 	}
-	if err := UnmarshalSlice(typed, &r2); err != nil {
+	if err := Decode(typed, &r2); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(r1, r2) {

@@ -30,18 +30,18 @@ int main() {
 
   // 1. Serialize a single struct
   User user{1, "Alice", true};
-  auto ason_str = ason::dump(user);
+  auto ason_str = ason::encode(user);
   std::cout << "1. Serialize single struct:\n   " << ason_str << "\n\n";
 
   // 2. Serialize with type annotations
-  auto typed_str = ason::dump_typed(user);
+  auto typed_str = ason::encode_typed(user);
   std::cout << "2. Serialize with type annotations:\n   " << typed_str
             << "\n\n";
   assert(typed_str.find("{id:int,name:str,active:bool}:") == 0);
 
   // 3. Deserialize from ASON
   auto loaded =
-      ason::load<User>("{id:int,name:str,active:bool}:(1,Alice,true)");
+      ason::decode<User>("{id:int,name:str,active:bool}:(1,Alice,true)");
   std::cout << "3. Deserialize single struct:\n   "
             << "User{id=" << loaded.id << ", name=\"" << loaded.name
             << "\", active=" << (loaded.active ? "true" : "false") << "}\n\n";
@@ -55,19 +55,19 @@ int main() {
       {2, "Bob", false},
       {3, "Carol Smith", true},
   };
-  auto ason_vec = ason::dump_vec(users);
+  auto ason_vec = ason::encode(users);
   std::cout << "4. Serialize vec (schema-driven):\n   " << ason_vec << "\n\n";
 
   // 5. Serialize vec with type annotations
-  auto typed_vec = ason::dump_vec_typed(users);
+  auto typed_vec = ason::encode_typed(users);
   std::cout << "5. Serialize vec with type annotations:\n   " << typed_vec
             << "\n\n";
-  assert(typed_vec.find("{id:int,name:str,active:bool}:") == 0);
+  assert(typed_vec.find("[{id:int,name:str,active:bool}]:") == 0);
 
   // 6. Deserialize vec
-  auto input6 = std::string_view("{id:int,name:str,active:bool}:(1,Alice,true),"
+  auto input6 = std::string_view("[{id:int,name:str,active:bool}]:(1,Alice,true),"
                                  "(2,Bob,false),(3,\"Carol Smith\",true)");
-  auto users2 = ason::load_vec<User>(input6);
+  auto users2 = ason::decode<std::vector<User>>(input6);
   std::cout << "6. Deserialize vec:\n";
   for (auto &u : users2) {
     std::cout << "   User{id=" << u.id << ", name=\"" << u.name
@@ -78,11 +78,11 @@ int main() {
 
   // 7. Multiline format
   std::cout << "\n7. Multiline format:\n";
-  auto multiline = std::string_view("{id:int, name:str, active:bool}:\n"
+  auto multiline = std::string_view("[{id:int, name:str, active:bool}]:\n"
                                     "  (1, Alice, true),\n"
                                     "  (2, Bob, false),\n"
                                     "  (3, \"Carol Smith\", true)");
-  auto users3 = ason::load_vec<User>(multiline);
+  auto users3 = ason::decode<std::vector<User>>(multiline);
   for (auto &u : users3) {
     std::cout << "   User{id=" << u.id << ", name=\"" << u.name
               << "\", active=" << (u.active ? "true" : "false") << "}\n";
@@ -94,16 +94,16 @@ int main() {
   User original{42, "Test User", true};
 
   // ASON text roundtrip
-  auto serialized = ason::dump(original);
-  auto deserialized = ason::load<User>(serialized);
+  auto serialized = ason::encode(original);
+  auto deserialized = ason::decode<User>(serialized);
   std::cout << "   ASON text:    " << serialized << " (" << serialized.size()
             << " B)\n";
   assert(deserialized.id == original.id);
   assert(deserialized.name == original.name);
 
   // ASON binary roundtrip
-  auto binary = ason::dump_bin(original);
-  auto deserialized_bin = ason::load_bin<User>(binary);
+  auto binary = ason::encode_bin(original);
+  auto deserialized_bin = ason::decode_bin<User>(binary);
   std::cout << "   ASON binary:  " << binary.size() << " B\n";
   assert(deserialized_bin.id == original.id);
   assert(deserialized_bin.name == original.name);
@@ -115,20 +115,20 @@ int main() {
 
   // 9. Optional fields
   std::cout << "\n9. Optional fields:\n";
-  auto item1 = ason::load<Item>("{id,label}:(1,hello)");
+  auto item1 = ason::decode<Item>("{id,label}:(1,hello)");
   std::cout << "   with value: Item{id=" << item1.id << ", label="
             << (item1.label ? "\"" + *item1.label + "\"" : "nullopt") << "}\n";
   assert(item1.label.has_value());
   assert(*item1.label == "hello");
 
-  auto item2 = ason::load<Item>("{id,label}:(2,)");
+  auto item2 = ason::decode<Item>("{id,label}:(2,)");
   std::cout << "   with null:  Item{id=" << item2.id << ", label="
             << (item2.label ? "\"" + *item2.label + "\"" : "nullopt") << "}\n";
   assert(!item2.label.has_value());
 
   // 10. Array fields
   std::cout << "\n10. Array fields:\n";
-  auto t = ason::load<Tagged>("{name,tags}:(Alice,[rust,go,python])");
+  auto t = ason::decode<Tagged>("{name,tags}:(Alice,[rust,go,python])");
   std::cout << "   Tagged{name=\"" << t.name << "\", tags=[";
   for (size_t i = 0; i < t.tags.size(); i++) {
     if (i > 0)
@@ -141,7 +141,7 @@ int main() {
   // 11. Comments
   std::cout << "\n11. With comments:\n";
   auto user4 =
-      ason::load<User>("/* user list */ {id,name,active}:(1,Alice,true)");
+      ason::decode<User>("/* user list */ {id,name,active}:(1,Alice,true)");
   std::cout << "   User{id=" << user4.id << ", name=\"" << user4.name
             << "\"}\n";
   assert(user4.id == 1);

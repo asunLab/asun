@@ -1,6 +1,5 @@
 use ason::{
-    Result, StructSchema, from_bin, from_bin_vec, from_str, from_str_vec, to_bin, to_bin_vec,
-    to_string, to_string_typed, to_string_vec, to_string_vec_typed,
+    decode, decode_binary, encode, encode_binary, encode_typed,
 };
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
@@ -19,29 +18,6 @@ struct User {
     active: bool,
     role: String,
     city: String,
-}
-
-impl StructSchema for User {
-    fn field_names() -> &'static [&'static str] {
-        &[
-            "id", "name", "email", "age", "score", "active", "role", "city",
-        ]
-    }
-    fn field_types() -> &'static [&'static str] {
-        &["int", "str", "str", "int", "float", "bool", "str", "str"]
-    }
-    fn serialize_fields(&self, ser: &mut ason::serialize::Serializer) -> Result<()> {
-        use serde::Serialize;
-        self.id.serialize(&mut *ser)?;
-        self.name.serialize(&mut *ser)?;
-        self.email.serialize(&mut *ser)?;
-        self.age.serialize(&mut *ser)?;
-        self.score.serialize(&mut *ser)?;
-        self.active.serialize(&mut *ser)?;
-        self.role.serialize(&mut *ser)?;
-        self.city.serialize(&mut *ser)?;
-        Ok(())
-    }
 }
 
 // ===========================================================================
@@ -317,7 +293,7 @@ fn bench_flat(count: usize, iterations: u32) -> BenchResult {
     let mut ason_str = String::new();
     let start = Instant::now();
     for _ in 0..iterations {
-        ason_str = to_string_vec(&users).unwrap();
+        ason_str = encode(&users).unwrap();
     }
     let ason_ser = start.elapsed();
 
@@ -331,12 +307,12 @@ fn bench_flat(count: usize, iterations: u32) -> BenchResult {
     // ASON deserialize
     let start = Instant::now();
     for _ in 0..iterations {
-        let _: Vec<User> = from_str_vec(&ason_str).unwrap();
+        let _: Vec<User> = decode(&ason_str).unwrap();
     }
     let ason_de = start.elapsed();
 
     // Verify
-    let decoded: Vec<User> = from_str_vec(&ason_str).unwrap();
+    let decoded: Vec<User> = decode(&ason_str).unwrap();
     assert_eq!(users, decoded, "flat {} roundtrip failed", count);
 
     BenchResult {
@@ -364,18 +340,11 @@ fn bench_all_types(count: usize, iterations: u32) -> BenchResult {
     }
     let json_ser = start.elapsed();
 
-    // ASON: serialize individually since AllTypes doesn't impl StructSchema
+    // ASON: serialize vec directly
     let mut ason_str = String::new();
     let start = Instant::now();
     for _ in 0..iterations {
-        ason_str = {
-            // Manual vec serialization via individual to_string calls
-            let mut parts: Vec<String> = Vec::with_capacity(items.len());
-            for item in &items {
-                parts.push(to_string(item).unwrap());
-            }
-            parts.join("\n")
-        };
+        ason_str = encode(&items).unwrap();
     }
     let ason_ser = start.elapsed();
 
@@ -385,19 +354,16 @@ fn bench_all_types(count: usize, iterations: u32) -> BenchResult {
     }
     let json_de = start.elapsed();
 
-    // ASON: deserialize individually
+    // ASON: deserialize vec directly
     let start = Instant::now();
     for _ in 0..iterations {
-        for line in ason_str.lines() {
-            let _: AllTypes = from_str(line).unwrap();
-        }
+        let _: Vec<AllTypes> = decode(&ason_str).unwrap();
     }
     let ason_de = start.elapsed();
 
     // Verify
-    for line in ason_str.lines() {
-        let _: AllTypes = from_str(line).unwrap();
-    }
+    let decoded: Vec<AllTypes> = decode(&ason_str).unwrap();
+    assert_eq!(items, decoded, "all-types {} roundtrip failed", count);
 
     BenchResult {
         name: format!("All-types struct × {} ({} fields, per-struct)", count, 16),
@@ -424,14 +390,13 @@ fn bench_deep(count: usize, iterations: u32) -> BenchResult {
     }
     let json_ser = start.elapsed();
 
-    // ASON: serialize each company individually (serialize_struct handles the nesting)
-    let mut ason_strs: Vec<String> = Vec::new();
+    // ASON: serialize vec directly
+    let mut ason_str = String::new();
     let start = Instant::now();
     for _ in 0..iterations {
-        ason_strs = companies.iter().map(|c| to_string(c).unwrap()).collect();
+        ason_str = encode(&companies).unwrap();
     }
     let ason_ser = start.elapsed();
-    let ason_total: String = ason_strs.join("\n");
 
     let start = Instant::now();
     for _ in 0..iterations {
@@ -441,17 +406,13 @@ fn bench_deep(count: usize, iterations: u32) -> BenchResult {
 
     let start = Instant::now();
     for _ in 0..iterations {
-        for s in &ason_strs {
-            let _: Company = from_str(s).unwrap();
-        }
+        let _: Vec<Company> = decode(&ason_str).unwrap();
     }
     let ason_de = start.elapsed();
 
     // Verify
-    for (i, s) in ason_strs.iter().enumerate() {
-        let c2: Company = from_str(s).unwrap();
-        assert_eq!(companies[i], c2, "deep roundtrip failed at {}", i);
-    }
+    let decoded: Vec<Company> = decode(&ason_str).unwrap();
+    assert_eq!(companies, decoded, "deep {} roundtrip failed", count);
 
     let nodes_per = 2 * 2 * 3 * 4; // divisions * teams * projects * tasks = 48 tasks
     BenchResult {
@@ -464,7 +425,7 @@ fn bench_deep(count: usize, iterations: u32) -> BenchResult {
         json_de_ms: json_de.as_secs_f64() * 1000.0,
         ason_de_ms: ason_de.as_secs_f64() * 1000.0,
         json_bytes: json_str.len(),
-        ason_bytes: ason_total.len(),
+        ason_bytes: ason_str.len(),
     }
 }
 
@@ -486,8 +447,8 @@ fn bench_single_roundtrip(iterations: u32) -> (f64, f64) {
 
     let start = Instant::now();
     for _ in 0..iterations {
-        let s = to_string(&user).unwrap();
-        let _: User = from_str(&s).unwrap();
+        let s = encode(&user).unwrap();
+        let _: User = decode(&s).unwrap();
     }
     let ason_ms = start.elapsed().as_secs_f64() * 1000.0;
 
@@ -554,8 +515,8 @@ fn bench_deep_single_roundtrip(iterations: u32) -> (f64, f64) {
 
     let start = Instant::now();
     for _ in 0..iterations {
-        let s = to_string(&company).unwrap();
-        let _: Company = from_str(&s).unwrap();
+        let s = encode(&company).unwrap();
+        let _: Company = decode(&s).unwrap();
     }
     let ason_ms = start.elapsed().as_secs_f64() * 1000.0;
 
@@ -624,14 +585,14 @@ fn bench_flat_bin(count: usize, iterations: u32) -> BinBenchResult {
     let mut ason_str = String::new();
     let start = Instant::now();
     for _ in 0..iterations {
-        ason_str = to_string_vec(&users).unwrap();
+        ason_str = encode(&users).unwrap();
     }
     let ason_ser = start.elapsed();
 
     let mut bin_buf: Vec<u8> = Vec::new();
     let start = Instant::now();
     for _ in 0..iterations {
-        bin_buf = to_bin_vec(&users).unwrap();
+        bin_buf = encode_binary(&users).unwrap();
     }
     let bin_ser = start.elapsed();
 
@@ -643,17 +604,17 @@ fn bench_flat_bin(count: usize, iterations: u32) -> BinBenchResult {
 
     let start = Instant::now();
     for _ in 0..iterations {
-        let _: Vec<User> = from_str_vec(&ason_str).unwrap();
+        let _: Vec<User> = decode(&ason_str).unwrap();
     }
     let ason_de = start.elapsed();
 
     let start = Instant::now();
     for _ in 0..iterations {
-        let _: Vec<User> = from_bin_vec(&bin_buf).unwrap();
+        let _: Vec<User> = decode_binary(&bin_buf).unwrap();
     }
     let bin_de = start.elapsed();
 
-    let decoded: Vec<User> = from_bin_vec(&bin_buf).unwrap();
+    let decoded: Vec<User> = decode_binary(&bin_buf).unwrap();
     assert_eq!(users, decoded, "bin flat {} roundtrip failed", count);
 
     BinBenchResult {
@@ -680,19 +641,18 @@ fn bench_deep_bin(count: usize, iterations: u32) -> BinBenchResult {
     }
     let json_ser = start.elapsed();
 
-    // ASON: per-element serialize (Company has no StructSchema)
-    let mut ason_strs: Vec<String> = Vec::new();
+    // ASON: serialize vec directly
+    let mut ason_str = String::new();
     let start = Instant::now();
     for _ in 0..iterations {
-        ason_strs = companies.iter().map(|c| to_string(c).unwrap()).collect();
+        ason_str = encode(&companies).unwrap();
     }
     let ason_ser = start.elapsed();
-    let ason_total_bytes: usize = ason_strs.iter().map(|s| s.len()).sum();
 
     let mut bin_buf: Vec<u8> = Vec::new();
     let start = Instant::now();
     for _ in 0..iterations {
-        bin_buf = to_bin_vec(&companies).unwrap();
+        bin_buf = encode_binary(&companies).unwrap();
     }
     let bin_ser = start.elapsed();
 
@@ -704,19 +664,17 @@ fn bench_deep_bin(count: usize, iterations: u32) -> BinBenchResult {
 
     let start = Instant::now();
     for _ in 0..iterations {
-        for s in &ason_strs {
-            let _: Company = from_str(s).unwrap();
-        }
+        let _: Vec<Company> = decode(&ason_str).unwrap();
     }
     let ason_de = start.elapsed();
 
     let start = Instant::now();
     for _ in 0..iterations {
-        let _: Vec<Company> = from_bin_vec(&bin_buf).unwrap();
+        let _: Vec<Company> = decode_binary(&bin_buf).unwrap();
     }
     let bin_de = start.elapsed();
 
-    let decoded: Vec<Company> = from_bin_vec(&bin_buf).unwrap();
+    let decoded: Vec<Company> = decode_binary(&bin_buf).unwrap();
     assert_eq!(companies, decoded, "bin deep {} roundtrip failed", count);
 
     BinBenchResult {
@@ -728,7 +686,7 @@ fn bench_deep_bin(count: usize, iterations: u32) -> BinBenchResult {
         ason_de_ms: ason_de.as_secs_f64() * 1000.0,
         bin_de_ms: bin_de.as_secs_f64() * 1000.0,
         json_bytes: json_str.len(),
-        ason_bytes: ason_total_bytes,
+        ason_bytes: ason_str.len(),
         bin_bytes: bin_buf.len(),
     }
 }
@@ -859,7 +817,7 @@ fn main() {
     {
         // --- (a) Flat struct vec: 1000 records ---
         let users_1k = generate_users(1000);
-        let ason_untyped = to_string_vec(&users_1k).unwrap(); // e.g. {id,name,...}:...
+        let ason_untyped = encode(&users_1k).unwrap(); // e.g. {id,name,...}:...
         // Build typed version by replacing the schema header
         let ason_typed = ason_untyped.replacen(
             "{id,name,email,age,score,active,role,city}:",
@@ -867,20 +825,20 @@ fn main() {
             1,
         );
         // Verify both parse identically
-        let v1: Vec<User> = from_str_vec(&ason_untyped).unwrap();
-        let v2: Vec<User> = from_str_vec(&ason_typed).unwrap();
+        let v1: Vec<User> = decode(&ason_untyped).unwrap();
+        let v2: Vec<User> = decode(&ason_typed).unwrap();
         assert_eq!(v1, v2, "typed/untyped flat roundtrip mismatch");
 
         let de_iters = 200u32;
         let start = Instant::now();
         for _ in 0..de_iters {
-            let _: Vec<User> = from_str_vec(&ason_untyped).unwrap();
+            let _: Vec<User> = decode(&ason_untyped).unwrap();
         }
         let untyped_ms = start.elapsed().as_secs_f64() * 1000.0;
 
         let start = Instant::now();
         for _ in 0..de_iters {
-            let _: Vec<User> = from_str_vec(&ason_typed).unwrap();
+            let _: Vec<User> = decode(&ason_typed).unwrap();
         }
         let typed_ms = start.elapsed().as_secs_f64() * 1000.0;
 
@@ -906,27 +864,27 @@ fn main() {
 
         // --- (b) Deep nested single struct ---
         let company = &generate_companies(1)[0];
-        let ason_deep_untyped = to_string(company).unwrap();
+        let ason_deep_untyped = encode(company).unwrap();
         let ason_deep_typed = ason_deep_untyped.replacen(
             "{name,founded,revenue_m,public,divisions,tags}:",
             "{name:str,founded:int,revenue_m:float,public:bool,divisions,tags}:",
             1,
         );
 
-        let c1: Company = from_str(&ason_deep_untyped).unwrap();
-        let c2: Company = from_str(&ason_deep_typed).unwrap();
+        let c1: Company = decode(&ason_deep_untyped).unwrap();
+        let c2: Company = decode(&ason_deep_typed).unwrap();
         assert_eq!(c1, c2, "typed/untyped deep roundtrip mismatch");
 
         let deep_iters = 5000u32;
         let start = Instant::now();
         for _ in 0..deep_iters {
-            let _: Company = from_str(&ason_deep_untyped).unwrap();
+            let _: Company = decode(&ason_deep_untyped).unwrap();
         }
         let deep_untyped_ms = start.elapsed().as_secs_f64() * 1000.0;
 
         let start = Instant::now();
         for _ in 0..deep_iters {
-            let _: Company = from_str(&ason_deep_typed).unwrap();
+            let _: Company = decode(&ason_deep_typed).unwrap();
         }
         let deep_typed_ms = start.elapsed().as_secs_f64() * 1000.0;
 
@@ -952,27 +910,27 @@ fn main() {
 
         // --- (c) All-types single struct ---
         let at = &generate_all_types(1)[0];
-        let ason_at_untyped = to_string(at).unwrap();
+        let ason_at_untyped = encode(at).unwrap();
         let ason_at_typed = ason_at_untyped.replacen(
             "{b,i8v,i16v,i32v,i64v,u8v,u16v,u32v,u64v,f32v,f64v,s,opt_some,opt_none,vec_int,vec_str}:",
             "{b:bool,i8v:int,i16v:int,i32v:int,i64v:int,u8v:int,u16v:int,u32v:int,u64v:int,f32v:float,f64v:float,s:str,opt_some:int,opt_none:int,vec_int:[int],vec_str:[str]}:",
             1,
         );
 
-        let a1: AllTypes = from_str(&ason_at_untyped).unwrap();
-        let a2: AllTypes = from_str(&ason_at_typed).unwrap();
+        let a1: AllTypes = decode(&ason_at_untyped).unwrap();
+        let a2: AllTypes = decode(&ason_at_typed).unwrap();
         assert_eq!(a1, a2, "typed/untyped all-types roundtrip mismatch");
 
         let at_iters = 10000u32;
         let start = Instant::now();
         for _ in 0..at_iters {
-            let _: AllTypes = from_str(&ason_at_untyped).unwrap();
+            let _: AllTypes = decode(&ason_at_untyped).unwrap();
         }
         let at_untyped_ms = start.elapsed().as_secs_f64() * 1000.0;
 
         let start = Instant::now();
         for _ in 0..at_iters {
-            let _: AllTypes = from_str(&ason_at_typed).unwrap();
+            let _: AllTypes = decode(&ason_at_typed).unwrap();
         }
         let at_typed_ms = start.elapsed().as_secs_f64() * 1000.0;
 
@@ -1008,27 +966,27 @@ fn main() {
     println!("└──────────────────────────────────────────────────────────────┘");
 
     {
-        // --- (a) Flat struct vec: 1000 records (to_string_vec vs to_string_vec_typed) ---
+        // --- (a) Flat struct vec: 1000 records (encode vs encode_typed) ---
         let users_1k = generate_users(1000);
 
         let ser_iters = 200u32;
         let start = Instant::now();
         let mut untyped_out = String::new();
         for _ in 0..ser_iters {
-            untyped_out = to_string_vec(&users_1k).unwrap();
+            untyped_out = encode(&users_1k).unwrap();
         }
         let untyped_ms = start.elapsed().as_secs_f64() * 1000.0;
 
         let start = Instant::now();
         let mut typed_out = String::new();
         for _ in 0..ser_iters {
-            typed_out = to_string_vec_typed(&users_1k).unwrap();
+            typed_out = encode_typed(&users_1k).unwrap();
         }
         let typed_ms = start.elapsed().as_secs_f64() * 1000.0;
 
         // Verify both deserialize to the same result
-        let v1: Vec<User> = from_str_vec(&untyped_out).unwrap();
-        let v2: Vec<User> = from_str_vec(&typed_out).unwrap();
+        let v1: Vec<User> = decode(&untyped_out).unwrap();
+        let v2: Vec<User> = decode(&typed_out).unwrap();
         assert_eq!(v1, v2, "typed/untyped flat serialize mismatch");
 
         let ratio = untyped_ms / typed_ms;
@@ -1051,21 +1009,21 @@ fn main() {
         );
         println!();
 
-        // --- (b) Single struct: to_string vs to_string_typed ---
+        // --- (b) Single struct: encode vs encode_typed ---
         let single_user = &users_1k[0];
         let single_iters = 10000u32;
 
         let start = Instant::now();
         let mut single_untyped = String::new();
         for _ in 0..single_iters {
-            single_untyped = to_string(single_user).unwrap();
+            single_untyped = encode(single_user).unwrap();
         }
         let single_untyped_ms = start.elapsed().as_secs_f64() * 1000.0;
 
         let start = Instant::now();
         let mut single_typed = String::new();
         for _ in 0..single_iters {
-            single_typed = to_string_typed(single_user).unwrap();
+            single_typed = encode_typed(single_user).unwrap();
         }
         let single_typed_ms = start.elapsed().as_secs_f64() * 1000.0;
 
@@ -1084,21 +1042,21 @@ fn main() {
         println!("    Ratio: {:.3}x (unannotated / annotated)", single_ratio);
         println!();
 
-        // --- (c) Deep nested single struct: to_string vs to_string_typed ---
+        // --- (c) Deep nested single struct: encode vs encode_typed ---
         let company = &generate_companies(1)[0];
 
         let deep_iters = 5000u32;
         let start = Instant::now();
         let mut deep_untyped = String::new();
         for _ in 0..deep_iters {
-            deep_untyped = to_string(company).unwrap();
+            deep_untyped = encode(company).unwrap();
         }
         let deep_untyped_ms = start.elapsed().as_secs_f64() * 1000.0;
 
         let start = Instant::now();
         let mut deep_typed = String::new();
         for _ in 0..deep_iters {
-            deep_typed = to_string_typed(company).unwrap();
+            deep_typed = encode_typed(company).unwrap();
         }
         let deep_typed_ms = start.elapsed().as_secs_f64() * 1000.0;
 
@@ -1122,8 +1080,8 @@ fn main() {
         );
 
         // Verify roundtrip
-        let c1: Company = from_str(&deep_untyped).unwrap();
-        let c2: Company = from_str(&deep_typed).unwrap();
+        let c1: Company = decode(&deep_untyped).unwrap();
+        let c2: Company = decode(&deep_typed).unwrap();
         assert_eq!(c1, c2, "typed/untyped deep serialize mismatch");
 
         println!();
@@ -1141,7 +1099,7 @@ fn main() {
     // Measure raw throughput: 1000 records × 100 iterations
     let users_1k = generate_users(1000);
     let json_1k = serde_json::to_string(&users_1k).unwrap();
-    let ason_1k = to_string_vec(&users_1k).unwrap();
+    let ason_1k = encode(&users_1k).unwrap();
 
     let iters = 100u32;
 
@@ -1153,7 +1111,7 @@ fn main() {
 
     let start = Instant::now();
     for _ in 0..iters {
-        let _ = to_string_vec(&users_1k).unwrap();
+        let _ = encode(&users_1k).unwrap();
     }
     let ason_ser_dur = start.elapsed();
 
@@ -1165,7 +1123,7 @@ fn main() {
 
     let start = Instant::now();
     for _ in 0..iters {
-        let _: Vec<User> = from_str_vec(&ason_1k).unwrap();
+        let _: Vec<User> = decode(&ason_1k).unwrap();
     }
     let ason_de_dur = start.elapsed();
 
@@ -1264,15 +1222,15 @@ fn main() {
 
         let start = Instant::now();
         for _ in 0..iters {
-            let b = to_bin(&user).unwrap();
-            let _: User = from_bin(&b).unwrap();
+            let b = encode_binary(&user).unwrap();
+            let _: User = decode_binary(&b).unwrap();
         }
         let bin_ns = start.elapsed().as_nanos() as f64 / iters as f64;
 
         let start = Instant::now();
         for _ in 0..iters {
-            let s = to_string(&user).unwrap();
-            let _: User = from_str(&s).unwrap();
+            let s = encode(&user).unwrap();
+            let _: User = decode(&s).unwrap();
         }
         let ason_ns = start.elapsed().as_nanos() as f64 / iters as f64;
 

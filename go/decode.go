@@ -8,29 +8,33 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Unmarshal — deserialize a single struct from ASON
+// Decode — deserialize from ASON
 // ---------------------------------------------------------------------------
 
-// Unmarshal parses ASON data and stores the result in v.
-// v must be a pointer to a struct.
-// Input: {field1,field2,...}:(val1,val2,...)
-// Also accepts type-annotated: {field1:type1,field2:type2,...}:(val1,val2,...)
-func Unmarshal(data []byte, v any) error {
+// Decode parses ASON data and stores the result in v.
+// v must be a pointer to a struct or a pointer to a slice of structs.
+// Single struct input: {field1,field2,...}:(val1,val2,...)
+// Slice input: [{field1,field2,...}]:(val1,val2,...),(val3,val4,...)
+// Also accepts type-annotated schemas.
+func Decode(data []byte, v any) error {
 	d := decoder{
 		data: data,
 		pos:  0,
 	}
 	d.skipWhitespaceAndComments()
+
+	// Auto-detect format: [{...}]: for slice, {...}: for single
+	if d.pos < len(d.data) && d.data[d.pos] == '[' && d.pos+1 < len(d.data) && d.data[d.pos+1] == '{' {
+		return d.decodeSliceTop(v)
+	}
 	return d.unmarshalTop(v)
 }
 
-// UnmarshalSlice parses ASON data into a slice of structs.
-// v must be a pointer to a slice of structs.
-// Input: {field1,field2,...}:(v1,v2,...),(v3,v4,...)
-func UnmarshalSlice(data []byte, v any) error {
+// decodeSliceTop parses [{schema}]:(v1,...),(v2,...) format
+func (d *decoder) decodeSliceTop(v any) error {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr || rv.Elem().Kind() != reflect.Slice {
-		return &UnmarshalError{0, "UnmarshalSlice requires a pointer to slice"}
+		return &UnmarshalError{d.pos, "Decode requires a pointer to slice for [{...}]: format"}
 	}
 	sliceVal := rv.Elem()
 	elemType := sliceVal.Type().Elem()
@@ -38,14 +42,11 @@ func UnmarshalSlice(data []byte, v any) error {
 		elemType = elemType.Elem()
 	}
 	if elemType.Kind() != reflect.Struct {
-		return &UnmarshalError{0, "UnmarshalSlice requires a slice of structs"}
+		return &UnmarshalError{d.pos, "Decode requires a slice of structs"}
 	}
 
-	d := decoder{
-		data: data,
-		pos:  0,
-	}
-	d.skipWhitespaceAndComments()
+	// Skip '['
+	d.pos++
 
 	// Parse schema
 	if d.pos >= len(d.data) || d.data[d.pos] != '{' {
@@ -55,6 +56,11 @@ func UnmarshalSlice(data []byte, v any) error {
 	if err != nil {
 		return err
 	}
+	d.skipWhitespaceAndComments()
+	if d.pos >= len(d.data) || d.data[d.pos] != ']' {
+		return d.errorf("expected ']'")
+	}
+	d.pos++
 	d.skipWhitespaceAndComments()
 	if d.pos >= len(d.data) || d.data[d.pos] != ':' {
 		return d.errorf("expected ':'")

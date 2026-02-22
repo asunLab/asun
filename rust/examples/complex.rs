@@ -1,4 +1,4 @@
-use ason::{from_bin, from_str, from_str_vec, to_bin, to_string, to_string_typed};
+use ason::{decode, decode_binary, encode, encode_binary, encode_typed};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -237,18 +237,18 @@ fn main() {
     // -----------------------------------------------------------------------
     println!("1. Nested struct:");
     let emp: Employee =
-        from_str("{id,name,dept:{title},skills,active}:(1,Alice,(Manager),[rust],true)").unwrap();
+        decode("{id,name,dept:{title},skills,active}:(1,Alice,(Manager),[rust],true)").unwrap();
     println!("   {:?}\n", emp);
 
     // -----------------------------------------------------------------------
     // 2. Vec with nested structs (existing)
     // -----------------------------------------------------------------------
     println!("2. Vec with nested structs:");
-    let input = "{id:int,name:str,dept:{title:str},skills:[str],active:bool}:
+    let input = "[{id:int,name:str,dept:{title:str},skills:[str],active:bool}]:
   (1, Alice, (Manager), [Rust, Go], true),
   (2, Bob, (Engineer), [Python], false),
   (3, \"Carol Smith\", (Director), [Leadership, Strategy], true)";
-    let employees: Vec<Employee> = from_str_vec(input).unwrap();
+    let employees: Vec<Employee> = decode(input).unwrap();
     for e in &employees {
         println!("   {:?}", e);
     }
@@ -258,7 +258,7 @@ fn main() {
     // -----------------------------------------------------------------------
     println!("\n3. Map/Dict field:");
     let input = "{name,attrs}:(Alice,[(age,30),(score,95)])";
-    let item: WithMap = from_str(input).unwrap();
+    let item: WithMap = decode(input).unwrap();
     println!("   {:?}", item);
 
     // -----------------------------------------------------------------------
@@ -272,9 +272,9 @@ fn main() {
             zip: 10001,
         },
     };
-    let s = to_string(&nested).unwrap();
+    let s = encode(&nested).unwrap();
     println!("   serialized:   {}", s);
-    let deserialized: Nested = from_str(&s).unwrap();
+    let deserialized: Nested = decode(&s).unwrap();
     assert_eq!(nested, deserialized);
     println!("   ✓ roundtrip OK");
 
@@ -289,9 +289,9 @@ fn main() {
     let note = Note {
         text: "say \"hi\", then (wave)\tnewline\nend".into(),
     };
-    let s = to_string(&note).unwrap();
+    let s = encode(&note).unwrap();
     println!("   serialized:   {}", s);
-    let note2: Note = from_str(&s).unwrap();
+    let note2: Note = decode(&s).unwrap();
     assert_eq!(note, note2);
     println!("   ✓ escape roundtrip OK");
 
@@ -310,9 +310,9 @@ fn main() {
         value: 95.0,
         label: "score".into(),
     };
-    let s = to_string(&m).unwrap();
+    let s = encode(&m).unwrap();
     println!("   serialized: {}", s);
-    let m2: Measurement = from_str(&s).unwrap();
+    let m2: Measurement = decode(&s).unwrap();
     assert_eq!(m, m2);
     println!("   ✓ float roundtrip OK");
 
@@ -331,9 +331,9 @@ fn main() {
         b: -3.15,
         c: i64::MIN + 1,
     };
-    let s = to_string(&n).unwrap();
+    let s = encode(&n).unwrap();
     println!("   serialized:   {}", s);
-    let n2: Nums = from_str(&s).unwrap();
+    let n2: Nums = decode(&s).unwrap();
     assert_eq!(n, n2);
     println!("   ✓ negative roundtrip OK");
 
@@ -361,10 +361,10 @@ fn main() {
         vec_str: vec!["alpha".into(), "beta gamma".into(), "delta".into()],
         nested_vec: vec![vec![1, 2], vec![3, 4, 5]],
     };
-    let s = to_string(&all).unwrap();
+    let s = encode(&all).unwrap();
     println!("   serialized ({} bytes):", s.len());
     println!("   {}", s);
-    let all2: AllTypes = from_str(&s).unwrap();
+    let all2: AllTypes = decode(&s).unwrap();
     assert_eq!(all, all2);
     println!("   ✓ all-types roundtrip OK");
 
@@ -378,9 +378,9 @@ fn main() {
         shape: Shape::Circle(5.0),
         score: 9.5,
     };
-    let s1 = to_string(&d1).unwrap();
+    let s1 = encode(&d1).unwrap();
     println!("   unit+newtype: {}", s1);
-    let d1b: Drawing = from_str(&s1).unwrap();
+    let d1b: Drawing = decode(&s1).unwrap();
     assert_eq!(d1, d1b);
 
     let d2 = Drawing {
@@ -389,9 +389,9 @@ fn main() {
         shape: Shape::Rectangle(3.0, 4.0),
         score: 8.2,
     };
-    let s2 = to_string(&d2).unwrap();
+    let s2 = encode(&d2).unwrap();
     println!("   tuple variant: {}", s2);
-    let d2b: Drawing = from_str(&s2).unwrap();
+    let d2b: Drawing = decode(&s2).unwrap();
     assert_eq!(d2, d2b);
 
     let d3 = Drawing {
@@ -403,9 +403,9 @@ fn main() {
         },
         score: 7.0,
     };
-    let s3 = to_string(&d3).unwrap();
+    let s3 = encode(&d3).unwrap();
     println!("   struct variant: {}", s3);
-    let d3b: Drawing = from_str(&s3).unwrap();
+    let d3b: Drawing = decode(&s3).unwrap();
     assert_eq!(d3, d3b);
     println!("   ✓ all enum variants roundtrip OK");
 
@@ -509,16 +509,16 @@ fn main() {
             },
         ],
     };
-    let s = to_string(&country).unwrap();
+    let s = encode(&country).unwrap();
     println!("   serialized ({} bytes)", s.len());
     println!("   first 200 chars: {}...", &s[..200.min(s.len())]);
-    let country2: Country = from_str(&s).unwrap();
+    let country2: Country = decode(&s).unwrap();
     assert_eq!(country, country2);
     println!("   ✓ 5-level ASON-text roundtrip OK");
 
     // ASON binary roundtrip
-    let bin = to_bin(&country).unwrap();
-    let country3: Country = from_bin(&bin).unwrap();
+    let bin = encode_binary(&country).unwrap();
+    let country3: Country = decode_binary(&bin).unwrap();
     assert_eq!(country, country3);
     println!("   ✓ 5-level ASON-bin roundtrip OK");
 
@@ -615,15 +615,15 @@ fn main() {
             }],
         }],
     };
-    let s = to_string(&universe).unwrap();
+    let s = encode(&universe).unwrap();
     println!("   serialized ({} bytes)", s.len());
-    let universe2: Universe = from_str(&s).unwrap();
+    let universe2: Universe = decode(&s).unwrap();
     assert_eq!(universe, universe2);
     println!("   ✓ 7-level ASON-text roundtrip OK");
 
     // ASON binary roundtrip
-    let bin = to_bin(&universe).unwrap();
-    let universe3: Universe = from_bin(&bin).unwrap();
+    let bin = encode_binary(&universe).unwrap();
+    let universe3: Universe = decode_binary(&bin).unwrap();
     assert_eq!(universe, universe3);
     println!("   ✓ 7-level ASON-bin roundtrip OK");
 
@@ -675,10 +675,10 @@ fn main() {
         features: vec!["auth".into(), "rate-limit".into(), "websocket".into()],
         env,
     };
-    let s = to_string(&config).unwrap();
+    let s = encode(&config).unwrap();
     println!("   serialized ({} bytes):", s.len());
     println!("   {}", s);
-    let config2: ServiceConfig = from_str(&s).unwrap();
+    let config2: ServiceConfig = decode(&s).unwrap();
     assert_eq!(config, config2);
     println!("   ✓ config roundtrip OK");
 
@@ -690,8 +690,8 @@ fn main() {
         (1.0 - s.len() as f64 / json.len() as f64) * 100.0
     );
     // Binary roundtrip
-    let bin = to_bin(&config).unwrap();
-    let config3: ServiceConfig = from_bin(&bin).unwrap();
+    let bin = encode_binary(&config).unwrap();
+    let config3: ServiceConfig = decode_binary(&bin).unwrap();
     assert_eq!(config, config3);
     println!("   ✓ config ASON-bin roundtrip OK");
     println!(
@@ -746,14 +746,14 @@ fn main() {
     let mut total_json_bytes = 0usize;
     let mut total_bin_bytes = 0usize;
     for c in &countries {
-        let s = to_string(c).unwrap();
+        let s = encode(c).unwrap();
         let j = serde_json::to_string(c).unwrap();
-        let b = to_bin(c).unwrap();
+        let b = encode_binary(c).unwrap();
         // Verify text roundtrip
-        let c2: Country = from_str(&s).unwrap();
+        let c2: Country = decode(&s).unwrap();
         assert_eq!(c, &c2);
         // Verify binary roundtrip
-        let c3: Country = from_bin(&b).unwrap();
+        let c3: Country = decode_binary(&b).unwrap();
         assert_eq!(c, &c3);
         total_ason_bytes += s.len();
         total_json_bytes += j.len();
@@ -787,7 +787,7 @@ fn main() {
     // -----------------------------------------------------------------------
     println!("\n14. Deserialize with nested schema type hints:");
     let input = "{name:str,code:str,population:int,gdp_trillion:float,regions:[{name:str,cities:[{name:str,population:int,area_km2:float,districts:[{name:str,population:int,streets:[{name:str,length_km:float,buildings:[{name:str,floors:int,residential:bool,height_m:float}]}]}]}]}]}:(TestLand,TL,1000000,0.5,[(TestRegion,[(TestCity,500000,100.0,[(Central,250000,[(Main St,2.5,[(HQ,10,false,45.0)])])])])])";
-    let c: Country = from_str(input).unwrap();
+    let c: Country = decode(input).unwrap();
     assert_eq!(c.name, "TestLand");
     assert_eq!(
         c.regions[0].cities[0].districts[0].streets[0].buildings[0].name,
@@ -800,12 +800,12 @@ fn main() {
     );
 
     // -----------------------------------------------------------------------
-    // 15. Typed serialization (to_string_typed)
+    // 15. Typed serialization (encode_typed)
     // -----------------------------------------------------------------------
-    println!("\n15. Typed serialization (to_string_typed):");
+    println!("\n15. Typed serialization (encode_typed):");
 
     // Simple struct
-    let user_typed = to_string_typed(&Employee {
+    let user_typed = encode_typed(&Employee {
         id: 1,
         name: "Alice".into(),
         dept: Department {
@@ -816,34 +816,34 @@ fn main() {
     })
     .unwrap();
     println!("   nested struct: {}", user_typed);
-    let emp_back: Employee = from_str(&user_typed).unwrap();
+    let emp_back: Employee = decode(&user_typed).unwrap();
     assert_eq!(emp_back.name, "Alice");
     println!("   ✓ typed nested struct roundtrip OK");
 
     // All-types struct
-    let all_typed = to_string_typed(&all).unwrap();
+    let all_typed = encode_typed(&all).unwrap();
     println!(
         "   all-types ({} bytes): {}...",
         all_typed.len(),
         &all_typed[..80.min(all_typed.len())]
     );
-    let all_back: AllTypes = from_str(&all_typed).unwrap();
+    let all_back: AllTypes = decode(&all_typed).unwrap();
     assert_eq!(all, all_back);
     println!("   ✓ typed all-types roundtrip OK");
 
     // Config struct
-    let config_typed = to_string_typed(&config).unwrap();
+    let config_typed = encode_typed(&config).unwrap();
     println!(
         "   config ({} bytes): {}...",
         config_typed.len(),
         &config_typed[..100.min(config_typed.len())]
     );
-    let config_back: ServiceConfig = from_str(&config_typed).unwrap();
+    let config_back: ServiceConfig = decode(&config_typed).unwrap();
     assert_eq!(config, config_back);
     println!("   ✓ typed config roundtrip OK");
 
     // Compare typed vs untyped output
-    let untyped = to_string(&config).unwrap();
+    let untyped = encode(&config).unwrap();
     println!(
         "   untyped schema: {} bytes | typed schema: {} bytes | overhead: {} bytes",
         untyped.len(),
@@ -862,9 +862,9 @@ fn main() {
         items: Vec<i64>,
     }
     let wv = WithVec { items: vec![] };
-    let s = to_string(&wv).unwrap();
+    let s = encode(&wv).unwrap();
     println!("   empty vec: {}", s);
-    let wv2: WithVec = from_str(&s).unwrap();
+    let wv2: WithVec = decode(&s).unwrap();
     assert_eq!(wv, wv2);
 
     // String with all special chars
@@ -875,25 +875,25 @@ fn main() {
     let sp = Special {
         val: "tabs\there, newlines\nhere, quotes\"and\\backslash".into(),
     };
-    let s = to_string(&sp).unwrap();
+    let s = encode(&sp).unwrap();
     println!("   special chars: {}", s);
-    let sp2: Special = from_str(&s).unwrap();
+    let sp2: Special = decode(&s).unwrap();
     assert_eq!(sp, sp2);
 
     // Boolean edge
     let sp3 = Special { val: "true".into() };
-    let s = to_string(&sp3).unwrap();
+    let s = encode(&sp3).unwrap();
     println!("   bool-like string: {}", s);
-    let sp4: Special = from_str(&s).unwrap();
+    let sp4: Special = decode(&s).unwrap();
     assert_eq!(sp3, sp4);
 
     // Number-like string
     let sp5 = Special {
         val: "12345".into(),
     };
-    let s = to_string(&sp5).unwrap();
+    let s = encode(&sp5).unwrap();
     println!("   number-like string: {}", s);
-    let sp6: Special = from_str(&s).unwrap();
+    let sp6: Special = decode(&s).unwrap();
     assert_eq!(sp5, sp6);
 
     println!("   ✓ all edge cases OK");
@@ -909,9 +909,9 @@ fn main() {
     let m3 = Matrix3D {
         data: vec![vec![vec![1, 2], vec![3, 4]], vec![vec![5, 6, 7], vec![8]]],
     };
-    let s = to_string(&m3).unwrap();
+    let s = encode(&m3).unwrap();
     println!("   {}", s);
-    let m3b: Matrix3D = from_str(&s).unwrap();
+    let m3b: Matrix3D = decode(&s).unwrap();
     assert_eq!(m3, m3b);
     println!("   ✓ triple-nested array roundtrip OK");
 
@@ -920,10 +920,10 @@ fn main() {
     // -----------------------------------------------------------------------
     println!("\n18. Comments:");
     let _input = "/* Top-level comment */
-{id,name,active}:
+[{id,name,active}]:
   /* row 1 */ (1, Alice, true)";
     let emp: Employee =
-        from_str("{id,name,dept:{title},skills,active}:/* inline */ (1,Alice,(HR),[rust],true)")
+        decode("{id,name,dept:{title},skills,active}:/* inline */ (1,Alice,(HR),[rust],true)")
             .unwrap();
     println!("   with inline comment: {:?}", emp);
     println!("   ✓ comment parsing OK");

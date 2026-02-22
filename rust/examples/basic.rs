@@ -1,6 +1,5 @@
 use ason::{
-    Result, StructSchema, from_bin, from_bin_vec, from_str, from_str_vec, to_bin, to_bin_vec,
-    to_string, to_string_typed, to_string_vec, to_string_vec_typed,
+    decode, decode_binary, encode, encode_binary, encode_typed,
 };
 use serde::{Deserialize, Serialize};
 
@@ -9,22 +8,6 @@ struct User {
     id: i64,
     name: String,
     active: bool,
-}
-
-impl StructSchema for User {
-    fn field_names() -> &'static [&'static str] {
-        &["id", "name", "active"]
-    }
-    fn field_types() -> &'static [&'static str] {
-        &["int", "str", "bool"]
-    }
-    fn serialize_fields(&self, ser: &mut ason::serialize::Serializer) -> Result<()> {
-        use serde::Serialize;
-        self.id.serialize(&mut *ser)?;
-        self.name.serialize(&mut *ser)?;
-        self.active.serialize(&mut *ser)?;
-        Ok(())
-    }
 }
 
 fn main() {
@@ -36,19 +19,19 @@ fn main() {
         name: "Alice".into(),
         active: true,
     };
-    let ason_str = to_string(&user).unwrap();
+    let ason_str = encode(&user).unwrap();
     println!("Serialize single struct:");
     println!("  {}\n", ason_str);
 
-    // 2. Serialize with type annotations (to_string_typed)
-    let typed_str = to_string_typed(&user).unwrap();
+    // 2. Serialize with type annotations (encode_typed)
+    let typed_str = encode_typed(&user).unwrap();
     println!("Serialize with type annotations:");
     println!("  {}\n", typed_str);
     assert!(typed_str.starts_with("{id:int,name:str,active:bool}:"));
 
     // 3. Deserialize from ASON (accepts both annotated and unannotated)
     let input = "{id:int,name:str,active:bool}:(1,Alice,true)";
-    let user: User = from_str(input).unwrap();
+    let user: User = decode(input).unwrap();
     println!("Deserialize single struct:");
     println!("  {:?}\n", user);
 
@@ -70,20 +53,20 @@ fn main() {
             active: true,
         },
     ];
-    let ason_vec = to_string_vec(&users).unwrap();
+    let ason_vec = encode(&users).unwrap();
     println!("Serialize vec (schema-driven):");
     println!("  {}\n", ason_vec);
 
-    // 5. Serialize vec with type annotations (to_string_vec_typed)
-    let typed_vec = to_string_vec_typed(&users).unwrap();
+    // 5. Serialize vec with type annotations (encode_typed)
+    let typed_vec = encode_typed(&users).unwrap();
     println!("Serialize vec with type annotations:");
     println!("  {}\n", typed_vec);
-    assert!(typed_vec.starts_with("{id:int,name:str,active:bool}:"));
+    assert!(typed_vec.starts_with("[{id:int,name:str,active:bool}]:"));
 
     // 6. Deserialize vec
     let input =
-        "{id:int,name:str,active:bool}:(1,Alice,true),(2,Bob,false),(3,\"Carol Smith\",true)";
-    let users: Vec<User> = from_str_vec(input).unwrap();
+        "[{id:int,name:str,active:bool}]:(1,Alice,true),(2,Bob,false),(3,\"Carol Smith\",true)";
+    let users: Vec<User> = decode(input).unwrap();
     println!("Deserialize vec:");
     for u in &users {
         println!("  {:?}", u);
@@ -91,11 +74,11 @@ fn main() {
 
     // 7. Multiline format
     println!("\nMultiline format:");
-    let multiline = "{id:int, name:str, active:bool}:
+    let multiline = "[{id:int, name:str, active:bool}]:
   (1, Alice, true),
   (2, Bob, false),
   (3, \"Carol Smith\", true)";
-    let users: Vec<User> = from_str_vec(multiline).unwrap();
+    let users: Vec<User> = decode(multiline).unwrap();
     for u in &users {
         println!("  {:?}", u);
     }
@@ -108,13 +91,13 @@ fn main() {
         active: true,
     };
     // ASON text
-    let ason_str = to_string(&original).unwrap();
-    let from_ason: User = from_str(&ason_str).unwrap();
+    let ason_str = encode(&original).unwrap();
+    let from_ason: User = decode(&ason_str).unwrap();
     assert_eq!(original, from_ason);
     // ASON binary
-    let ason_bin = to_bin(&original).unwrap();
-    let from_bin_val: User = from_bin(&ason_bin).unwrap();
-    assert_eq!(original, from_bin_val);
+    let ason_bin = encode_binary(&original).unwrap();
+    let decode_binary_val: User = decode_binary(&ason_bin).unwrap();
+    assert_eq!(original, decode_binary_val);
     // JSON
     let json_str = serde_json::to_string(&original).unwrap();
     let from_json: User = serde_json::from_str(&json_str).unwrap();
@@ -127,11 +110,11 @@ fn main() {
 
     // 9. Vec roundtrip (ASON-text + ASON-bin + JSON)
     println!("\n9. Vec roundtrip (ASON-text vs ASON-bin vs JSON):");
-    let vec_ason = to_string_vec(&users).unwrap();
-    let vec_bin = to_bin_vec(&users).unwrap();
+    let vec_ason = encode(&users).unwrap();
+    let vec_bin = encode_binary(&users).unwrap();
     let vec_json = serde_json::to_string(&users).unwrap();
-    let v1: Vec<User> = from_str_vec(&vec_ason).unwrap();
-    let v2: Vec<User> = from_bin_vec(&vec_bin).unwrap();
+    let v1: Vec<User> = decode(&vec_ason).unwrap();
+    let v2: Vec<User> = decode_binary(&vec_bin).unwrap();
     let v3: Vec<User> = serde_json::from_str(&vec_json).unwrap();
     assert_eq!(users, v1);
     assert_eq!(users, v2);
@@ -153,11 +136,11 @@ fn main() {
         label: Option<String>,
     }
     let input = "{id,label}:(1,hello)";
-    let item: Item = from_str(input).unwrap();
+    let item: Item = decode(input).unwrap();
     println!("  with value: {:?}", item);
 
     let input = "{id,label}:(2,)";
-    let item: Item = from_str(input).unwrap();
+    let item: Item = decode(input).unwrap();
     println!("  with null:  {:?}", item);
 
     // 11. Array fields
@@ -168,13 +151,13 @@ fn main() {
         tags: Vec<String>,
     }
     let input = "{name,tags}:(Alice,[rust,go,python])";
-    let t: Tagged = from_str(input).unwrap();
+    let t: Tagged = decode(input).unwrap();
     println!("  {:?}", t);
 
     // 12. Comments
     println!("\n12. With comments:");
     let input = "/* user list */ {id,name,active}:(1,Alice,true)";
-    let user: User = from_str(input).unwrap();
+    let user: User = decode(input).unwrap();
     println!("  {:?}", user);
 
     println!("\n=== All examples passed! ===");

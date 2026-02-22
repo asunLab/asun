@@ -91,8 +91,8 @@ ASON_FIELDS(StringOnly, (val, "val", "str"))
 void test_simple_roundtrip() {
     TEST(simple_roundtrip);
     Simple s{42, "Alice", true};
-    auto str = ason::dump(s);
-    auto s2 = ason::load<Simple>(str);
+    auto str = ason::encode(s);
+    auto s2 = ason::decode<Simple>(str);
     ASSERT_EQ(s2.id, 42);
     ASSERT_EQ(s2.name, "Alice");
     ASSERT_TRUE(s2.active);
@@ -102,9 +102,9 @@ void test_simple_roundtrip() {
 void test_typed_roundtrip() {
     TEST(typed_roundtrip);
     Simple s{1, "Bob", false};
-    auto str = ason::dump_typed(s);
+    auto str = ason::encode_typed(s);
     ASSERT_TRUE(str.find("id:int") != std::string::npos);
-    auto s2 = ason::load<Simple>(str);
+    auto s2 = ason::decode<Simple>(str);
     ASSERT_EQ(s2.id, 1);
     ASSERT_EQ(s2.name, "Bob");
     ASSERT_FALSE(s2.active);
@@ -114,8 +114,8 @@ void test_typed_roundtrip() {
 void test_vec_roundtrip() {
     TEST(vec_roundtrip);
     std::vector<Simple> vec = {{1,"A",true},{2,"B",false},{3,"C",true}};
-    auto str = ason::dump_vec(vec);
-    auto vec2 = ason::load_vec<Simple>(str);
+    auto str = ason::encode(vec);
+    auto vec2 = ason::decode<std::vector<Simple>>(str);
     ASSERT_EQ(vec2.size(), 3u);
     ASSERT_EQ(vec2[0].id, 1);
     ASSERT_EQ(vec2[1].name, "B");
@@ -126,9 +126,9 @@ void test_vec_roundtrip() {
 void test_vec_typed_roundtrip() {
     TEST(vec_typed_roundtrip);
     std::vector<Simple> vec = {{1,"A",true}};
-    auto str = ason::dump_vec_typed(vec);
+    auto str = ason::encode_typed(vec);
     ASSERT_TRUE(str.find("id:int") != std::string::npos);
-    auto vec2 = ason::load_vec<Simple>(str);
+    auto vec2 = ason::decode<std::vector<Simple>>(str);
     ASSERT_EQ(vec2.size(), 1u);
     ASSERT_EQ(vec2[0].name, "A");
     PASS();
@@ -136,7 +136,7 @@ void test_vec_typed_roundtrip() {
 
 void test_optional_present() {
     TEST(optional_present);
-    auto r = ason::load<WithOptional>("{id,label,count}:(1,hello,42)");
+    auto r = ason::decode<WithOptional>("{id,label,count}:(1,hello,42)");
     ASSERT_EQ(r.id, 1);
     ASSERT_TRUE(r.label.has_value());
     ASSERT_EQ(*r.label, "hello");
@@ -147,7 +147,7 @@ void test_optional_present() {
 
 void test_optional_absent() {
     TEST(optional_absent);
-    auto r = ason::load<WithOptional>("{id,label,count}:(1,,)");
+    auto r = ason::decode<WithOptional>("{id,label,count}:(1,,)");
     ASSERT_EQ(r.id, 1);
     ASSERT_FALSE(r.label.has_value());
     ASSERT_FALSE(r.count.has_value());
@@ -157,8 +157,8 @@ void test_optional_absent() {
 void test_optional_dump() {
     TEST(optional_dump);
     WithOptional w{1, "hi", std::nullopt};
-    auto s = ason::dump(w);
-    auto w2 = ason::load<WithOptional>(s);
+    auto s = ason::encode(w);
+    auto w2 = ason::decode<WithOptional>(s);
     ASSERT_EQ(w2.id, 1);
     ASSERT_TRUE(w2.label.has_value());
     ASSERT_EQ(*w2.label, "hi");
@@ -168,7 +168,7 @@ void test_optional_dump() {
 
 void test_vec_field() {
     TEST(vec_field);
-    auto r = ason::load<WithVec>("{name,nums}:(test,[1,2,3,4,5])");
+    auto r = ason::decode<WithVec>("{name,nums}:(test,[1,2,3,4,5])");
     ASSERT_EQ(r.name, "test");
     ASSERT_EQ(r.nums.size(), 5u);
     ASSERT_EQ(r.nums[0], 1);
@@ -178,19 +178,19 @@ void test_vec_field() {
 
 void test_empty_vec() {
     TEST(empty_vec);
-    auto r = ason::load<WithVec>("{name,nums}:(test,[])");
+    auto r = ason::decode<WithVec>("{name,nums}:(test,[])");
     ASSERT_EQ(r.name, "test");
     ASSERT_TRUE(r.nums.empty());
     // Roundtrip
-    auto s = ason::dump(r);
-    auto r2 = ason::load<WithVec>(s);
+    auto s = ason::encode(r);
+    auto r2 = ason::decode<WithVec>(s);
     ASSERT_TRUE(r2.nums.empty());
     PASS();
 }
 
 void test_nested_struct() {
     TEST(nested_struct);
-    auto r = ason::load<Outer>("{label,inner:{val,n}}:(hello,(world,42))");
+    auto r = ason::decode<Outer>("{label,inner:{val,n}}:(hello,(world,42))");
     ASSERT_EQ(r.label, "hello");
     ASSERT_EQ(r.inner.val, "world");
     ASSERT_EQ(r.inner.n, 42);
@@ -200,8 +200,8 @@ void test_nested_struct() {
 void test_nested_roundtrip() {
     TEST(nested_roundtrip);
     Outer o{"test", {"value", 99}};
-    auto s = ason::dump(o);
-    auto o2 = ason::load<Outer>(s);
+    auto s = ason::encode(o);
+    auto o2 = ason::decode<Outer>(s);
     ASSERT_EQ(o2.label, "test");
     ASSERT_EQ(o2.inner.val, "value");
     ASSERT_EQ(o2.inner.n, 99);
@@ -210,7 +210,7 @@ void test_nested_roundtrip() {
 
 void test_map_field() {
     TEST(map_field);
-    auto r = ason::load<WithMap>("{name,attrs}:(Alice,[(age,30),(score,95)])");
+    auto r = ason::decode<WithMap>("{name,attrs}:(Alice,[(age,30),(score,95)])");
     ASSERT_EQ(r.name, "Alice");
     ASSERT_EQ(r.attrs.size(), 2u);
     ASSERT_EQ(r.attrs.at("age"), 30);
@@ -221,8 +221,8 @@ void test_map_field() {
 void test_map_roundtrip() {
     TEST(map_roundtrip);
     WithMap m{"Bob", {{"x", 1}, {"y", 2}}};
-    auto s = ason::dump(m);
-    auto m2 = ason::load<WithMap>(s);
+    auto s = ason::encode(m);
+    auto m2 = ason::decode<WithMap>(s);
     ASSERT_EQ(m2.name, "Bob");
     ASSERT_EQ(m2.attrs.at("x"), 1);
     ASSERT_EQ(m2.attrs.at("y"), 2);
@@ -231,7 +231,7 @@ void test_map_roundtrip() {
 
 void test_quoted_string() {
     TEST(quoted_string);
-    auto r = ason::load<Simple>("{id,name,active}:(1,\"hello world\",true)");
+    auto r = ason::decode<Simple>("{id,name,active}:(1,\"hello world\",true)");
     ASSERT_EQ(r.name, "hello world");
     PASS();
 }
@@ -239,8 +239,8 @@ void test_quoted_string() {
 void test_escape_sequences() {
     TEST(escape_sequences);
     StringOnly s{"say \"hi\", then (wave)\tnewline\nend"};
-    auto str = ason::dump(s);
-    auto s2 = ason::load<StringOnly>(str);
+    auto str = ason::encode(s);
+    auto s2 = ason::decode<StringOnly>(str);
     ASSERT_EQ(s.val, s2.val);
     PASS();
 }
@@ -249,16 +249,16 @@ void test_string_needs_quoting() {
     TEST(string_needs_quoting);
     // Strings with special chars should be quoted
     StringOnly s1{"hello,world"};
-    auto str1 = ason::dump(s1);
+    auto str1 = ason::encode(s1);
     ASSERT_TRUE(str1.find("\"hello,world\"") != std::string::npos ||
                 str1.find("\"hello\\,world\"") != std::string::npos);
 
     StringOnly s2{"true"};
-    auto str2 = ason::dump(s2);
+    auto str2 = ason::encode(s2);
     ASSERT_TRUE(str2.find("\"true\"") != std::string::npos);
 
     StringOnly s3{"12345"};
-    auto str3 = ason::dump(s3);
+    auto str3 = ason::encode(s3);
     ASSERT_TRUE(str3.find("\"12345\"") != std::string::npos);
     PASS();
 }
@@ -266,8 +266,8 @@ void test_string_needs_quoting() {
 void test_floats() {
     TEST(floats);
     Floats f{3.14, -0.5, 100.0f};
-    auto s = ason::dump(f);
-    auto f2 = ason::load<Floats>(s);
+    auto s = ason::encode(f);
+    auto f2 = ason::decode<Floats>(s);
     ASSERT_NEAR(f2.a, 3.14, 0.001);
     ASSERT_NEAR(f2.b, -0.5, 0.001);
     ASSERT_NEAR(f2.c, 100.0, 0.001);
@@ -277,10 +277,10 @@ void test_floats() {
 void test_integer_valued_float() {
     TEST(integer_valued_float);
     Floats f{42.0, 0.0, -7.0f};
-    auto s = ason::dump(f);
+    auto s = ason::encode(f);
     // Should output "42.0" not "42"
     ASSERT_TRUE(s.find("42.0") != std::string::npos);
-    auto f2 = ason::load<Floats>(s);
+    auto f2 = ason::decode<Floats>(s);
     ASSERT_NEAR(f2.a, 42.0, 0.001);
     PASS();
 }
@@ -289,8 +289,8 @@ void test_negative_numbers() {
     TEST(negative_numbers);
     AllNums n{};
     n.i8 = -128; n.i16 = -32768; n.i32 = -2147483647-1; n.i64 = -9223372036854775807LL;
-    auto s = ason::dump(n);
-    auto n2 = ason::load<AllNums>(s);
+    auto s = ason::encode(n);
+    auto n2 = ason::decode<AllNums>(s);
     ASSERT_EQ(n2.i8, -128);
     ASSERT_EQ(n2.i16, -32768);
     ASSERT_EQ(n2.i64, -9223372036854775807LL);
@@ -302,8 +302,8 @@ void test_large_unsigned() {
     AllNums n{};
     n.u64 = 18446744073709551615ULL;
     n.u32 = 4294967295U;
-    auto s = ason::dump(n);
-    auto n2 = ason::load<AllNums>(s);
+    auto s = ason::encode(n);
+    auto n2 = ason::decode<AllNums>(s);
     ASSERT_EQ(n2.u64, 18446744073709551615ULL);
     ASSERT_EQ(n2.u32, 4294967295U);
     PASS();
@@ -318,8 +318,8 @@ void test_deep_nesting() {
             DeepB{"group2", {DeepA{"b1", 10}}},
         }
     };
-    auto s = ason::dump(c);
-    auto c2 = ason::load<DeepC>(s);
+    auto s = ason::encode(c);
+    auto c2 = ason::decode<DeepC>(s);
     ASSERT_EQ(c2.title, "top");
     ASSERT_EQ(c2.groups.size(), 2u);
     ASSERT_EQ(c2.groups[0].label, "group1");
@@ -332,8 +332,8 @@ void test_deep_nesting() {
 void test_nested_vec() {
     TEST(nested_vec);
     NestedVec nv{{{1,2,3},{4,5},{6}}};
-    auto s = ason::dump(nv);
-    auto nv2 = ason::load<NestedVec>(s);
+    auto s = ason::encode(nv);
+    auto nv2 = ason::decode<NestedVec>(s);
     ASSERT_EQ(nv2.matrix.size(), 3u);
     ASSERT_EQ(nv2.matrix[0], (std::vector<int64_t>{1,2,3}));
     ASSERT_EQ(nv2.matrix[1], (std::vector<int64_t>{4,5}));
@@ -343,7 +343,7 @@ void test_nested_vec() {
 
 void test_comments() {
     TEST(comments);
-    auto r = ason::load<Simple>("/* top-level comment */ {id,name,active}: /* inline */ (1,Alice,true)");
+    auto r = ason::decode<Simple>("/* top-level comment */ {id,name,active}: /* inline */ (1,Alice,true)");
     ASSERT_EQ(r.id, 1);
     ASSERT_EQ(r.name, "Alice");
     ASSERT_TRUE(r.active);
@@ -352,7 +352,7 @@ void test_comments() {
 
 void test_whitespace() {
     TEST(whitespace);
-    auto r = ason::load<Simple>("{ id , name , active } : ( 1 , Alice , true )");
+    auto r = ason::decode<Simple>("{ id , name , active } : ( 1 , Alice , true )");
     ASSERT_EQ(r.id, 1);
     ASSERT_EQ(r.name, "Alice");
     ASSERT_TRUE(r.active);
@@ -361,8 +361,8 @@ void test_whitespace() {
 
 void test_multiline() {
     TEST(multiline);
-    auto vec = ason::load_vec<Simple>(
-        "{id, name, active}:\n"
+    auto vec = ason::decode<std::vector<Simple>>(
+        "[{id, name, active}]:\n"
         "  (1, Alice, true),\n"
         "  (2, Bob, false)");
     ASSERT_EQ(vec.size(), 2u);
@@ -373,7 +373,7 @@ void test_multiline() {
 
 void test_typed_schema_parse() {
     TEST(typed_schema_parse);
-    auto r = ason::load<Simple>(
+    auto r = ason::decode<Simple>(
         "{id:int,name:str,active:bool}:(42,Hello,false)");
     ASSERT_EQ(r.id, 42);
     ASSERT_EQ(r.name, "Hello");
@@ -384,7 +384,7 @@ void test_typed_schema_parse() {
 void test_schema_field_mismatch() {
     TEST(schema_field_mismatch);
     // Extra field in schema that struct doesn't have — should skip
-    auto r = ason::load<Simple>(
+    auto r = ason::decode<Simple>(
         "{id,extra_field,name,active}:(42,ignored,Hello,true)");
     ASSERT_EQ(r.id, 42);
     ASSERT_EQ(r.name, "Hello");
@@ -394,23 +394,23 @@ void test_schema_field_mismatch() {
 
 void test_unquoted_string_trim() {
     TEST(unquoted_string_trim);
-    auto r = ason::load<Simple>("{id,name,active}:(1,  Alice  ,true)");
+    auto r = ason::decode<Simple>("{id,name,active}:(1,  Alice  ,true)");
     ASSERT_EQ(r.name, "Alice");
     PASS();
 }
 
 void test_bool_values() {
     TEST(bool_values);
-    auto r1 = ason::load<Simple>("{id,name,active}:(1,A,true)");
+    auto r1 = ason::decode<Simple>("{id,name,active}:(1,A,true)");
     ASSERT_TRUE(r1.active);
-    auto r2 = ason::load<Simple>("{id,name,active}:(1,A,false)");
+    auto r2 = ason::decode<Simple>("{id,name,active}:(1,A,false)");
     ASSERT_FALSE(r2.active);
     PASS();
 }
 
 void test_empty_optional_between_commas() {
     TEST(empty_optional_between_commas);
-    auto r = ason::load<WithOptional>("{id,label,count}:(1,,42)");
+    auto r = ason::decode<WithOptional>("{id,label,count}:(1,,42)");
     ASSERT_EQ(r.id, 1);
     ASSERT_FALSE(r.label.has_value());
     ASSERT_TRUE(r.count.has_value());
@@ -420,7 +420,7 @@ void test_empty_optional_between_commas() {
 
 void test_string_with_spaces() {
     TEST(string_with_spaces);
-    auto r = ason::load<Simple>("{id,name,active}:(1,\"  spaces  \",true)");
+    auto r = ason::decode<Simple>("{id,name,active}:(1,\"  spaces  \",true)");
     ASSERT_EQ(r.name, "  spaces  ");
     PASS();
 }
@@ -430,7 +430,7 @@ void test_vec_of_strings() {
     struct VS { std::vector<std::string> tags; };
     // We need ASON_FIELDS for VS
     // Let's use WithVec with string parsing
-    auto r = ason::load<WithVec>("{name,nums}:(test,[1,2,3])");
+    auto r = ason::decode<WithVec>("{name,nums}:(test,[1,2,3])");
     ASSERT_EQ(r.nums, (std::vector<int64_t>{1,2,3}));
     PASS();
 }
@@ -439,7 +439,7 @@ void test_error_handling() {
     TEST(error_handling);
     bool caught = false;
     try {
-        ason::load<Simple>("not valid ason");
+        ason::decode<Simple>("not valid ason");
     } catch (const ason::Error&) {
         caught = true;
     }
@@ -447,25 +447,25 @@ void test_error_handling() {
     PASS();
 }
 
-void test_dump_vec_empty() {
-    TEST(dump_vec_empty);
+void test_encode_vec_empty() {
+    TEST(encode_vec_empty);
     std::vector<Simple> empty;
-    auto s = ason::dump_vec(empty);
-    ASSERT_TRUE(s.find("{id,name,active}:") == 0);
+    auto s = ason::encode(empty);
+    ASSERT_TRUE(s.find("[{id,name,active}]:") == 0);
     PASS();
 }
 
 void test_leading_trailing_space_quoting() {
     TEST(leading_trailing_space_quoting);
     StringOnly s{" leading"};
-    auto str = ason::dump(s);
+    auto str = ason::encode(s);
     ASSERT_TRUE(str.find("\" leading\"") != std::string::npos);
-    auto s2 = ason::load<StringOnly>(str);
+    auto s2 = ason::decode<StringOnly>(str);
     ASSERT_EQ(s2.val, " leading");
 
     StringOnly s3{"trailing "};
-    auto str3 = ason::dump(s3);
-    auto s4 = ason::load<StringOnly>(str3);
+    auto str3 = ason::encode(s3);
+    auto s4 = ason::decode<StringOnly>(str3);
     ASSERT_EQ(s4.val, "trailing ");
     PASS();
 }
@@ -473,8 +473,8 @@ void test_leading_trailing_space_quoting() {
 void test_backslash_escape() {
     TEST(backslash_escape);
     StringOnly s{"path\\to\\file"};
-    auto str = ason::dump(s);
-    auto s2 = ason::load<StringOnly>(str);
+    auto str = ason::encode(s);
+    auto s2 = ason::decode<StringOnly>(str);
     ASSERT_EQ(s2.val, "path\\to\\file");
     PASS();
 }
@@ -535,7 +535,7 @@ int main() {
 
     std::cout << "\n--- Edge cases ---\n";
     test_error_handling();
-    test_dump_vec_empty();
+    test_encode_vec_empty();
     test_vec_of_strings();
 
     std::cout << "\n=== Results: " << tests_passed << " passed, "

@@ -242,12 +242,12 @@ pub fn main() !void {
     print("2. Vec with nested structs:\n", .{});
     {
         const input =
-            \\{id,name,dept:{title},skills,active}:
+            \\[{id,name,dept:{title},skills,active}]:
             \\  (1, Alice, (Manager), [Rust, Go], true),
             \\  (2, Bob, (Engineer), [Python], false),
             \\  (3, "Carol Smith", (Director), [Leadership, Strategy], true)
         ;
-        const employees = try ason.decodeVec(Employee, input, alloc);
+        const employees = try ason.decode([]Employee, input, alloc);
         for (employees) |e| {
             print("   id={d} name={s} dept={s}\n", .{ e.id, e.name, e.dept.title });
         }

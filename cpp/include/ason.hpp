@@ -3,12 +3,13 @@
 // ASON — Array-Schema Object Notation  (C++17 header-only, SIMD-accelerated)
 //
 // API:
-//   ason::dump(object)             -> std::string       (serialize)
-//   ason::dump_typed(object)       -> std::string       (serialize with type annotations)
-//   ason::dump_vec(vector)         -> std::string       (serialize vector)
-//   ason::dump_vec_typed(vector)   -> std::string       (serialize vector typed)
-//   ason::load<T>(str)             -> T                 (deserialize single)
-//   ason::load_vec<T>(str)         -> std::vector<T>    (deserialize vector)
+//   ason::encode(object)           -> std::string       (serialize single struct)
+//   ason::encode(vector)           -> std::string       (serialize vector)
+//   ason::encode_typed(object)     -> std::string       (serialize with type annotations)
+//   ason::encode_typed(vector)     -> std::string       (serialize vector typed)
+//   ason::decode<T>(str)           -> T                 (deserialize, auto-detects single/{vec})
+//   ason::encode_bin(object)       -> std::string       (binary serialize)
+//   ason::decode_bin<T>(str)       -> T                 (binary deserialize)
 //
 // Reflection macro:
 //   ASON_FIELDS(StructName, (field1, "name1", "type1"), (field2, "name2", "type2"), ...)
@@ -1156,139 +1157,159 @@ load_bin_value(const char*& pos, const char* end, T& out) {
 // Public API
 // ============================================================================
 
-// dump: struct -> ASON string  {field1,field2,...}:(val1,val2,...)
-template <typename T>
-std::string dump(const T& v) {
-    static_assert(AsonFields<T>::defined, "ASON_FIELDS not defined for this type");
-    std::string buf;
-    buf.reserve(256);
-    // Schema
-    buf.push_back('{');
-    AsonFields<T>::write_schema(buf, false);
-    buf.push_back('}');
-    buf.push_back(':');
-    // Data
-    buf.push_back('(');
-    AsonFields<T>::dump_fields(buf, v);
-    buf.push_back(')');
-    return buf;
-}
+// is_vector trait
+namespace detail {
+template <typename T> struct is_vector : std::false_type {};
+template <typename T> struct is_vector<std::vector<T>> : std::true_type {};
+} // namespace detail
 
-// dump_typed: struct -> ASON string with type annotations
+// encode: struct -> ASON string  {field1,field2,...}:(val1,val2,...)
+// encode: vector<struct> -> ASON string  [{field1,field2,...}]:(val1,...),(val2,...),...
 template <typename T>
-std::string dump_typed(const T& v) {
-    static_assert(AsonFields<T>::defined, "ASON_FIELDS not defined for this type");
-    std::string buf;
-    buf.reserve(256);
-    buf.push_back('{');
-    AsonFields<T>::write_schema(buf, true);
-    buf.push_back('}');
-    buf.push_back(':');
-    buf.push_back('(');
-    AsonFields<T>::dump_fields(buf, v);
-    buf.push_back(')');
-    return buf;
-}
-
-// dump_vec: vector<struct> -> {schema}:(row1),(row2),...
-template <typename T>
-std::string dump_vec(const std::vector<T>& vec) {
-    static_assert(AsonFields<T>::defined, "ASON_FIELDS not defined for this type");
-    std::string buf;
-    buf.reserve(vec.size() * 64 + 128);
-    buf.push_back('{');
-    AsonFields<T>::write_schema(buf, false);
-    buf.push_back('}');
-    buf.push_back(':');
-    for (size_t i = 0; i < vec.size(); i++) {
-        if (i > 0) buf.push_back(',');
-        buf.push_back('(');
-        AsonFields<T>::dump_fields(buf, vec[i]);
-        buf.push_back(')');
-    }
-    return buf;
-}
-
-// dump_vec_typed
-template <typename T>
-std::string dump_vec_typed(const std::vector<T>& vec) {
-    static_assert(AsonFields<T>::defined, "ASON_FIELDS not defined for this type");
-    std::string buf;
-    buf.reserve(vec.size() * 64 + 128);
-    buf.push_back('{');
-    AsonFields<T>::write_schema(buf, true);
-    buf.push_back('}');
-    buf.push_back(':');
-    for (size_t i = 0; i < vec.size(); i++) {
-        if (i > 0) buf.push_back(',');
-        buf.push_back('(');
-        AsonFields<T>::dump_fields(buf, vec[i]);
-        buf.push_back(')');
-    }
-    return buf;
-}
-
-// load: ASON string -> struct
-template <typename T>
-T load(std::string_view input) {
-    static_assert(AsonFields<T>::defined, "ASON_FIELDS not defined for this type");
-    const char* pos = input.data();
-    const char* end = pos + input.size();
-    detail::skip_whitespace_and_comments(pos, end);
-    T result{};
-    // Must start with '{'
-    if (pos >= end || *pos != '{') throw Error("expected '{'");
-    auto schema = detail::parse_schema(pos, end);
-    detail::skip_whitespace_and_comments(pos, end);
-    if (pos >= end || *pos != ':') throw Error("expected ':'");
-    pos++;
-    detail::skip_whitespace_and_comments(pos, end);
-    int field_map[detail::ParsedSchema::MAX_FIELDS];
-    for (int fi = 0; fi < schema.count; fi++)
-        field_map[fi] = AsonFields<T>::find_field(schema.fields[fi]);
-    if (pos >= end || *pos != '(') throw Error("expected '('");
-    pos++;
-    for (int i = 0; i < schema.count; i++) {
-        detail::skip_whitespace_and_comments(pos, end);
-        if (pos < end && *pos == ')') break;
-        if (i > 0) {
-            if (*pos == ',') { pos++; detail::skip_whitespace_and_comments(pos, end); if (pos < end && *pos == ')') break; }
-            else if (*pos == ')') break;
-            else throw Error("expected ',' or ')'");
+std::string encode(const T& v) {
+    if constexpr (detail::is_vector<T>::value) {
+        using Elem = typename T::value_type;
+        static_assert(AsonFields<Elem>::defined, "ASON_FIELDS not defined for element type");
+        std::string buf;
+        buf.reserve(v.size() * 64 + 128);
+        buf.push_back('[');
+        buf.push_back('{');
+        AsonFields<Elem>::write_schema(buf, false);
+        buf.push_back('}');
+        buf.push_back(']');
+        buf.push_back(':');
+        for (size_t i = 0; i < v.size(); i++) {
+            if (i > 0) buf.push_back(',');
+            buf.push_back('(');
+            AsonFields<Elem>::dump_fields(buf, v[i]);
+            buf.push_back(')');
         }
-        if (field_map[i] >= 0) {
-            AsonFields<T>::load_field(pos, end, result, field_map[i]);
-        } else {
-            detail::skip_value(pos, end);
-        }
+        return buf;
+    } else {
+        static_assert(AsonFields<T>::defined, "ASON_FIELDS not defined for this type");
+        std::string buf;
+        buf.reserve(256);
+        buf.push_back('{');
+        AsonFields<T>::write_schema(buf, false);
+        buf.push_back('}');
+        buf.push_back(':');
+        buf.push_back('(');
+        AsonFields<T>::dump_fields(buf, v);
+        buf.push_back(')');
+        return buf;
     }
-    detail::skip_whitespace_and_comments(pos, end);
-    if (pos < end && *pos == ')') pos++;
-    return result;
 }
 
-// load_vec: ASON string -> vector<struct>
+// encode_typed: struct or vector<struct> -> ASON string with type annotations
 template <typename T>
-std::vector<T> load_vec(std::string_view input) {
-    static_assert(AsonFields<T>::defined, "ASON_FIELDS not defined for this type");
-    const char* pos = input.data();
-    const char* end = pos + input.size();
-    detail::skip_whitespace_and_comments(pos, end);
-    if (pos >= end || *pos != '{') throw Error("expected '{'");
-    auto schema = detail::parse_schema(pos, end);
-    detail::skip_whitespace_and_comments(pos, end);
-    if (pos >= end || *pos != ':') throw Error("expected ':'");
-    pos++;
-    int field_map[detail::ParsedSchema::MAX_FIELDS];
-    for (int fi = 0; fi < schema.count; fi++)
-        field_map[fi] = AsonFields<T>::find_field(schema.fields[fi]);
-    std::vector<T> result;
-    for (;;) {
+std::string encode_typed(const T& v) {
+    if constexpr (detail::is_vector<T>::value) {
+        using Elem = typename T::value_type;
+        static_assert(AsonFields<Elem>::defined, "ASON_FIELDS not defined for element type");
+        std::string buf;
+        buf.reserve(v.size() * 64 + 128);
+        buf.push_back('[');
+        buf.push_back('{');
+        AsonFields<Elem>::write_schema(buf, true);
+        buf.push_back('}');
+        buf.push_back(']');
+        buf.push_back(':');
+        for (size_t i = 0; i < v.size(); i++) {
+            if (i > 0) buf.push_back(',');
+            buf.push_back('(');
+            AsonFields<Elem>::dump_fields(buf, v[i]);
+            buf.push_back(')');
+        }
+        return buf;
+    } else {
+        static_assert(AsonFields<T>::defined, "ASON_FIELDS not defined for this type");
+        std::string buf;
+        buf.reserve(256);
+        buf.push_back('{');
+        AsonFields<T>::write_schema(buf, true);
+        buf.push_back('}');
+        buf.push_back(':');
+        buf.push_back('(');
+        AsonFields<T>::dump_fields(buf, v);
+        buf.push_back(')');
+        return buf;
+    }
+}
+
+// decode: ASON string -> T (auto-detects single struct vs vector)
+// For single: {schema}:(data)
+// For vector: [{schema}]:(data1),(data2),...
+template <typename T>
+T decode(std::string_view input) {
+    if constexpr (detail::is_vector<T>::value) {
+        using Elem = typename T::value_type;
+        static_assert(AsonFields<Elem>::defined, "ASON_FIELDS not defined for element type");
+        const char* pos = input.data();
+        const char* end = pos + input.size();
         detail::skip_whitespace_and_comments(pos, end);
-        if (pos >= end) break;
-        if (*pos != '(') break;
+        if (pos >= end || *pos != '[') throw Error("expected '[' for vec");
         pos++;
-        T elem{};
+        if (pos >= end || *pos != '{') throw Error("expected '{' after '['");
+        auto schema = detail::parse_schema(pos, end);
+        detail::skip_whitespace_and_comments(pos, end);
+        if (pos >= end || *pos != ']') throw Error("expected ']' after schema");
+        pos++;
+        detail::skip_whitespace_and_comments(pos, end);
+        if (pos >= end || *pos != ':') throw Error("expected ':'");
+        pos++;
+        int field_map[detail::ParsedSchema::MAX_FIELDS];
+        for (int fi = 0; fi < schema.count; fi++)
+            field_map[fi] = AsonFields<Elem>::find_field(schema.fields[fi]);
+        T result;
+        for (;;) {
+            detail::skip_whitespace_and_comments(pos, end);
+            if (pos >= end) break;
+            if (*pos != '(') break;
+            pos++;
+            Elem elem{};
+            for (int i = 0; i < schema.count; i++) {
+                detail::skip_whitespace_and_comments(pos, end);
+                if (pos < end && *pos == ')') break;
+                if (i > 0) {
+                    if (*pos == ',') { pos++; detail::skip_whitespace_and_comments(pos, end); if (pos < end && *pos == ')') break; }
+                    else if (*pos == ')') break;
+                    else throw Error("expected ',' or ')'");
+                }
+                if (field_map[i] >= 0) {
+                    AsonFields<Elem>::load_field(pos, end, elem, field_map[i]);
+                } else {
+                    detail::skip_value(pos, end);
+                }
+            }
+            detail::skip_whitespace_and_comments(pos, end);
+            if (pos < end && *pos == ')') pos++;
+            result.push_back(std::move(elem));
+
+            detail::skip_whitespace_and_comments(pos, end);
+            if (pos < end && *pos == ',') {
+                pos++;
+                detail::skip_whitespace_and_comments(pos, end);
+                if (pos >= end || *pos != '(') break;
+            }
+        }
+        return result;
+    } else {
+        static_assert(AsonFields<T>::defined, "ASON_FIELDS not defined for this type");
+        const char* pos = input.data();
+        const char* end = pos + input.size();
+        detail::skip_whitespace_and_comments(pos, end);
+        T result{};
+        if (pos >= end || *pos != '{') throw Error("expected '{'");
+        auto schema = detail::parse_schema(pos, end);
+        detail::skip_whitespace_and_comments(pos, end);
+        if (pos >= end || *pos != ':') throw Error("expected ':'");
+        pos++;
+        detail::skip_whitespace_and_comments(pos, end);
+        int field_map[detail::ParsedSchema::MAX_FIELDS];
+        for (int fi = 0; fi < schema.count; fi++)
+            field_map[fi] = AsonFields<T>::find_field(schema.fields[fi]);
+        if (pos >= end || *pos != '(') throw Error("expected '('");
+        pos++;
         for (int i = 0; i < schema.count; i++) {
             detail::skip_whitespace_and_comments(pos, end);
             if (pos < end && *pos == ')') break;
@@ -1298,37 +1319,29 @@ std::vector<T> load_vec(std::string_view input) {
                 else throw Error("expected ',' or ')'");
             }
             if (field_map[i] >= 0) {
-                AsonFields<T>::load_field(pos, end, elem, field_map[i]);
+                AsonFields<T>::load_field(pos, end, result, field_map[i]);
             } else {
                 detail::skip_value(pos, end);
             }
         }
         detail::skip_whitespace_and_comments(pos, end);
         if (pos < end && *pos == ')') pos++;
-        result.push_back(std::move(elem));
-
-        detail::skip_whitespace_and_comments(pos, end);
-        if (pos < end && *pos == ',') {
-            pos++;
-            detail::skip_whitespace_and_comments(pos, end);
-            if (pos >= end || *pos != '(') break;
-        }
+        return result;
     }
-    return result;
 }
 
-// dump_bin: struct -> ASON-BIN string
+// encode_bin: struct -> ASON-BIN string
 template <typename T>
-std::string dump_bin(const T& v) {
+std::string encode_bin(const T& v) {
     std::string buf;
     buf.reserve(256);
     dump_bin_value(buf, v);
     return buf;
 }
 
-// load_bin: ASON-BIN string -> struct
+// decode_bin: ASON-BIN string -> struct
 template <typename T>
-T load_bin(std::string_view input) {
+T decode_bin(std::string_view input) {
     T result{};
     const char* pos = input.data();
     const char* end = pos + input.size();

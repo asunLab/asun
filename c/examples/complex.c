@@ -393,7 +393,7 @@ int main(void) {
     const char *input =
         "{id,name,dept:{title},skills,active}:(1,Alice,(Manager),[rust],true)";
     Employee emp = {0};
-    ason_err_t err = ason_load_Employee(input, strlen(input), &emp);
+    ason_err_t err = ason_decode_Employee(input, strlen(input), &emp);
     assert(err == ASON_OK);
     printf("   id=%lld name=%s dept=%s skills=[", (long long)emp.id,
            emp.name.data, emp.dept.title.data);
@@ -415,13 +415,13 @@ int main(void) {
   printf("2. Vec with nested structs:\n");
   {
     const char *input =
-        "{id:int,name:str,dept:{title:str},skills:[str],active:bool}:"
+        "[{id:int,name:str,dept:{title:str},skills:[str],active:bool}]:"
         "(1,Alice,(Manager),[Rust,Go],true),"
         "(2,Bob,(Engineer),[Python],false),"
         "(3,\"Carol Smith\",(Director),[Leadership,Strategy],true)";
     Employee *emps = NULL;
     size_t cnt = 0;
-    ason_err_t err = ason_load_vec_Employee(input, strlen(input), &emps, &cnt);
+    ason_err_t err = ason_decode_vec_Employee(input, strlen(input), &emps, &cnt);
     assert(err == ASON_OK);
     for (size_t i = 0; i < cnt; i++) {
       printf("   id=%lld name=%s dept=%s\n", (long long)emps[i].id,
@@ -442,7 +442,7 @@ int main(void) {
   {
     const char *input = "{name,attrs}:(Alice,[(age,30),(score,95)])";
     WithMap item = {0};
-    ason_err_t err = ason_load_WithMap(input, strlen(input), &item);
+    ason_err_t err = ason_decode_WithMap(input, strlen(input), &item);
     assert(err == ASON_OK);
     printf("   name=%s attrs={", item.name.data);
     for (size_t i = 0; i < item.attrs.len; i++) {
@@ -463,10 +463,10 @@ int main(void) {
   printf("4. Nested struct roundtrip:\n");
   {
     Nested n = {ason_string_from("Alice"), {ason_string_from("NYC"), 10001}};
-    ason_buf_t buf = ason_dump_Nested(&n);
+    ason_buf_t buf = ason_encode_Nested(&n);
     printf("   serialized:   %.*s\n", (int)buf.len, buf.data);
     Nested n2 = {0};
-    ason_err_t err = ason_load_Nested(buf.data, buf.len, &n2);
+    ason_err_t err = ason_decode_Nested(buf.data, buf.len, &n2);
     assert(err == ASON_OK);
     assert(strcmp(n2.name.data, "Alice") == 0);
     assert(strcmp(n2.addr.city.data, "NYC") == 0);
@@ -484,10 +484,10 @@ int main(void) {
   printf("5. Escaped strings:\n");
   {
     Note note = {ason_string_from("say \"hi\", then (wave)\tnewline\nend")};
-    ason_buf_t buf = ason_dump_Note(&note);
+    ason_buf_t buf = ason_encode_Note(&note);
     printf("   serialized:   %.*s\n", (int)buf.len, buf.data);
     Note note2 = {0};
-    ason_err_t err = ason_load_Note(buf.data, buf.len, &note2);
+    ason_err_t err = ason_decode_Note(buf.data, buf.len, &note2);
     assert(err == ASON_OK);
     assert(strcmp(note.text.data, note2.text.data) == 0);
     printf("   escape roundtrip OK\n\n");
@@ -501,10 +501,10 @@ int main(void) {
   printf("6. Float fields:\n");
   {
     Measurement m = {2, 95.0, ason_string_from("score")};
-    ason_buf_t buf = ason_dump_Measurement(&m);
+    ason_buf_t buf = ason_encode_Measurement(&m);
     printf("   serialized: %.*s\n", (int)buf.len, buf.data);
     Measurement m2 = {0};
-    ason_err_t err = ason_load_Measurement(buf.data, buf.len, &m2);
+    ason_err_t err = ason_decode_Measurement(buf.data, buf.len, &m2);
     assert(err == ASON_OK);
     assert(m2.id == 2);
     assert(fabs(m2.value - 95.0) < 0.001);
@@ -519,10 +519,10 @@ int main(void) {
   printf("7. Negative numbers:\n");
   {
     Nums n = {-42, -3.15, -9223372036854775807LL};
-    ason_buf_t buf = ason_dump_Nums(&n);
+    ason_buf_t buf = ason_encode_Nums(&n);
     printf("   serialized:   %.*s\n", (int)buf.len, buf.data);
     Nums n2 = {0};
-    ason_err_t err = ason_load_Nums(buf.data, buf.len, &n2);
+    ason_err_t err = ason_decode_Nums(buf.data, buf.len, &n2);
     assert(err == ASON_OK);
     assert(n2.a == -42);
     assert(n2.c == -9223372036854775807LL);
@@ -568,12 +568,12 @@ int main(void) {
     ason_vec_vec_i64_push(&all.nested_vec, nv1);
     ason_vec_vec_i64_push(&all.nested_vec, nv2);
 
-    ason_buf_t buf = ason_dump_AllTypes(&all);
+    ason_buf_t buf = ason_encode_AllTypes(&all);
     printf("   serialized (%zu bytes):\n   %.*s\n", buf.len, (int)buf.len,
            buf.data);
 
     AllTypes all2 = {0};
-    ason_err_t err = ason_load_AllTypes(buf.data, buf.len, &all2);
+    ason_err_t err = ason_decode_AllTypes(buf.data, buf.len, &all2);
     assert(err == ASON_OK);
     assert(all2.b == true);
     assert(all2.i8v == -128);
@@ -650,20 +650,20 @@ int main(void) {
     ason_vec_City_push(&r2.cities, c2);
     ason_vec_Region_push(&country.regions, r2);
 
-    ason_buf_t buf = ason_dump_Country(&country);
+    ason_buf_t buf = ason_encode_Country(&country);
     printf("   serialized (%zu bytes)\n", buf.len);
 
     Country country2 = {0};
-    ason_err_t err = ason_load_Country(buf.data, buf.len, &country2);
+    ason_err_t err = ason_decode_Country(buf.data, buf.len, &country2);
     assert(err == ASON_OK);
     assert(strcmp(country2.name.data, "Rustland") == 0);
     assert(country2.regions.len == 2);
     printf("   ✓ 5-level ASON-text roundtrip OK\n");
 
     /* ASON binary roundtrip */
-    ason_buf_t bin = ason_dump_bin_Country(&country);
+    ason_buf_t bin = ason_encode_bin_Country(&country);
     Country country3 = {0};
-    ason_err_t err2 = ason_load_bin_Country(bin.data, bin.len, &country3);
+    ason_err_t err2 = ason_decode_bin_Country(bin.data, bin.len, &country3);
     assert(err2 == ASON_OK);
     assert(strcmp(country3.name.data, "Rustland") == 0);
     printf("   ✓ 5-level ASON-bin roundtrip OK\n");
@@ -729,19 +729,19 @@ int main(void) {
     ason_vec_SolarSystem_push(&g.systems, ss);
     ason_vec_Galaxy_push(&u.galaxies, g);
 
-    ason_buf_t buf = ason_dump_Universe(&u);
+    ason_buf_t buf = ason_encode_Universe(&u);
     printf("   serialized (%zu bytes)\n", buf.len);
 
     Universe u2 = {0};
-    ason_err_t err = ason_load_Universe(buf.data, buf.len, &u2);
+    ason_err_t err = ason_decode_Universe(buf.data, buf.len, &u2);
     assert(err == ASON_OK);
     assert(strcmp(u2.name.data, "Observable") == 0);
     printf("   ✓ 7-level ASON-text roundtrip OK\n");
 
     /* ASON binary roundtrip */
-    ason_buf_t bin = ason_dump_bin_Universe(&u);
+    ason_buf_t bin = ason_encode_bin_Universe(&u);
     Universe u3 = {0};
-    ason_err_t err2 = ason_load_bin_Universe(bin.data, bin.len, &u3);
+    ason_err_t err2 = ason_decode_bin_Universe(bin.data, bin.len, &u3);
     assert(err2 == ASON_OK);
     assert(strcmp(u3.name.data, "Observable") == 0);
     printf("   ✓ 7-level ASON-bin roundtrip OK\n");
@@ -783,12 +783,12 @@ int main(void) {
     ason_map_ss_push(&cfg.env, e2);
     ason_map_ss_push(&cfg.env, e3);
 
-    ason_buf_t buf = ason_dump_ServiceConfig(&cfg);
+    ason_buf_t buf = ason_encode_ServiceConfig(&cfg);
     printf("   serialized (%zu bytes):\n   %.*s\n", buf.len,
            (int)(buf.len > 200 ? 200 : buf.len), buf.data);
 
     ServiceConfig cfg2 = {0};
-    ason_err_t err = ason_load_ServiceConfig(buf.data, buf.len, &cfg2);
+    ason_err_t err = ason_decode_ServiceConfig(buf.data, buf.len, &cfg2);
     assert(err == ASON_OK);
     assert(strcmp(cfg2.name.data, "my-service") == 0);
     assert(cfg2.db.port == 5432);
@@ -832,10 +832,10 @@ int main(void) {
     /* Empty vec */
     WithVec wv = {{0}};
     wv.items = ason_vec_i64_new();
-    ason_buf_t buf = ason_dump_WithVec(&wv);
+    ason_buf_t buf = ason_encode_WithVec(&wv);
     printf("   empty vec: %.*s\n", (int)buf.len, buf.data);
     WithVec wv2 = {0};
-    ason_err_t err = ason_load_WithVec(buf.data, buf.len, &wv2);
+    ason_err_t err = ason_decode_WithVec(buf.data, buf.len, &wv2);
     assert(err == ASON_OK);
     assert(wv2.items.len == 0);
     ason_buf_free(&buf);
@@ -845,10 +845,10 @@ int main(void) {
     /* Special chars */
     Special sp = {
         ason_string_from("tabs\there, newlines\nhere, quotes\"and\\backslash")};
-    buf = ason_dump_Special(&sp);
+    buf = ason_encode_Special(&sp);
     printf("   special chars: %.*s\n", (int)buf.len, buf.data);
     Special sp2 = {0};
-    err = ason_load_Special(buf.data, buf.len, &sp2);
+    err = ason_decode_Special(buf.data, buf.len, &sp2);
     assert(err == ASON_OK);
     assert(strcmp(sp.val.data, sp2.val.data) == 0);
     ason_buf_free(&buf);
@@ -857,10 +857,10 @@ int main(void) {
 
     /* Bool-like string */
     Special sp3 = {ason_string_from("true")};
-    buf = ason_dump_Special(&sp3);
+    buf = ason_encode_Special(&sp3);
     printf("   bool-like string: %.*s\n", (int)buf.len, buf.data);
     Special sp4 = {0};
-    err = ason_load_Special(buf.data, buf.len, &sp4);
+    err = ason_decode_Special(buf.data, buf.len, &sp4);
     assert(err == ASON_OK);
     assert(strcmp(sp4.val.data, "true") == 0);
     ason_buf_free(&buf);
@@ -869,10 +869,10 @@ int main(void) {
 
     /* Number-like string */
     Special sp5 = {ason_string_from("12345")};
-    buf = ason_dump_Special(&sp5);
+    buf = ason_encode_Special(&sp5);
     printf("   number-like string: %.*s\n", (int)buf.len, buf.data);
     Special sp6 = {0};
-    err = ason_load_Special(buf.data, buf.len, &sp6);
+    err = ason_decode_Special(buf.data, buf.len, &sp6);
     assert(err == ASON_OK);
     assert(strcmp(sp6.val.data, "12345") == 0);
     ason_buf_free(&buf);
@@ -902,10 +902,10 @@ int main(void) {
     ason_vec_vec_i64_push(&m3.data, r2);
     ason_vec_vec_i64_push(&m3.data, r3);
 
-    ason_buf_t buf = ason_dump_Matrix3D(&m3);
+    ason_buf_t buf = ason_encode_Matrix3D(&m3);
     printf("   %.*s\n", (int)buf.len, buf.data);
     Matrix3D m3b = {0};
-    ason_err_t err = ason_load_Matrix3D(buf.data, buf.len, &m3b);
+    ason_err_t err = ason_decode_Matrix3D(buf.data, buf.len, &m3b);
     assert(err == ASON_OK);
     assert(m3b.data.len == 3);
     assert(m3b.data.data[2].len == 3);
@@ -928,7 +928,7 @@ int main(void) {
         "/* Top-level */ {id,name,dept:{title},skills,active}:/* inline */ "
         "(1,Alice,(HR),[rust],true)";
     Employee emp = {0};
-    ason_err_t err = ason_load_Employee(input, strlen(input), &emp);
+    ason_err_t err = ason_decode_Employee(input, strlen(input), &emp);
     assert(err == ASON_OK);
     printf("   with inline comment: id=%lld name=%s dept=%s\n",
            (long long)emp.id, emp.name.data, emp.dept.title.data);

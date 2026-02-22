@@ -212,7 +212,7 @@ func benchFlat(count, iterations int) benchResult {
 	var asonStr []byte
 	start = time.Now()
 	for i := 0; i < iterations; i++ {
-		asonStr, _ = ason.MarshalSlice(users)
+		asonStr, _ = ason.Encode(users)
 	}
 	asonSer := time.Since(start)
 
@@ -226,12 +226,12 @@ func benchFlat(count, iterations int) benchResult {
 	start = time.Now()
 	for i := 0; i < iterations; i++ {
 		var out []User
-		ason.UnmarshalSlice(asonStr, &out)
+		ason.Decode(asonStr, &out)
 	}
 	asonDe := time.Since(start)
 
 	var decoded []User
-	ason.UnmarshalSlice(asonStr, &decoded)
+	ason.Decode(asonStr, &decoded)
 	if len(decoded) != count {
 		panic(fmt.Sprintf("flat %d roundtrip failed: got %d", count, len(decoded)))
 	}
@@ -257,7 +257,7 @@ func benchAllTypes(count, iterations int) benchResult {
 	for i := 0; i < iterations; i++ {
 		asonLines = make([][]byte, len(items))
 		for j := range items {
-			asonLines[j], _ = ason.Marshal(&items[j])
+			asonLines[j], _ = ason.Encode(&items[j])
 		}
 	}
 	asonSer := time.Since(start)
@@ -278,7 +278,7 @@ func benchAllTypes(count, iterations int) benchResult {
 	for i := 0; i < iterations; i++ {
 		for _, l := range asonLines {
 			var out AllTypes
-			ason.Unmarshal(l, &out)
+			ason.Decode(l, &out)
 		}
 	}
 	asonDe := time.Since(start)
@@ -304,7 +304,7 @@ func benchDeep(count, iterations int) benchResult {
 	start = time.Now()
 	for i := 0; i < iterations; i++ {
 		for j := range companies {
-			asonStrs[j], _ = ason.Marshal(&companies[j])
+			asonStrs[j], _ = ason.Encode(&companies[j])
 		}
 	}
 	asonSer := time.Since(start)
@@ -325,14 +325,14 @@ func benchDeep(count, iterations int) benchResult {
 	for i := 0; i < iterations; i++ {
 		for _, s := range asonStrs {
 			var out Company
-			ason.Unmarshal(s, &out)
+			ason.Decode(s, &out)
 		}
 	}
 	asonDe := time.Since(start)
 
 	for i, s := range asonStrs {
 		var c2 Company
-		if err := ason.Unmarshal(s, &c2); err != nil {
+		if err := ason.Decode(s, &c2); err != nil {
 			panic(fmt.Sprintf("deep roundtrip failed at %d: %v", i, err))
 		}
 	}
@@ -349,9 +349,9 @@ func benchSingleRoundtrip(iterations int) (asonMs, jsonMs float64) {
 	user := User{ID: 1, Name: "Alice", Email: "alice@example.com", Age: 30, Score: 95.5, Active: true, Role: "engineer", City: "NYC"}
 	start := time.Now()
 	for i := 0; i < iterations; i++ {
-		s, _ := ason.Marshal(&user)
+		s, _ := ason.Encode(&user)
 		var out User
-		ason.Unmarshal(s, &out)
+		ason.Decode(s, &out)
 	}
 	asonMs = float64(time.Since(start).Nanoseconds()) / 1e6
 	start = time.Now()
@@ -383,9 +383,9 @@ func benchDeepSingleRoundtrip(iterations int) (asonMs, jsonMs float64) {
 	}
 	start := time.Now()
 	for i := 0; i < iterations; i++ {
-		s, _ := ason.Marshal(&company)
+		s, _ := ason.Encode(&company)
 		var out Company
-		ason.Unmarshal(s, &out)
+		ason.Decode(s, &out)
 	}
 	asonMs = float64(time.Since(start).Nanoseconds()) / 1e6
 	start = time.Now()
@@ -462,24 +462,24 @@ func main() {
 	fmt.Println("└──────────────────────────────────────────────────────────────┘")
 	{
 		users1k := generateUsers(1000)
-		asonUntyped, _ := ason.MarshalSlice(users1k)
+		asonUntyped, _ := ason.Encode(users1k)
 		untypedStr := string(asonUntyped)
 		typedStr := strings.Replace(untypedStr,
-			"{id,name,email,age,score,active,role,city}:",
-			"{id:int,name:str,email:str,age:int,score:float,active:bool,role:str,city:str}:", 1)
+			"[{id,name,email,age,score,active,role,city}]:",
+			"[{id:int,name:str,email:str,age:int,score:float,active:bool,role:str,city:str}]:", 1)
 		asonTyped := []byte(typedStr)
 
 		deIters := 200
 		start := time.Now()
 		for i := 0; i < deIters; i++ {
 			var out []User
-			ason.UnmarshalSlice(asonUntyped, &out)
+			ason.Decode(asonUntyped, &out)
 		}
 		untypedMs := float64(time.Since(start).Nanoseconds()) / 1e6
 		start = time.Now()
 		for i := 0; i < deIters; i++ {
 			var out []User
-			ason.UnmarshalSlice(asonTyped, &out)
+			ason.Decode(asonTyped, &out)
 		}
 		typedMs := float64(time.Since(start).Nanoseconds()) / 1e6
 		fmt.Printf("  Flat struct × 1000 (%d iters, deserialize only)\n", deIters)
@@ -488,7 +488,7 @@ func main() {
 		fmt.Printf("    Ratio: %.3fx\n\n", untypedMs/typedMs)
 
 		company := generateCompanies(1)[0]
-		deepUntyped, _ := ason.Marshal(&company)
+		deepUntyped, _ := ason.Encode(&company)
 		deepUntypedStr := string(deepUntyped)
 		deepTypedStr := strings.Replace(deepUntypedStr,
 			"{name,founded,revenue_m,public,divisions,tags}:",
@@ -498,13 +498,13 @@ func main() {
 		start = time.Now()
 		for i := 0; i < deepIters; i++ {
 			var out Company
-			ason.Unmarshal(deepUntyped, &out)
+			ason.Decode(deepUntyped, &out)
 		}
 		deepUntypedMs := float64(time.Since(start).Nanoseconds()) / 1e6
 		start = time.Now()
 		for i := 0; i < deepIters; i++ {
 			var out Company
-			ason.Unmarshal(deepTyped, &out)
+			ason.Decode(deepTyped, &out)
 		}
 		deepTypedMs := float64(time.Since(start).Nanoseconds()) / 1e6
 		fmt.Printf("  5-level deep (%d iters, deserialize only)\n", deepIters)
@@ -523,13 +523,13 @@ func main() {
 		start := time.Now()
 		var untypedOut []byte
 		for i := 0; i < serIters; i++ {
-			untypedOut, _ = ason.MarshalSlice(users1k)
+			untypedOut, _ = ason.Encode(users1k)
 		}
 		untypedMs := float64(time.Since(start).Nanoseconds()) / 1e6
 		start = time.Now()
 		var typedOut []byte
 		for i := 0; i < serIters; i++ {
-			typedOut, _ = ason.MarshalSliceTyped(users1k, []string{"int", "str", "str", "int", "float", "bool", "str", "str"})
+			typedOut, _ = ason.EncodeTyped(users1k)
 		}
 		typedMs := float64(time.Since(start).Nanoseconds()) / 1e6
 		fmt.Printf("  Flat struct × 1000 vec (%d iters, serialize only)\n", serIters)
@@ -542,13 +542,13 @@ func main() {
 		start = time.Now()
 		var singleUntyped []byte
 		for i := 0; i < singleIters; i++ {
-			singleUntyped, _ = ason.Marshal(&singleUser)
+			singleUntyped, _ = ason.Encode(&singleUser)
 		}
 		singleUntypedMs := float64(time.Since(start).Nanoseconds()) / 1e6
 		start = time.Now()
 		var singleTyped []byte
 		for i := 0; i < singleIters; i++ {
-			singleTyped, _ = ason.MarshalTyped(&singleUser)
+			singleTyped, _ = ason.EncodeTyped(&singleUser)
 		}
 		singleTypedMs := float64(time.Since(start).Nanoseconds()) / 1e6
 		fmt.Printf("  Single flat struct (%d iters, serialize only)\n", singleIters)
@@ -564,7 +564,7 @@ func main() {
 	{
 		users1k := generateUsers(1000)
 		jsonData, _ := json.Marshal(users1k)
-		asonData, _ := ason.MarshalSlice(users1k)
+		asonData, _ := ason.Encode(users1k)
 		iters := 100
 
 		start := time.Now()
@@ -574,7 +574,7 @@ func main() {
 		jsonSerDur := time.Since(start)
 		start = time.Now()
 		for i := 0; i < iters; i++ {
-			ason.MarshalSlice(users1k)
+			ason.Encode(users1k)
 		}
 		asonSerDur := time.Since(start)
 		start = time.Now()
@@ -586,7 +586,7 @@ func main() {
 		start = time.Now()
 		for i := 0; i < iters; i++ {
 			var out []User
-			ason.UnmarshalSlice(asonData, &out)
+			ason.Decode(asonData, &out)
 		}
 		asonDeDur := time.Since(start)
 
@@ -640,10 +640,10 @@ func main() {
 			var asonTotal int
 			var jsonTotal int
 			for _, u := range users {
-				binData, _ := ason.MarshalBinary(&u)
+				binData, _ := ason.EncodeBinary(&u)
 				binTotal += len(binData)
 			}
-			asonData, _ := ason.MarshalSlice(users)
+			asonData, _ := ason.Encode(users)
 			asonTotal = len(asonData)
 			jsonData, _ := json.Marshal(users)
 			jsonTotal = len(jsonData)
@@ -652,7 +652,7 @@ func main() {
 			start := time.Now()
 			for it := 0; it < iters; it++ {
 				for i := range users {
-					ason.MarshalBinary(&users[i])
+					ason.EncodeBinary(&users[i])
 				}
 			}
 			binSerMs := float64(time.Since(start).Nanoseconds()) / 1e6
@@ -660,13 +660,13 @@ func main() {
 			// Benchmark BIN deserialize
 			binBlobs := make([][]byte, len(users))
 			for i := range users {
-				binBlobs[i], _ = ason.MarshalBinary(&users[i])
+				binBlobs[i], _ = ason.EncodeBinary(&users[i])
 			}
 			start = time.Now()
 			for it := 0; it < iters; it++ {
 				for i := range binBlobs {
 					var u User
-					ason.UnmarshalBinary(binBlobs[i], &u)
+					ason.DecodeBinary(binBlobs[i], &u)
 				}
 			}
 			binDeMs := float64(time.Since(start).Nanoseconds()) / 1e6
@@ -674,13 +674,13 @@ func main() {
 			// Benchmark ASON text
 			start = time.Now()
 			for it := 0; it < iters; it++ {
-				ason.MarshalSlice(users)
+				ason.Encode(users)
 			}
 			asonSerMs := float64(time.Since(start).Nanoseconds()) / 1e6
 			start = time.Now()
 			for it := 0; it < iters; it++ {
 				var out []User
-				ason.UnmarshalSlice(asonData, &out)
+				ason.Decode(asonData, &out)
 			}
 			asonDeMs := float64(time.Since(start).Nanoseconds()) / 1e6
 
@@ -718,9 +718,9 @@ func main() {
 			// Sizes
 			var binTotal, asonTotal, jsonTotal int
 			for i := range companies {
-				b, _ := ason.MarshalBinary(&companies[i])
+				b, _ := ason.EncodeBinary(&companies[i])
 				binTotal += len(b)
-				a, _ := ason.Marshal(&companies[i])
+				a, _ := ason.Encode(&companies[i])
 				asonTotal += len(a)
 				j, _ := json.Marshal(&companies[i])
 				jsonTotal += len(j)
@@ -730,7 +730,7 @@ func main() {
 			start := time.Now()
 			for it := 0; it < iters; it++ {
 				for i := range companies {
-					ason.MarshalBinary(&companies[i])
+					ason.EncodeBinary(&companies[i])
 				}
 			}
 			binSerMs := float64(time.Since(start).Nanoseconds()) / 1e6
@@ -738,13 +738,13 @@ func main() {
 			// BIN deserialize
 			binBlobs := make([][]byte, len(companies))
 			for i := range companies {
-				binBlobs[i], _ = ason.MarshalBinary(&companies[i])
+				binBlobs[i], _ = ason.EncodeBinary(&companies[i])
 			}
 			start = time.Now()
 			for it := 0; it < iters; it++ {
 				for i := range binBlobs {
 					var c Company
-					ason.UnmarshalBinary(binBlobs[i], &c)
+					ason.DecodeBinary(binBlobs[i], &c)
 				}
 			}
 			binDeMs := float64(time.Since(start).Nanoseconds()) / 1e6
@@ -752,12 +752,12 @@ func main() {
 			// ASON text
 			asonBlobs := make([][]byte, len(companies))
 			for i := range companies {
-				asonBlobs[i], _ = ason.Marshal(&companies[i])
+				asonBlobs[i], _ = ason.Encode(&companies[i])
 			}
 			start = time.Now()
 			for it := 0; it < iters; it++ {
 				for i := range companies {
-					ason.Marshal(&companies[i])
+					ason.Encode(&companies[i])
 				}
 			}
 			asonSerMs := float64(time.Since(start).Nanoseconds()) / 1e6
@@ -765,7 +765,7 @@ func main() {
 			for it := 0; it < iters; it++ {
 				for i := range asonBlobs {
 					var c Company
-					ason.Unmarshal(asonBlobs[i], &c)
+					ason.Decode(asonBlobs[i], &c)
 				}
 			}
 			asonDeMs := float64(time.Since(start).Nanoseconds()) / 1e6
@@ -808,17 +808,17 @@ func main() {
 
 			start := time.Now()
 			for i := 0; i < rtIters; i++ {
-				b, _ := ason.MarshalBinary(&user)
+				b, _ := ason.EncodeBinary(&user)
 				var u User
-				ason.UnmarshalBinary(b, &u)
+				ason.DecodeBinary(b, &u)
 			}
 			binNs := float64(time.Since(start).Nanoseconds()) / float64(rtIters)
 
 			start = time.Now()
 			for i := 0; i < rtIters; i++ {
-				s, _ := ason.Marshal(&user)
+				s, _ := ason.Encode(&user)
 				var u User
-				ason.Unmarshal(s, &u)
+				ason.Decode(s, &u)
 			}
 			asonNs := float64(time.Since(start).Nanoseconds()) / float64(rtIters)
 

@@ -146,7 +146,7 @@ fn write_escaped(buf: &mut Vec<u8>, s: &str) {
 // Serializer
 // ---------------------------------------------------------------------------
 
-pub struct Serializer {
+pub struct Encoder {
     pub(crate) buf: Vec<u8>,
     in_tuple: bool,
     first: bool,
@@ -154,15 +154,24 @@ pub struct Serializer {
     typed: bool,
     /// Accumulates type hint for the current field being serialized.
     current_type_hint: Option<&'static str>,
+    /// Top-level seq (Vec<Struct>) support
+    in_top_seq: bool,
+    top_seq_data_start: usize,
+    top_seq_fields: Option<Vec<&'static str>>,
+    top_seq_field_types: Option<Vec<Option<&'static str>>>,
 }
 
-pub fn to_string<T: Serialize>(value: &T) -> Result<String> {
-    let mut serializer = Serializer {
+pub fn encode<T: Serialize>(value: &T) -> Result<String> {
+    let mut serializer = Encoder {
         buf: Vec::with_capacity(256),
         in_tuple: false,
         first: true,
         typed: false,
         current_type_hint: None,
+        in_top_seq: false,
+        top_seq_data_start: 0,
+        top_seq_fields: None,
+        top_seq_field_types: None,
     };
     value.serialize(&mut serializer)?;
     Ok(unsafe { String::from_utf8_unchecked(serializer.buf) })
@@ -171,19 +180,23 @@ pub fn to_string<T: Serialize>(value: &T) -> Result<String> {
 /// Serialize a single struct to ASON string with type-annotated schema.
 ///
 /// Output example: `{id:int,name:str,active:bool}:(1,Alice,true)`
-pub fn to_string_typed<T: Serialize>(value: &T) -> Result<String> {
-    let mut serializer = Serializer {
+pub fn encode_typed<T: Serialize>(value: &T) -> Result<String> {
+    let mut serializer = Encoder {
         buf: Vec::with_capacity(256),
         in_tuple: false,
         first: true,
         typed: true,
         current_type_hint: None,
+        in_top_seq: false,
+        top_seq_data_start: 0,
+        top_seq_fields: None,
+        top_seq_field_types: None,
     };
     value.serialize(&mut serializer)?;
     Ok(unsafe { String::from_utf8_unchecked(serializer.buf) })
 }
 
-impl Serializer {
+impl Encoder {
     #[inline(always)]
     fn push_separator(&mut self) {
         if !self.first {
@@ -193,17 +206,17 @@ impl Serializer {
     }
 }
 
-impl<'a> ser::Serializer for &'a mut Serializer {
+impl<'a> ser::Serializer for &'a mut Encoder {
     type Ok = ();
     type Error = Error;
 
-    type SerializeSeq = SeqSerializer<'a>;
-    type SerializeTuple = TupleSerializer<'a>;
-    type SerializeTupleStruct = TupleSerializer<'a>;
-    type SerializeTupleVariant = TupleSerializer<'a>;
-    type SerializeMap = MapSerializer<'a>;
-    type SerializeStruct = StructSerializer<'a>;
-    type SerializeStructVariant = StructSerializer<'a>;
+    type SerializeSeq = SeqEncoder<'a>;
+    type SerializeTuple = TupleEncoder<'a>;
+    type SerializeTupleStruct = TupleEncoder<'a>;
+    type SerializeTupleVariant = TupleEncoder<'a>;
+    type SerializeMap = MapEncoder<'a>;
+    type SerializeStruct = StructEncoder<'a>;
+    type SerializeStructVariant = StructEncoder<'a>;
 
     #[inline]
     fn serialize_bool(self, v: bool) -> Result<()> {
@@ -374,24 +387,34 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         Ok(())
     }
 
-    fn serialize_seq(self, _len: Option<usize>) -> Result<SeqSerializer<'a>> {
-        self.push_separator();
-        // For typed mode: mark as generic array if no specific hint set
-        if self.current_type_hint.is_none() && self.typed {
-            // We'll refine with element types if possible, but default to generic
-            // The hint will stay None and StructSerializer will not emit a type
+    fn serialize_seq(self, _len: Option<usize>) -> Result<SeqEncoder<'a>> {
+        if !self.in_tuple {
+            // Top-level seq: Vec<T> — defer format until we know element types
+            self.in_top_seq = true;
+            self.in_tuple = true;
+            self.top_seq_data_start = self.buf.len();
+            self.top_seq_fields = None;
+            self.top_seq_field_types = None;
+            Ok(SeqEncoder {
+                ser: self,
+                first: true,
+                is_top_seq: true,
+            })
+        } else {
+            self.push_separator();
+            self.buf.push(b'[');
+            Ok(SeqEncoder {
+                ser: self,
+                first: true,
+                is_top_seq: false,
+            })
         }
-        self.buf.push(b'[');
-        Ok(SeqSerializer {
-            ser: self,
-            first: true,
-        })
     }
 
-    fn serialize_tuple(self, _len: usize) -> Result<TupleSerializer<'a>> {
+    fn serialize_tuple(self, _len: usize) -> Result<TupleEncoder<'a>> {
         self.push_separator();
         self.buf.push(b'(');
-        Ok(TupleSerializer {
+        Ok(TupleEncoder {
             ser: self,
             first: true,
         })
@@ -401,10 +424,10 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         self,
         _name: &'static str,
         _len: usize,
-    ) -> Result<TupleSerializer<'a>> {
+    ) -> Result<TupleEncoder<'a>> {
         self.push_separator();
         self.buf.push(b'(');
-        Ok(TupleSerializer {
+        Ok(TupleEncoder {
             ser: self,
             first: true,
         })
@@ -416,50 +439,53 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         _variant_index: u32,
         variant: &'static str,
         _len: usize,
-    ) -> Result<TupleSerializer<'a>> {
+    ) -> Result<TupleEncoder<'a>> {
         self.push_separator();
         self.buf.push(b'(');
         self.buf.extend_from_slice(variant.as_bytes());
-        Ok(TupleSerializer {
+        Ok(TupleEncoder {
             ser: self,
             first: false,
         })
     }
 
-    fn serialize_map(self, _len: Option<usize>) -> Result<MapSerializer<'a>> {
+    fn serialize_map(self, _len: Option<usize>) -> Result<MapEncoder<'a>> {
         self.push_separator();
         if self.current_type_hint.is_none() && self.typed {
             self.current_type_hint = Some("map");
         }
         self.buf.push(b'[');
-        Ok(MapSerializer {
+        Ok(MapEncoder {
             ser: self,
             first: true,
         })
     }
 
-    fn serialize_struct(self, _name: &'static str, len: usize) -> Result<StructSerializer<'a>> {
+    fn serialize_struct(self, _name: &'static str, len: usize) -> Result<StructEncoder<'a>> {
         let is_top = !self.in_tuple;
+        let capture_for_seq = !is_top && self.in_top_seq && self.top_seq_fields.is_none();
         if is_top {
             let data_start = self.buf.len();
             self.buf.push(b'(');
             self.in_tuple = true;
-            Ok(StructSerializer {
+            Ok(StructEncoder {
                 ser: self,
                 fields: Vec::with_capacity(len),
                 field_types: Vec::with_capacity(len),
                 is_top: true,
+                capture_for_seq: false,
                 first: true,
                 data_start,
             })
         } else {
             self.push_separator();
             self.buf.push(b'(');
-            Ok(StructSerializer {
+            Ok(StructEncoder {
                 ser: self,
-                fields: Vec::new(),
-                field_types: Vec::new(),
+                fields: if capture_for_seq { Vec::with_capacity(len) } else { Vec::new() },
+                field_types: if capture_for_seq { Vec::with_capacity(len) } else { Vec::new() },
                 is_top: false,
+                capture_for_seq,
                 first: true,
                 data_start: 0,
             })
@@ -472,16 +498,17 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         _variant_index: u32,
         variant: &'static str,
         _len: usize,
-    ) -> Result<StructSerializer<'a>> {
+    ) -> Result<StructEncoder<'a>> {
         self.push_separator();
         self.buf.push(b'(');
         self.buf.extend_from_slice(variant.as_bytes());
         self.buf.push(b',');
-        Ok(StructSerializer {
+        Ok(StructEncoder {
             ser: self,
             fields: Vec::new(),
             field_types: Vec::new(),
             is_top: false,
+            capture_for_seq: false,
             first: true,
             data_start: 0,
         })
@@ -492,12 +519,13 @@ impl<'a> ser::Serializer for &'a mut Serializer {
 // SeqSerializer
 // ---------------------------------------------------------------------------
 
-pub struct SeqSerializer<'a> {
-    ser: &'a mut Serializer,
+pub struct SeqEncoder<'a> {
+    ser: &'a mut Encoder,
     first: bool,
+    is_top_seq: bool,
 }
 
-impl<'a> ser::SerializeSeq for SeqSerializer<'a> {
+impl<'a> ser::SerializeSeq for SeqEncoder<'a> {
     type Ok = ();
     type Error = Error;
 
@@ -513,7 +541,38 @@ impl<'a> ser::SerializeSeq for SeqSerializer<'a> {
 
     #[inline]
     fn end(self) -> Result<()> {
-        self.ser.buf.push(b']');
+        if self.is_top_seq {
+            if let Some(ref fields) = self.ser.top_seq_fields {
+                // Struct elements: prepend [{schema}]:
+                let data = self.ser.buf.split_off(self.ser.top_seq_data_start);
+                self.ser.buf.extend_from_slice(b"[{");
+                for (i, f) in fields.iter().enumerate() {
+                    if i > 0 {
+                        self.ser.buf.push(b',');
+                    }
+                    self.ser.buf.extend_from_slice(f.as_bytes());
+                    if self.ser.typed {
+                        if let Some(ref field_types) = self.ser.top_seq_field_types {
+                            if let Some(Some(type_hint)) = field_types.get(i) {
+                                self.ser.buf.push(b':');
+                                self.ser.buf.extend_from_slice(type_hint.as_bytes());
+                            }
+                        }
+                    }
+                }
+                self.ser.buf.extend_from_slice(b"}]:");
+                self.ser.buf.extend_from_slice(&data);
+            } else {
+                // Non-struct elements: wrap in [...]
+                let data = self.ser.buf.split_off(self.ser.top_seq_data_start);
+                self.ser.buf.push(b'[');
+                self.ser.buf.extend_from_slice(&data);
+                self.ser.buf.push(b']');
+            }
+            self.ser.in_top_seq = false;
+        } else {
+            self.ser.buf.push(b']');
+        }
         self.ser.first = false;
         Ok(())
     }
@@ -523,12 +582,12 @@ impl<'a> ser::SerializeSeq for SeqSerializer<'a> {
 // TupleSerializer
 // ---------------------------------------------------------------------------
 
-pub struct TupleSerializer<'a> {
-    ser: &'a mut Serializer,
+pub struct TupleEncoder<'a> {
+    ser: &'a mut Encoder,
     first: bool,
 }
 
-impl<'a> ser::SerializeTuple for TupleSerializer<'a> {
+impl<'a> ser::SerializeTuple for TupleEncoder<'a> {
     type Ok = ();
     type Error = Error;
 
@@ -550,7 +609,7 @@ impl<'a> ser::SerializeTuple for TupleSerializer<'a> {
     }
 }
 
-impl<'a> ser::SerializeTupleStruct for TupleSerializer<'a> {
+impl<'a> ser::SerializeTupleStruct for TupleEncoder<'a> {
     type Ok = ();
     type Error = Error;
 
@@ -565,7 +624,7 @@ impl<'a> ser::SerializeTupleStruct for TupleSerializer<'a> {
     }
 }
 
-impl<'a> ser::SerializeTupleVariant for TupleSerializer<'a> {
+impl<'a> ser::SerializeTupleVariant for TupleEncoder<'a> {
     type Ok = ();
     type Error = Error;
 
@@ -584,12 +643,12 @@ impl<'a> ser::SerializeTupleVariant for TupleSerializer<'a> {
 // MapSerializer
 // ---------------------------------------------------------------------------
 
-pub struct MapSerializer<'a> {
-    ser: &'a mut Serializer,
+pub struct MapEncoder<'a> {
+    ser: &'a mut Encoder,
     first: bool,
 }
 
-impl<'a> ser::SerializeMap for MapSerializer<'a> {
+impl<'a> ser::SerializeMap for MapEncoder<'a> {
     type Ok = ();
     type Error = Error;
 
@@ -622,17 +681,18 @@ impl<'a> ser::SerializeMap for MapSerializer<'a> {
 // StructSerializer
 // ---------------------------------------------------------------------------
 
-pub struct StructSerializer<'a> {
-    ser: &'a mut Serializer,
+pub struct StructEncoder<'a> {
+    ser: &'a mut Encoder,
     fields: Vec<&'static str>,
     /// Type hints collected for each field (only when typed mode is on)
     field_types: Vec<Option<&'static str>>,
     is_top: bool,
+    capture_for_seq: bool,
     first: bool,
     data_start: usize,
 }
 
-impl<'a> ser::SerializeStruct for StructSerializer<'a> {
+impl<'a> ser::SerializeStruct for StructEncoder<'a> {
     type Ok = ();
     type Error = Error;
 
@@ -642,9 +702,8 @@ impl<'a> ser::SerializeStruct for StructSerializer<'a> {
         key: &'static str,
         value: &T,
     ) -> Result<()> {
-        if self.is_top {
+        if self.is_top || self.capture_for_seq {
             self.fields.push(key);
-            // Clear the type hint slot before serializing the value
             if self.ser.typed {
                 self.ser.current_type_hint = None;
             }
@@ -656,7 +715,7 @@ impl<'a> ser::SerializeStruct for StructSerializer<'a> {
         self.ser.first = true;
         self.ser.in_tuple = true;
         value.serialize(&mut *self.ser)?;
-        if self.is_top && self.ser.typed {
+        if (self.is_top || self.capture_for_seq) && self.ser.typed {
             self.field_types.push(self.ser.current_type_hint.take());
         }
         Ok(())
@@ -686,7 +745,12 @@ impl<'a> ser::SerializeStruct for StructSerializer<'a> {
         } else {
             self.ser.buf.push(b')');
             self.ser.first = false;
-            // Clear any leaked type hint from nested struct fields
+            if self.capture_for_seq {
+                self.ser.top_seq_fields = Some(self.fields);
+                if self.ser.typed {
+                    self.ser.top_seq_field_types = Some(self.field_types);
+                }
+            }
             if self.ser.typed {
                 self.ser.current_type_hint = None;
             }
@@ -695,7 +759,7 @@ impl<'a> ser::SerializeStruct for StructSerializer<'a> {
     }
 }
 
-impl<'a> ser::SerializeStructVariant for StructSerializer<'a> {
+impl<'a> ser::SerializeStructVariant for StructEncoder<'a> {
     type Ok = ();
     type Error = Error;
 
@@ -720,89 +784,4 @@ impl<'a> ser::SerializeStructVariant for StructSerializer<'a> {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Vec<T: StructSchema> — direct serialization, no per-row allocation
-// ---------------------------------------------------------------------------
 
-pub fn to_string_vec<T: Serialize>(values: &[T]) -> Result<String>
-where
-    T: StructSchema,
-{
-    to_string_vec_inner(values, false)
-}
-
-/// Serialize a Vec of structs to ASON string with type-annotated schema.
-///
-/// Output example: `{id:int,name:str,active:bool}:(1,Alice,true),(2,Bob,false)`
-///
-/// Requires `StructSchema` to be implemented with `field_types()`.
-pub fn to_string_vec_typed<T: Serialize>(values: &[T]) -> Result<String>
-where
-    T: StructSchema,
-{
-    to_string_vec_inner(values, true)
-}
-
-fn to_string_vec_inner<T: Serialize>(values: &[T], typed: bool) -> Result<String>
-where
-    T: StructSchema,
-{
-    let mut ser = Serializer {
-        buf: Vec::with_capacity(values.len() * 48 + 64),
-        in_tuple: true,
-        first: true,
-        typed,
-        current_type_hint: None,
-    };
-
-    // Write schema header
-    ser.buf.push(b'{');
-    let fields = T::field_names();
-    let types = if typed { Some(T::field_types()) } else { None };
-    for (i, f) in fields.iter().enumerate() {
-        if i > 0 {
-            ser.buf.push(b',');
-        }
-        ser.buf.extend_from_slice(f.as_bytes());
-        if let Some(ref type_list) = types {
-            if let Some(type_hint) = type_list.get(i).copied() {
-                if !type_hint.is_empty() {
-                    ser.buf.push(b':');
-                    ser.buf.extend_from_slice(type_hint.as_bytes());
-                }
-            }
-        }
-    }
-    ser.buf.extend_from_slice(b"}:");
-
-    // Write data rows directly — no per-row allocation
-    for (i, val) in values.iter().enumerate() {
-        if i > 0 {
-            ser.buf.push(b',');
-        }
-        ser.buf.push(b'(');
-        ser.first = true;
-        val.serialize_fields(&mut ser)?;
-        ser.buf.push(b')');
-    }
-
-    Ok(unsafe { String::from_utf8_unchecked(ser.buf) })
-}
-
-/// Trait for structs to provide their schema for optimized vec serialization.
-pub trait StructSchema {
-    fn field_names() -> &'static [&'static str];
-    fn serialize_fields(&self, ser: &mut Serializer) -> Result<()>;
-
-    /// Return type annotations for each field. Used by `to_string_vec_typed`.
-    ///
-    /// Each entry should be an ASON type hint string (e.g. `"int"`, `"str"`,
-    /// `"float"`, `"bool"`), or `""` to omit the type for that field.
-    ///
-    /// Default implementation returns empty (no types), which means
-    /// `to_string_vec_typed` will fall back to unannotated schema for
-    /// fields without explicit types.
-    fn field_types() -> &'static [&'static str] {
-        &[]
-    }
-}

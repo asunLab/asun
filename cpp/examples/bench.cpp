@@ -562,13 +562,13 @@ BenchResult bench_flat(size_t count, int iterations) {
     // ASON serialize
     std::string ason_str;
     t0 = Clock::now();
-    for (int i = 0; i < iterations; i++) ason_str = ason::dump_vec(users);
+    for (int i = 0; i < iterations; i++) ason_str = ason::encode(users);
     double ason_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
     // ASON-BIN serialize
     std::string ason_bin_str;
     t0 = Clock::now();
-    for (int i = 0; i < iterations; i++) ason_bin_str = ason::dump_bin(users);
+    for (int i = 0; i < iterations; i++) ason_bin_str = ason::encode_bin(users);
     double ason_bin_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
     // JSON deserialize
@@ -582,7 +582,7 @@ BenchResult bench_flat(size_t count, int iterations) {
     // ASON deserialize
     t0 = Clock::now();
     for (int i = 0; i < iterations; i++) {
-        auto r = ason::load_vec<User>(ason_str);
+        auto r = ason::decode<std::vector<User>>(ason_str);
         assert(r.size() == count);
     }
     double ason_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
@@ -590,13 +590,13 @@ BenchResult bench_flat(size_t count, int iterations) {
     // ASON-BIN deserialize
     t0 = Clock::now();
     for (int i = 0; i < iterations; i++) {
-        auto r = ason::load_bin<std::vector<User>>(ason_bin_str);
+        auto r = ason::decode_bin<std::vector<User>>(ason_bin_str);
         assert(r.size() == count);
     }
     double ason_bin_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
     // Verify
-    auto decoded = ason::load_vec<User>(ason_str);
+    auto decoded = ason::decode<std::vector<User>>(ason_str);
     assert(decoded.size() == count);
     assert(decoded[0].id == users[0].id);
 
@@ -643,7 +643,7 @@ BenchResult bench_all_types(size_t count, int iterations) {
     for (int iter = 0; iter < iterations; iter++) {
         ason_strs.clear();
         ason_strs.reserve(items.size());
-        for (auto& item : items) ason_strs.push_back(ason::dump(item));
+        for (auto& item : items) ason_strs.push_back(ason::encode(item));
     }
     double ason_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
@@ -653,7 +653,7 @@ BenchResult bench_all_types(size_t count, int iterations) {
     for (int iter = 0; iter < iterations; iter++) {
         ason_bin_strs.clear();
         ason_bin_strs.reserve(items.size());
-        for (auto& item : items) ason_bin_strs.push_back(ason::dump_bin(item));
+        for (auto& item : items) ason_bin_strs.push_back(ason::encode_bin(item));
     }
     double ason_bin_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
@@ -664,7 +664,7 @@ BenchResult bench_all_types(size_t count, int iterations) {
     t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
         for (auto& s : ason_strs) {
-            auto r = ason::load<AllTypes>(s);
+            auto r = ason::decode<AllTypes>(s);
             (void)r;
         }
     }
@@ -674,7 +674,7 @@ BenchResult bench_all_types(size_t count, int iterations) {
     t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
         for (auto& s : ason_bin_strs) {
-            auto r = ason::load_bin<AllTypes>(s);
+            auto r = ason::decode_bin<AllTypes>(s);
             (void)r;
         }
     }
@@ -767,7 +767,7 @@ BenchResult bench_deep(size_t count, int iterations) {
     for (int iter = 0; iter < iterations; iter++) {
         ason_strs.clear();
         ason_strs.reserve(companies.size());
-        for (auto& c : companies) ason_strs.push_back(ason::dump(c));
+        for (auto& c : companies) ason_strs.push_back(ason::encode(c));
     }
     double ason_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
@@ -777,7 +777,7 @@ BenchResult bench_deep(size_t count, int iterations) {
     for (int iter = 0; iter < iterations; iter++) {
         ason_bin_strs.clear();
         ason_bin_strs.reserve(companies.size());
-        for (auto& c : companies) ason_bin_strs.push_back(ason::dump_bin(c));
+        for (auto& c : companies) ason_bin_strs.push_back(ason::encode_bin(c));
     }
     double ason_bin_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
@@ -793,7 +793,7 @@ BenchResult bench_deep(size_t count, int iterations) {
     t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
         for (auto& s : ason_strs) {
-            auto c = ason::load<Company>(s);
+            auto c = ason::decode<Company>(s);
             (void)c;
         }
     }
@@ -803,7 +803,7 @@ BenchResult bench_deep(size_t count, int iterations) {
     t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
         for (auto& s : ason_bin_strs) {
-            auto c = ason::load_bin<Company>(s);
+            auto c = ason::decode_bin<Company>(s);
             (void)c;
         }
     }
@@ -811,7 +811,7 @@ BenchResult bench_deep(size_t count, int iterations) {
 
     // Verify
     for (size_t i = 0; i < ason_strs.size(); i++) {
-        auto c2 = ason::load<Company>(ason_strs[i]);
+        auto c2 = ason::decode<Company>(ason_strs[i]);
         assert(c2.name == companies[i].name);
     }
 
@@ -832,8 +832,8 @@ std::pair<double, double> bench_single_roundtrip(int iterations) {
 
     auto t0 = Clock::now();
     for (int i = 0; i < iterations; i++) {
-        auto s = ason::dump(user);
-        auto r = ason::load<User>(s);
+        auto s = ason::encode(user);
+        auto r = ason::decode<User>(s);
         (void)r;
     }
     double ason_ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
@@ -910,8 +910,8 @@ std::pair<double, double> bench_deep_single_roundtrip(int iterations) {
 
     auto t0 = Clock::now();
     for (int i = 0; i < iterations; i++) {
-        auto s = ason::dump(company);
-        auto r = ason::load<Company>(s);
+        auto s = ason::encode(company);
+        auto r = ason::decode<Company>(s);
         (void)r;
     }
     double ason_ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
@@ -1014,24 +1014,24 @@ int main() {
     std::cout << "└──────────────────────────────────────────────────────────────┘\n";
     {
         auto users_1k = generate_users(1000);
-        auto ason_untyped = ason::dump_vec(users_1k);
-        auto ason_typed = ason::dump_vec_typed(users_1k);
+        auto ason_untyped = ason::encode(users_1k);
+        auto ason_typed = ason::encode_typed(users_1k);
 
-        auto v1 = ason::load_vec<User>(ason_untyped);
-        auto v2 = ason::load_vec<User>(ason_typed);
+        auto v1 = ason::decode<std::vector<User>>(ason_untyped);
+        auto v2 = ason::decode<std::vector<User>>(ason_typed);
         assert(v1.size() == v2.size());
 
         int de_iters = 200;
         auto t0 = Clock::now();
         for (int i = 0; i < de_iters; i++) {
-            auto r = ason::load_vec<User>(ason_untyped);
+            auto r = ason::decode<std::vector<User>>(ason_untyped);
             (void)r;
         }
         double untyped_ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
         t0 = Clock::now();
         for (int i = 0; i < de_iters; i++) {
-            auto r = ason::load_vec<User>(ason_typed);
+            auto r = ason::decode<std::vector<User>>(ason_typed);
             (void)r;
         }
         double typed_ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
@@ -1056,12 +1056,12 @@ int main() {
 
         auto t0 = Clock::now();
         std::string untyped_out;
-        for (int i = 0; i < ser_iters; i++) untyped_out = ason::dump_vec(users_1k);
+        for (int i = 0; i < ser_iters; i++) untyped_out = ason::encode(users_1k);
         double untyped_ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
         t0 = Clock::now();
         std::string typed_out;
-        for (int i = 0; i < ser_iters; i++) typed_out = ason::dump_vec_typed(users_1k);
+        for (int i = 0; i < ser_iters; i++) typed_out = ason::encode_typed(users_1k);
         double typed_ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
         std::cout << std::fixed << std::setprecision(2);
@@ -1081,7 +1081,7 @@ int main() {
     {
         auto users_1k = generate_users(1000);
         auto json_1k = json_serialize_users(users_1k);
-        auto ason_1k = ason::dump_vec(users_1k);
+        auto ason_1k = ason::encode(users_1k);
 
         int iters = 100;
         auto t0 = Clock::now();
@@ -1089,7 +1089,7 @@ int main() {
         double json_ser_dur = std::chrono::duration<double>(Clock::now() - t0).count();
 
         t0 = Clock::now();
-        for (int i = 0; i < iters; i++) { auto s = ason::dump_vec(users_1k); (void)s; }
+        for (int i = 0; i < iters; i++) { auto s = ason::encode(users_1k); (void)s; }
         double ason_ser_dur = std::chrono::duration<double>(Clock::now() - t0).count();
 
         t0 = Clock::now();
@@ -1097,7 +1097,7 @@ int main() {
         double json_de_dur = std::chrono::duration<double>(Clock::now() - t0).count();
 
         t0 = Clock::now();
-        for (int i = 0; i < iters; i++) { auto r = ason::load_vec<User>(ason_1k); (void)r; }
+        for (int i = 0; i < iters; i++) { auto r = ason::decode<std::vector<User>>(ason_1k); (void)r; }
         double ason_de_dur = std::chrono::duration<double>(Clock::now() - t0).count();
 
         double total_records = 1000.0 * iters;
