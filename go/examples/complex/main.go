@@ -370,10 +370,28 @@ func main() {
 	if country.Name != country2.Name || country.Population != country2.Population {
 		log.Fatal("5-level roundtrip mismatch")
 	}
-	fmt.Println("   ✓ 5-level roundtrip OK")
+	fmt.Println("   ✓ 5-level ASON-text roundtrip OK")
+
+	// ASON binary roundtrip
+	binBytes, err := ason.MarshalBinary(&country)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var country3 Country
+	if err := ason.UnmarshalBinary(binBytes, &country3); err != nil {
+		log.Fatal(err)
+	}
+	if country.Name != country3.Name || country.Population != country3.Population {
+		log.Fatal("5-level binary roundtrip mismatch")
+	}
+	fmt.Println("   ✓ 5-level ASON-bin roundtrip OK")
+
 	jsonBytes, _ := json.Marshal(&country)
-	fmt.Printf("   ASON: %d bytes | JSON: %d bytes | saving %.0f%%\n",
-		len(s), len(jsonBytes), (1.0-float64(len(s))/float64(len(jsonBytes)))*100.0)
+	fmt.Printf("   ASON text: %d B | ASON bin: %d B | JSON: %d B\n",
+		len(s), len(binBytes), len(jsonBytes))
+	fmt.Printf("   BIN vs JSON: %.0f%% smaller | TEXT vs JSON: %.0f%% smaller\n",
+		(1.0-float64(len(binBytes))/float64(len(jsonBytes)))*100.0,
+		(1.0-float64(len(s))/float64(len(jsonBytes)))*100.0)
 
 	// 10. 7-level deep
 	fmt.Println("\n10. Seven-level nesting (Universe>Galaxy>SolarSystem>Planet>Continent>Nation>State):")
@@ -418,10 +436,28 @@ func main() {
 	if universe.Name != universe2.Name {
 		log.Fatal("7-level roundtrip mismatch")
 	}
-	fmt.Println("   ✓ 7-level roundtrip OK")
+	fmt.Println("   ✓ 7-level ASON-text roundtrip OK")
+
+	// ASON binary roundtrip
+	uniBin, err := ason.MarshalBinary(&universe)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var universe3 Universe
+	if err := ason.UnmarshalBinary(uniBin, &universe3); err != nil {
+		log.Fatal(err)
+	}
+	if universe.Name != universe3.Name {
+		log.Fatal("7-level binary roundtrip mismatch")
+	}
+	fmt.Println("   ✓ 7-level ASON-bin roundtrip OK")
+
 	jsonBytes, _ = json.Marshal(&universe)
-	fmt.Printf("   ASON: %d bytes | JSON: %d bytes | saving %.0f%%\n",
-		len(s), len(jsonBytes), (1.0-float64(len(s))/float64(len(jsonBytes)))*100.0)
+	fmt.Printf("   ASON text: %d B | ASON bin: %d B | JSON: %d B\n",
+		len(s), len(uniBin), len(jsonBytes))
+	fmt.Printf("   BIN vs JSON: %.0f%% smaller | TEXT vs JSON: %.0f%% smaller\n",
+		(1.0-float64(len(uniBin))/float64(len(jsonBytes)))*100.0,
+		(1.0-float64(len(s))/float64(len(jsonBytes)))*100.0)
 
 	// 11. Service config
 	fmt.Println("\n11. Complex config struct (nested + map + optional):")
@@ -450,10 +486,25 @@ func main() {
 	if config.Name != config2.Name || config.Db.Port != config2.Db.Port {
 		log.Fatal("config roundtrip mismatch")
 	}
-	fmt.Println("   ✓ config roundtrip OK")
+	fmt.Println("   ✓ config ASON-text roundtrip OK")
 	jsonBytes, _ = json.Marshal(&config)
-	fmt.Printf("   ASON: %d bytes | JSON: %d bytes | saving %.0f%%\n",
+	fmt.Printf("   ASON text: %d B | JSON: %d B | TEXT vs JSON: %.0f%% smaller\n",
 		len(s), len(jsonBytes), (1.0-float64(len(s))/float64(len(jsonBytes)))*100.0)
+	// Binary roundtrip
+	cfgBin, err := ason.MarshalBinary(&config)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var config3 ServiceConfig
+	if err := ason.UnmarshalBinary(cfgBin, &config3); err != nil {
+		log.Fatal(err)
+	}
+	if config.Name != config3.Name || config.Db.Port != config3.Db.Port {
+		log.Fatal("config binary roundtrip mismatch")
+	}
+	fmt.Println("   ✓ config ASON-bin roundtrip OK")
+	fmt.Printf("   ASON bin: %d B | BIN vs JSON: %.0f%% smaller\n",
+		len(cfgBin), (1.0-float64(len(cfgBin))/float64(len(jsonBytes)))*100.0)
 
 	// 12. Large structure — 100 countries
 	fmt.Println("\n12. Large structure (100 countries × nested regions):")
@@ -485,10 +536,12 @@ func main() {
 			Population: int64(1000000 + i*500000), GdpTrillion: float64(i) * 0.5, Regions: regions,
 		}
 	}
-	totalASON, totalJSON := 0, 0
+	totalASON, totalJSON, totalBIN := 0, 0, 0
 	for i := range countries {
 		as, _ := ason.Marshal(&countries[i])
 		js, _ := json.Marshal(&countries[i])
+		bs, _ := ason.MarshalBinary(&countries[i])
+		// Verify text roundtrip
 		var c2 Country
 		if err := ason.Unmarshal(as, &c2); err != nil {
 			log.Fatalf("country %d roundtrip failed: %v", i, err)
@@ -496,14 +549,26 @@ func main() {
 		if countries[i].Name != c2.Name {
 			log.Fatalf("country %d name mismatch", i)
 		}
+		// Verify binary roundtrip
+		var c3 Country
+		if err := ason.UnmarshalBinary(bs, &c3); err != nil {
+			log.Fatalf("country %d binary roundtrip failed: %v", i, err)
+		}
+		if countries[i].Name != c3.Name {
+			log.Fatalf("country %d binary name mismatch", i)
+		}
 		totalASON += len(as)
 		totalJSON += len(js)
+		totalBIN += len(bs)
 	}
 	fmt.Println("   100 countries with 5-level nesting:")
-	fmt.Printf("   Total ASON: %d bytes (%.1f KB)\n", totalASON, float64(totalASON)/1024.0)
-	fmt.Printf("   Total JSON: %d bytes (%.1f KB)\n", totalJSON, float64(totalJSON)/1024.0)
-	fmt.Printf("   Saving: %.0f%%\n", (1.0-float64(totalASON)/float64(totalJSON))*100.0)
-	fmt.Println("   ✓ all 100 countries roundtrip OK")
+	fmt.Printf("   Total ASON text: %d bytes (%.1f KB)\n", totalASON, float64(totalASON)/1024.0)
+	fmt.Printf("   Total ASON bin:  %d bytes (%.1f KB)\n", totalBIN, float64(totalBIN)/1024.0)
+	fmt.Printf("   Total JSON:      %d bytes (%.1f KB)\n", totalJSON, float64(totalJSON)/1024.0)
+	fmt.Printf("   TEXT vs JSON: %.0f%% smaller | BIN vs JSON: %.0f%% smaller\n",
+		(1.0-float64(totalASON)/float64(totalJSON))*100.0,
+		(1.0-float64(totalBIN)/float64(totalJSON))*100.0)
+	fmt.Println("   ✓ all 100 countries roundtrip OK (text + bin)")
 
 	// 13. Deserialize with nested schema type hints
 	fmt.Println("\n13. Deserialize with nested schema type hints:")

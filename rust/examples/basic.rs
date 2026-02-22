@@ -1,6 +1,6 @@
 use ason::{
-    Result, StructSchema, from_str, from_str_vec, to_string, to_string_typed, to_string_vec,
-    to_string_vec_typed,
+    Result, StructSchema, from_bin, from_bin_vec, from_str, from_str_vec, to_bin, to_bin_vec,
+    to_string, to_string_typed, to_string_vec, to_string_vec_typed,
 };
 use serde::{Deserialize, Serialize};
 
@@ -100,23 +100,53 @@ fn main() {
         println!("  {:?}", u);
     }
 
-    // 8. Roundtrip
-    println!("\nRoundtrip test:");
+    // 8. Roundtrip (ASON-text + ASON-bin + JSON)
+    println!("\n8. Roundtrip (ASON-text vs ASON-bin vs JSON):");
     let original = User {
         id: 42,
         name: "Test User".into(),
         active: true,
     };
-    let serialized = to_string(&original).unwrap();
-    let deserialized: User = from_str(&serialized).unwrap();
+    // ASON text
+    let ason_str = to_string(&original).unwrap();
+    let from_ason: User = from_str(&ason_str).unwrap();
+    assert_eq!(original, from_ason);
+    // ASON binary
+    let ason_bin = to_bin(&original).unwrap();
+    let from_bin_val: User = from_bin(&ason_bin).unwrap();
+    assert_eq!(original, from_bin_val);
+    // JSON
+    let json_str = serde_json::to_string(&original).unwrap();
+    let from_json: User = serde_json::from_str(&json_str).unwrap();
+    assert_eq!(original, from_json);
     println!("  original:     {:?}", original);
-    println!("  serialized:   {}", serialized);
-    println!("  deserialized: {:?}", deserialized);
-    assert_eq!(original, deserialized);
-    println!("  ✓ roundtrip OK");
+    println!("  ASON text:    {} ({} B)", ason_str, ason_str.len());
+    println!("  ASON binary:  {} B", ason_bin.len());
+    println!("  JSON:         {} ({} B)", json_str, json_str.len());
+    println!("  ✓ all 3 formats roundtrip OK");
 
-    // 9. Optional fields
-    println!("\nOptional fields:");
+    // 9. Vec roundtrip (ASON-text + ASON-bin + JSON)
+    println!("\n9. Vec roundtrip (ASON-text vs ASON-bin vs JSON):");
+    let vec_ason = to_string_vec(&users).unwrap();
+    let vec_bin = to_bin_vec(&users).unwrap();
+    let vec_json = serde_json::to_string(&users).unwrap();
+    let v1: Vec<User> = from_str_vec(&vec_ason).unwrap();
+    let v2: Vec<User> = from_bin_vec(&vec_bin).unwrap();
+    let v3: Vec<User> = serde_json::from_str(&vec_json).unwrap();
+    assert_eq!(users, v1);
+    assert_eq!(users, v2);
+    assert_eq!(users, v3);
+    println!("  ASON text:   {} B", vec_ason.len());
+    println!("  ASON binary: {} B", vec_bin.len());
+    println!("  JSON:        {} B", vec_json.len());
+    println!(
+        "  BIN vs JSON: {:.0}% smaller",
+        (1.0 - vec_bin.len() as f64 / vec_json.len() as f64) * 100.0
+    );
+    println!("  ✓ vec roundtrip OK (all 3 formats)");
+
+    // 10. Optional fields
+    println!("\n10. Optional fields:");
     #[derive(Debug, Deserialize)]
     struct Item {
         id: i64,
@@ -130,8 +160,8 @@ fn main() {
     let item: Item = from_str(input).unwrap();
     println!("  with null:  {:?}", item);
 
-    // 10. Array fields
-    println!("\nArray fields:");
+    // 11. Array fields
+    println!("\n11. Array fields:");
     #[derive(Debug, Deserialize)]
     struct Tagged {
         name: String,
@@ -141,8 +171,8 @@ fn main() {
     let t: Tagged = from_str(input).unwrap();
     println!("  {:?}", t);
 
-    // 11. Comments
-    println!("\nWith comments:");
+    // 12. Comments
+    println!("\n12. With comments:");
     let input = "/* user list */ {id,name,active}:(1,Alice,true)";
     let user: User = from_str(input).unwrap();
     println!("  {:?}", user);

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 
@@ -8,9 +9,9 @@ import (
 )
 
 type User struct {
-	ID     int64  `ason:"id"`
-	Name   string `ason:"name"`
-	Active bool   `ason:"active"`
+	ID     int64  `ason:"id" json:"id"`
+	Name   string `ason:"name" json:"name"`
+	Active bool   `ason:"active" json:"active"`
 }
 
 func main() {
@@ -89,30 +90,56 @@ func main() {
 		fmt.Printf("  %+v\n", u)
 	}
 
-	// 8. Roundtrip
-	fmt.Println("\nRoundtrip test:")
+	// 8. Roundtrip (ASON-text vs ASON-bin vs JSON)
+	fmt.Println("\n8. Roundtrip (ASON-text vs ASON-bin vs JSON):")
 	original := User{ID: 42, Name: "Test User", Active: true}
-	serialized, err := ason.Marshal(&original)
+	// ASON text
+	asonText, err := ason.Marshal(&original)
 	if err != nil {
 		log.Fatal(err)
 	}
-	var deserialized User
-	if err := ason.Unmarshal(serialized, &deserialized); err != nil {
+	var fromAson User
+	if err := ason.Unmarshal(asonText, &fromAson); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("  original:     %+v\n", original)
-	fmt.Printf("  serialized:   %s\n", serialized)
-	fmt.Printf("  deserialized: %+v\n", deserialized)
-	if original != deserialized {
-		log.Fatal("roundtrip mismatch")
+	if original != fromAson {
+		log.Fatal("ASON text roundtrip mismatch")
 	}
-	fmt.Println("  ✓ roundtrip OK")
+	// ASON binary
+	asonBin, err := ason.MarshalBinary(&original)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var fromBin User
+	if err := ason.UnmarshalBinary(asonBin, &fromBin); err != nil {
+		log.Fatal(err)
+	}
+	if original != fromBin {
+		log.Fatal("ASON binary roundtrip mismatch")
+	}
+	// JSON
+	jsonData, err := json.Marshal(&original)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var fromJSON User
+	if err := json.Unmarshal(jsonData, &fromJSON); err != nil {
+		log.Fatal(err)
+	}
+	if original != fromJSON {
+		log.Fatal("JSON roundtrip mismatch")
+	}
+	fmt.Printf("  original:     %+v\n", original)
+	fmt.Printf("  ASON text:    %s (%d B)\n", asonText, len(asonText))
+	fmt.Printf("  ASON binary:  %d B\n", len(asonBin))
+	fmt.Printf("  JSON:         %s (%d B)\n", jsonData, len(jsonData))
+	fmt.Println("  ✓ all 3 formats roundtrip OK")
 
 	// 9. Optional fields
-	fmt.Println("\nOptional fields:")
+	fmt.Println("\n9. Optional fields:")
 	type Item struct {
-		ID    int64   `ason:"id"`
-		Label *string `ason:"label"`
+		ID    int64   `ason:"id" json:"id"`
+		Label *string `ason:"label" json:"label"`
 	}
 	var item Item
 	if err := ason.Unmarshal([]byte("{id,label}:(1,hello)"), &item); err != nil {
@@ -127,10 +154,10 @@ func main() {
 	fmt.Printf("  with null:  %+v\n", item2)
 
 	// 10. Array fields
-	fmt.Println("\nArray fields:")
+	fmt.Println("\n10. Array fields:")
 	type Tagged struct {
-		Name string   `ason:"name"`
-		Tags []string `ason:"tags"`
+		Name string   `ason:"name" json:"name"`
+		Tags []string `ason:"tags" json:"tags"`
 	}
 	var t Tagged
 	if err := ason.Unmarshal([]byte("{name,tags}:(Alice,[rust,go,python])"), &t); err != nil {
@@ -139,7 +166,7 @@ func main() {
 	fmt.Printf("  %+v\n", t)
 
 	// 11. Comments
-	fmt.Println("\nWith comments:")
+	fmt.Println("\n11. With comments:")
 	var commented User
 	if err := ason.Unmarshal([]byte("/* user list */ {id,name,active}:(1,Alice,true)"), &commented); err != nil {
 		log.Fatal(err)

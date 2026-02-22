@@ -1,4 +1,4 @@
-use ason::{from_str, from_str_vec, to_string, to_string_typed};
+use ason::{from_bin, from_str, from_str_vec, to_bin, to_string, to_string_typed};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -514,14 +514,25 @@ fn main() {
     println!("   first 200 chars: {}...", &s[..200.min(s.len())]);
     let country2: Country = from_str(&s).unwrap();
     assert_eq!(country, country2);
-    println!("   ✓ 5-level roundtrip OK");
+    println!("   ✓ 5-level ASON-text roundtrip OK");
 
-    // Also compare size with JSON
+    // ASON binary roundtrip
+    let bin = to_bin(&country).unwrap();
+    let country3: Country = from_bin(&bin).unwrap();
+    assert_eq!(country, country3);
+    println!("   ✓ 5-level ASON-bin roundtrip OK");
+
+    // Size comparison: ASON-text vs ASON-bin vs JSON
     let json = serde_json::to_string(&country).unwrap();
     println!(
-        "   ASON: {} bytes | JSON: {} bytes | saving {:.0}%",
+        "   ASON text: {} B | ASON bin: {} B | JSON: {} B",
         s.len(),
-        json.len(),
+        bin.len(),
+        json.len()
+    );
+    println!(
+        "   BIN vs JSON: {:.0}% smaller | TEXT vs JSON: {:.0}% smaller",
+        (1.0 - bin.len() as f64 / json.len() as f64) * 100.0,
         (1.0 - s.len() as f64 / json.len() as f64) * 100.0
     );
 
@@ -608,13 +619,24 @@ fn main() {
     println!("   serialized ({} bytes)", s.len());
     let universe2: Universe = from_str(&s).unwrap();
     assert_eq!(universe, universe2);
-    println!("   ✓ 7-level roundtrip OK");
+    println!("   ✓ 7-level ASON-text roundtrip OK");
+
+    // ASON binary roundtrip
+    let bin = to_bin(&universe).unwrap();
+    let universe3: Universe = from_bin(&bin).unwrap();
+    assert_eq!(universe, universe3);
+    println!("   ✓ 7-level ASON-bin roundtrip OK");
 
     let json = serde_json::to_string(&universe).unwrap();
     println!(
-        "   ASON: {} bytes | JSON: {} bytes | saving {:.0}%",
+        "   ASON text: {} B | ASON bin: {} B | JSON: {} B",
         s.len(),
-        json.len(),
+        bin.len(),
+        json.len()
+    );
+    println!(
+        "   BIN vs JSON: {:.0}% smaller | TEXT vs JSON: {:.0}% smaller",
+        (1.0 - bin.len() as f64 / json.len() as f64) * 100.0,
         (1.0 - s.len() as f64 / json.len() as f64) * 100.0
     );
 
@@ -662,10 +684,20 @@ fn main() {
 
     let json = serde_json::to_string(&config).unwrap();
     println!(
-        "   ASON: {} bytes | JSON: {} bytes | saving {:.0}%",
+        "   ASON text: {} B | JSON: {} B | TEXT vs JSON: {:.0}% smaller",
         s.len(),
         json.len(),
         (1.0 - s.len() as f64 / json.len() as f64) * 100.0
+    );
+    // Binary roundtrip
+    let bin = to_bin(&config).unwrap();
+    let config3: ServiceConfig = from_bin(&bin).unwrap();
+    assert_eq!(config, config3);
+    println!("   ✓ config ASON-bin roundtrip OK");
+    println!(
+        "   ASON bin: {} B | BIN vs JSON: {:.0}% smaller",
+        bin.len(),
+        (1.0 - bin.len() as f64 / json.len() as f64) * 100.0
     );
 
     // -----------------------------------------------------------------------
@@ -712,31 +744,43 @@ fn main() {
     // Serialize each country individually and measure total
     let mut total_ason_bytes = 0usize;
     let mut total_json_bytes = 0usize;
+    let mut total_bin_bytes = 0usize;
     for c in &countries {
         let s = to_string(c).unwrap();
         let j = serde_json::to_string(c).unwrap();
-        // Verify roundtrip
+        let b = to_bin(c).unwrap();
+        // Verify text roundtrip
         let c2: Country = from_str(&s).unwrap();
         assert_eq!(c, &c2);
+        // Verify binary roundtrip
+        let c3: Country = from_bin(&b).unwrap();
+        assert_eq!(c, &c3);
         total_ason_bytes += s.len();
         total_json_bytes += j.len();
+        total_bin_bytes += b.len();
     }
     println!("   100 countries with 5-level nesting:");
     println!(
-        "   Total ASON: {} bytes ({:.1} KB)",
+        "   Total ASON text: {} bytes ({:.1} KB)",
         total_ason_bytes,
         total_ason_bytes as f64 / 1024.0
     );
     println!(
-        "   Total JSON: {} bytes ({:.1} KB)",
+        "   Total ASON bin:  {} bytes ({:.1} KB)",
+        total_bin_bytes,
+        total_bin_bytes as f64 / 1024.0
+    );
+    println!(
+        "   Total JSON:      {} bytes ({:.1} KB)",
         total_json_bytes,
         total_json_bytes as f64 / 1024.0
     );
     println!(
-        "   Saving: {:.0}%",
-        (1.0 - total_ason_bytes as f64 / total_json_bytes as f64) * 100.0
+        "   TEXT vs JSON: {:.0}% smaller | BIN vs JSON: {:.0}% smaller",
+        (1.0 - total_ason_bytes as f64 / total_json_bytes as f64) * 100.0,
+        (1.0 - total_bin_bytes as f64 / total_json_bytes as f64) * 100.0
     );
-    println!("   ✓ all 100 countries roundtrip OK");
+    println!("   ✓ all 100 countries roundtrip OK (text + bin)");
 
     // -----------------------------------------------------------------------
     // 14. Deserialize from ASON with deeply nested schema type hints

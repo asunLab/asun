@@ -236,7 +236,7 @@ func benchFlat(count, iterations int) benchResult {
 		panic(fmt.Sprintf("flat %d roundtrip failed: got %d", count, len(decoded)))
 	}
 	return benchResult{
-		name: fmt.Sprintf("Flat struct × %d (8 fields)", count),
+		name:      fmt.Sprintf("Flat struct × %d (8 fields)", count),
 		jsonSerMs: float64(jsonSer.Nanoseconds()) / 1e6, asonSerMs: float64(asonSer.Nanoseconds()) / 1e6,
 		jsonDeMs: float64(jsonDe.Nanoseconds()) / 1e6, asonDeMs: float64(asonDe.Nanoseconds()) / 1e6,
 		jsonBytes: len(jsonStr), asonBytes: len(asonStr),
@@ -284,7 +284,7 @@ func benchAllTypes(count, iterations int) benchResult {
 	asonDe := time.Since(start)
 
 	return benchResult{
-		name: fmt.Sprintf("All-types struct × %d (16 fields, per-struct)", count),
+		name:      fmt.Sprintf("All-types struct × %d (16 fields, per-struct)", count),
 		jsonSerMs: float64(jsonSer.Nanoseconds()) / 1e6, asonSerMs: float64(asonSer.Nanoseconds()) / 1e6,
 		jsonDeMs: float64(jsonDe.Nanoseconds()) / 1e6, asonDeMs: float64(asonDe.Nanoseconds()) / 1e6,
 		jsonBytes: len(jsonStr), asonBytes: totalASON,
@@ -338,7 +338,7 @@ func benchDeep(count, iterations int) benchResult {
 	}
 
 	return benchResult{
-		name: fmt.Sprintf("5-level deep × %d (~48 nodes each)", count),
+		name:      fmt.Sprintf("5-level deep × %d (~48 nodes each)", count),
 		jsonSerMs: float64(jsonSer.Nanoseconds()) / 1e6, asonSerMs: float64(asonSer.Nanoseconds()) / 1e6,
 		jsonDeMs: float64(jsonDe.Nanoseconds()) / 1e6, asonDeMs: float64(asonDe.Nanoseconds()) / 1e6,
 		jsonBytes: len(jsonStr), asonBytes: totalASON,
@@ -617,6 +617,224 @@ func main() {
 		runtime.ReadMemStats(&memAfter)
 		fmt.Printf("\n  Memory: Alloc=%s TotalAlloc=%s Sys=%s\n",
 			formatBytes(int(memAfter.Alloc)), formatBytes(int(memAfter.TotalAlloc)), formatBytes(int(memAfter.Sys)))
+	}
+
+	// Section 9: Binary Format (ASON-BIN) benchmarks
+	fmt.Println("\n┌──────────────────────────────────────────────────────────────┐")
+	fmt.Println("│  Section 9: Binary Format (ASON-BIN) vs ASON text vs JSON   │")
+	fmt.Println("└──────────────────────────────────────────────────────────────┘")
+	{
+		// -- Flat struct benchmark --
+		fmt.Println("\n  ── Flat struct ──")
+		for _, count := range []int{100, 1000, 5000} {
+			iters := 50
+			if count >= 5000 {
+				iters = 5
+			} else if count >= 1000 {
+				iters = 20
+			}
+			users := generateUsers(count)
+
+			// Serialize once to get sizes
+			var binTotal int
+			var asonTotal int
+			var jsonTotal int
+			for _, u := range users {
+				binData, _ := ason.MarshalBinary(&u)
+				binTotal += len(binData)
+			}
+			asonData, _ := ason.MarshalSlice(users)
+			asonTotal = len(asonData)
+			jsonData, _ := json.Marshal(users)
+			jsonTotal = len(jsonData)
+
+			// Benchmark BIN serialize
+			start := time.Now()
+			for it := 0; it < iters; it++ {
+				for i := range users {
+					ason.MarshalBinary(&users[i])
+				}
+			}
+			binSerMs := float64(time.Since(start).Nanoseconds()) / 1e6
+
+			// Benchmark BIN deserialize
+			binBlobs := make([][]byte, len(users))
+			for i := range users {
+				binBlobs[i], _ = ason.MarshalBinary(&users[i])
+			}
+			start = time.Now()
+			for it := 0; it < iters; it++ {
+				for i := range binBlobs {
+					var u User
+					ason.UnmarshalBinary(binBlobs[i], &u)
+				}
+			}
+			binDeMs := float64(time.Since(start).Nanoseconds()) / 1e6
+
+			// Benchmark ASON text
+			start = time.Now()
+			for it := 0; it < iters; it++ {
+				ason.MarshalSlice(users)
+			}
+			asonSerMs := float64(time.Since(start).Nanoseconds()) / 1e6
+			start = time.Now()
+			for it := 0; it < iters; it++ {
+				var out []User
+				ason.UnmarshalSlice(asonData, &out)
+			}
+			asonDeMs := float64(time.Since(start).Nanoseconds()) / 1e6
+
+			// Benchmark JSON
+			start = time.Now()
+			for it := 0; it < iters; it++ {
+				json.Marshal(users)
+			}
+			jsonSerMs := float64(time.Since(start).Nanoseconds()) / 1e6
+			start = time.Now()
+			for it := 0; it < iters; it++ {
+				var out []User
+				json.Unmarshal(jsonData, &out)
+			}
+			jsonDeMs := float64(time.Since(start).Nanoseconds()) / 1e6
+
+			fmt.Printf("  %d records × %d iters:\n", count, iters)
+			fmt.Printf("    Size:  BIN %6d B | ASON %6d B | JSON %6d B\n", binTotal, asonTotal, jsonTotal)
+			fmt.Printf("    Ser:   BIN %7.1fms | ASON %7.1fms | JSON %7.1fms\n", binSerMs, asonSerMs, jsonSerMs)
+			fmt.Printf("    De:    BIN %7.1fms | ASON %7.1fms | JSON %7.1fms\n", binDeMs, asonDeMs, jsonDeMs)
+			fmt.Printf("    vs JSON: BIN ser %.1fx | ASON ser %.1fx | BIN de %.1fx | ASON de %.1fx\n\n",
+				jsonSerMs/binSerMs, jsonSerMs/asonSerMs,
+				jsonDeMs/binDeMs, jsonDeMs/asonDeMs)
+		}
+
+		// -- Deep struct benchmark --
+		fmt.Println("  ── Deep struct (5-level nested) ──")
+		for _, count := range []int{10, 100} {
+			iters := 50
+			if count >= 100 {
+				iters = 10
+			}
+			companies := generateCompanies(count)
+
+			// Sizes
+			var binTotal, asonTotal, jsonTotal int
+			for i := range companies {
+				b, _ := ason.MarshalBinary(&companies[i])
+				binTotal += len(b)
+				a, _ := ason.Marshal(&companies[i])
+				asonTotal += len(a)
+				j, _ := json.Marshal(&companies[i])
+				jsonTotal += len(j)
+			}
+
+			// BIN serialize
+			start := time.Now()
+			for it := 0; it < iters; it++ {
+				for i := range companies {
+					ason.MarshalBinary(&companies[i])
+				}
+			}
+			binSerMs := float64(time.Since(start).Nanoseconds()) / 1e6
+
+			// BIN deserialize
+			binBlobs := make([][]byte, len(companies))
+			for i := range companies {
+				binBlobs[i], _ = ason.MarshalBinary(&companies[i])
+			}
+			start = time.Now()
+			for it := 0; it < iters; it++ {
+				for i := range binBlobs {
+					var c Company
+					ason.UnmarshalBinary(binBlobs[i], &c)
+				}
+			}
+			binDeMs := float64(time.Since(start).Nanoseconds()) / 1e6
+
+			// ASON text
+			asonBlobs := make([][]byte, len(companies))
+			for i := range companies {
+				asonBlobs[i], _ = ason.Marshal(&companies[i])
+			}
+			start = time.Now()
+			for it := 0; it < iters; it++ {
+				for i := range companies {
+					ason.Marshal(&companies[i])
+				}
+			}
+			asonSerMs := float64(time.Since(start).Nanoseconds()) / 1e6
+			start = time.Now()
+			for it := 0; it < iters; it++ {
+				for i := range asonBlobs {
+					var c Company
+					ason.Unmarshal(asonBlobs[i], &c)
+				}
+			}
+			asonDeMs := float64(time.Since(start).Nanoseconds()) / 1e6
+
+			// JSON
+			jsonBlobs := make([][]byte, len(companies))
+			for i := range companies {
+				jsonBlobs[i], _ = json.Marshal(&companies[i])
+			}
+			start = time.Now()
+			for it := 0; it < iters; it++ {
+				for i := range companies {
+					json.Marshal(&companies[i])
+				}
+			}
+			jsonSerMs := float64(time.Since(start).Nanoseconds()) / 1e6
+			start = time.Now()
+			for it := 0; it < iters; it++ {
+				for i := range jsonBlobs {
+					var c Company
+					json.Unmarshal(jsonBlobs[i], &c)
+				}
+			}
+			jsonDeMs := float64(time.Since(start).Nanoseconds()) / 1e6
+
+			fmt.Printf("  %d companies × %d iters:\n", count, iters)
+			fmt.Printf("    Size:  BIN %6d B | ASON %6d B | JSON %6d B\n", binTotal, asonTotal, jsonTotal)
+			fmt.Printf("    Ser:   BIN %7.1fms | ASON %7.1fms | JSON %7.1fms\n", binSerMs, asonSerMs, jsonSerMs)
+			fmt.Printf("    De:    BIN %7.1fms | ASON %7.1fms | JSON %7.1fms\n", binDeMs, asonDeMs, jsonDeMs)
+			fmt.Printf("    vs JSON: BIN ser %.1fx | ASON ser %.1fx | BIN de %.1fx | ASON de %.1fx\n\n",
+				jsonSerMs/binSerMs, jsonSerMs/asonSerMs,
+				jsonDeMs/binDeMs, jsonDeMs/asonDeMs)
+		}
+
+		// -- Single struct roundtrip --
+		fmt.Println("  ── Single User roundtrip ──")
+		{
+			user := User{ID: 42, Name: "Alice", Email: "alice@example.com", Age: 30, Score: 9.8, Active: true, Role: "admin", City: "Berlin"}
+			rtIters := 100000
+
+			start := time.Now()
+			for i := 0; i < rtIters; i++ {
+				b, _ := ason.MarshalBinary(&user)
+				var u User
+				ason.UnmarshalBinary(b, &u)
+			}
+			binNs := float64(time.Since(start).Nanoseconds()) / float64(rtIters)
+
+			start = time.Now()
+			for i := 0; i < rtIters; i++ {
+				s, _ := ason.Marshal(&user)
+				var u User
+				ason.Unmarshal(s, &u)
+			}
+			asonNs := float64(time.Since(start).Nanoseconds()) / float64(rtIters)
+
+			start = time.Now()
+			for i := 0; i < rtIters; i++ {
+				s, _ := json.Marshal(&user)
+				var u User
+				json.Unmarshal(s, &u)
+			}
+			jsonNs := float64(time.Since(start).Nanoseconds()) / float64(rtIters)
+
+			fmt.Printf("    × %d: BIN %6.0fns | ASON %6.0fns | JSON %6.0fns\n",
+				rtIters, binNs, asonNs, jsonNs)
+			fmt.Printf("    Speedup vs JSON: BIN %.1fx faster | ASON %.1fx faster\n",
+				jsonNs/binNs, jsonNs/asonNs)
+		}
 	}
 
 	fmt.Println("\n╔══════════════════════════════════════════════════════════════╗")
