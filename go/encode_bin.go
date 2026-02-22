@@ -6,8 +6,8 @@ import (
 	"reflect"
 )
 
-// MarshalBinary serializes a Go value to ASON-BIN format.
-func MarshalBinary(v any) ([]byte, error) {
+// EncodeBinary serializes a Go value to ASON-BIN format.
+func EncodeBinary(v any) ([]byte, error) {
 	if v == nil {
 		return nil, &MarshalError{Message: "cannot marshal nil"}
 	}

@@ -1,13 +1,13 @@
 pub mod binary;
-pub mod deserialize;
+pub mod decode;
 pub mod error;
-pub mod serialize;
+pub mod encode;
 pub mod simd;
 
-pub use binary::{from_bin, from_bin_vec, to_bin, to_bin_vec};
-pub use deserialize::{from_str, from_str_vec};
+pub use binary::{encode_binary, decode_binary};
+pub use decode::decode;
 pub use error::{Error, Result};
-pub use serialize::{StructSchema, to_string, to_string_typed, to_string_vec, to_string_vec_typed};
+pub use encode::{encode, encode_typed};
 
 #[cfg(test)]
 mod tests {
@@ -21,20 +21,6 @@ mod tests {
         active: bool,
     }
 
-    impl StructSchema for User {
-        fn field_names() -> &'static [&'static str] {
-            &["id", "name", "active"]
-        }
-        fn serialize_fields(&self, ser: &mut serialize::Serializer) -> Result<()> {
-            use serde::Serialize;
-            self.id.serialize(&mut *ser)?;
-            self.name.serialize(&mut *ser)?;
-            self.active.serialize(&mut *ser)?;
-            Ok(())
-        }
-        // field_types not overridden — default returns &[]
-    }
-
     #[test]
     fn test_serialize_struct() {
         let user = User {
@@ -42,14 +28,14 @@ mod tests {
             name: "Alice".into(),
             active: true,
         };
-        let s = to_string(&user).unwrap();
+        let s = encode(&user).unwrap();
         assert_eq!(s, "{id,name,active}:(1,Alice,true)");
     }
 
     #[test]
     fn test_deserialize_struct_with_schema() {
         let input = "{id,name,active}:(1,Alice,true)";
-        let user: User = from_str(input).unwrap();
+        let user: User = decode(input).unwrap();
         assert_eq!(user.id, 1);
         assert_eq!(user.name, "Alice");
         assert!(user.active);
@@ -58,7 +44,7 @@ mod tests {
     #[test]
     fn test_deserialize_struct_with_typed_schema() {
         let input = "{id:int,name:str,active:bool}:(1,Alice,true)";
-        let user: User = from_str(input).unwrap();
+        let user: User = decode(input).unwrap();
         assert_eq!(user.id, 1);
         assert_eq!(user.name, "Alice");
         assert!(user.active);
@@ -71,15 +57,15 @@ mod tests {
             name: "Bob".into(),
             active: false,
         };
-        let s = to_string(&user).unwrap();
-        let user2: User = from_str(&s).unwrap();
+        let s = encode(&user).unwrap();
+        let user2: User = decode(&s).unwrap();
         assert_eq!(user, user2);
     }
 
     #[test]
     fn test_vec_deserialize() {
-        let input = "{id:int,name:str,active:bool}:(1,Alice,true),(2,Bob,false)";
-        let users: Vec<User> = from_str_vec(input).unwrap();
+        let input = "[{id:int,name:str,active:bool}]:(1,Alice,true),(2,Bob,false)";
+        let users: Vec<User> = decode(input).unwrap();
         assert_eq!(users.len(), 2);
         assert_eq!(users[0].name, "Alice");
         assert_eq!(users[1].name, "Bob");
@@ -87,17 +73,17 @@ mod tests {
 
     #[test]
     fn test_multiline() {
-        let input = "{id:int,name:str,active:bool}:
+        let input = "[{id:int,name:str,active:bool}]:
   (1, Alice, true),
   (2, Bob, false)";
-        let users: Vec<User> = from_str_vec(input).unwrap();
+        let users: Vec<User> = decode(input).unwrap();
         assert_eq!(users.len(), 2);
     }
 
     #[test]
     fn test_quoted_string() {
         let input = "{id,name,active}:(1,\"Carol Smith\",true)";
-        let user: User = from_str(input).unwrap();
+        let user: User = decode(input).unwrap();
         assert_eq!(user.name, "Carol Smith");
     }
 
@@ -109,7 +95,7 @@ mod tests {
             label: Option<String>,
         }
         let input = "{id,label}:(1,)";
-        let item: Item = from_str(input).unwrap();
+        let item: Item = decode(input).unwrap();
         assert_eq!(item.id, 1);
         assert_eq!(item.label, None);
     }
@@ -122,7 +108,7 @@ mod tests {
             tags: Vec<String>,
         }
         let input = "{name,tags}:(Alice,[rust,go])";
-        let t: Tagged = from_str(input).unwrap();
+        let t: Tagged = decode(input).unwrap();
         assert_eq!(t.tags, vec!["rust", "go"]);
     }
 
@@ -138,7 +124,7 @@ mod tests {
             dept: Dept,
         }
         let input = "{name,dept:{title}}:(Alice,(Manager))";
-        let e: Employee = from_str(input).unwrap();
+        let e: Employee = decode(input).unwrap();
         assert_eq!(e.name, "Alice");
         assert_eq!(e.dept.title, "Manager");
     }
@@ -150,17 +136,6 @@ mod tests {
             id: i64,
             name: String,
         }
-        impl StructSchema for Row {
-            fn field_names() -> &'static [&'static str] {
-                &["id", "name"]
-            }
-            fn serialize_fields(&self, ser: &mut serialize::Serializer) -> Result<()> {
-                use serde::Serialize;
-                self.id.serialize(&mut *ser)?;
-                self.name.serialize(&mut *ser)?;
-                Ok(())
-            }
-        }
         let rows = vec![
             Row {
                 id: 1,
@@ -171,8 +146,8 @@ mod tests {
                 name: "Bob".into(),
             },
         ];
-        let s = to_string_vec(&rows).unwrap();
-        assert_eq!(s, "{id,name}:(1,Alice),(2,Bob)");
+        let s = encode(&rows).unwrap();
+        assert_eq!(s, "[{id,name}]:(1,Alice),(2,Bob)");
     }
 
     #[test]
@@ -184,22 +159,22 @@ mod tests {
         let note = Note {
             text: "hello, world (test)".into(),
         };
-        let s = to_string(&note).unwrap();
-        let note2: Note = from_str(&s).unwrap();
+        let s = encode(&note).unwrap();
+        let note2: Note = decode(&s).unwrap();
         assert_eq!(note, note2);
     }
 
     #[test]
     fn test_trailing_comma() {
-        let input = "{id:int,name:str,active:bool}:(1,Alice,true),(2,Bob,false),";
-        let users: Vec<User> = from_str_vec(input).unwrap();
+        let input = "[{id:int,name:str,active:bool}]:(1,Alice,true),(2,Bob,false),";
+        let users: Vec<User> = decode(input).unwrap();
         assert_eq!(users.len(), 2);
     }
 
     #[test]
     fn test_comment_stripping() {
         let input = "/* users */ {id,name,active}:(1,Alice,true)";
-        let user: User = from_str(input).unwrap();
+        let user: User = decode(input).unwrap();
         assert_eq!(user.id, 1);
     }
 
@@ -211,7 +186,7 @@ mod tests {
             value: f64,
         }
         let input = "{id,value}:(1,95.5)";
-        let s: Score = from_str(input).unwrap();
+        let s: Score = decode(input).unwrap();
         assert_eq!(s.value, 95.5);
     }
 
@@ -224,7 +199,7 @@ mod tests {
             attrs: HashMap<String, i64>,
         }
         let input = "{name,attrs}:(Alice,[(age,30),(score,95)])";
-        let item: Item = from_str(input).unwrap();
+        let item: Item = decode(input).unwrap();
         assert_eq!(item.attrs["age"], 30);
         assert_eq!(item.attrs["score"], 95);
     }
@@ -237,8 +212,8 @@ mod tests {
     fn test_annotated_simple_struct() {
         let typed = "{id:int,name:str,active:bool}:(42,Bob,false)";
         let untyped = "{id,name,active}:(42,Bob,false)";
-        let u1: User = from_str(typed).unwrap();
-        let u2: User = from_str(untyped).unwrap();
+        let u1: User = decode(typed).unwrap();
+        let u2: User = decode(untyped).unwrap();
         assert_eq!(u1, u2);
         assert_eq!(u1.id, 42);
         assert_eq!(u1.name, "Bob");
@@ -247,10 +222,10 @@ mod tests {
 
     #[test]
     fn test_annotated_vec() {
-        let typed = "{id:int,name:str,active:bool}:(1,Alice,true),(2,Bob,false)";
-        let untyped = "{id,name,active}:(1,Alice,true),(2,Bob,false)";
-        let v1: Vec<User> = from_str_vec(typed).unwrap();
-        let v2: Vec<User> = from_str_vec(untyped).unwrap();
+        let typed = "[{id:int,name:str,active:bool}]:(1,Alice,true),(2,Bob,false)";
+        let untyped = "[{id,name,active}]:(1,Alice,true),(2,Bob,false)";
+        let v1: Vec<User> = decode(typed).unwrap();
+        let v2: Vec<User> = decode(untyped).unwrap();
         assert_eq!(v1, v2);
         assert_eq!(v1.len(), 2);
     }
@@ -272,8 +247,8 @@ mod tests {
 
         let typed = "{name:str,age:int,dept:{title:str,budget:float},active:bool}:(Alice,30,(Engineering,50000.5),true)";
         let untyped = "{name,age,dept:{title,budget},active}:(Alice,30,(Engineering,50000.5),true)";
-        let e1: Employee = from_str(typed).unwrap();
-        let e2: Employee = from_str(untyped).unwrap();
+        let e1: Employee = decode(typed).unwrap();
+        let e2: Employee = decode(untyped).unwrap();
         assert_eq!(e1, e2);
         assert_eq!(e1.name, "Alice");
         assert_eq!(e1.dept.title, "Engineering");
@@ -291,8 +266,8 @@ mod tests {
 
         let typed = "{name:str,scores:[int],tags:[str]}:(Alice,[90,85,92],[rust,go])";
         let untyped = "{name,scores,tags}:(Alice,[90,85,92],[rust,go])";
-        let p1: Profile = from_str(typed).unwrap();
-        let p2: Profile = from_str(untyped).unwrap();
+        let p1: Profile = decode(typed).unwrap();
+        let p2: Profile = decode(untyped).unwrap();
         assert_eq!(p1, p2);
         assert_eq!(p1.scores, vec![90, 85, 92]);
         assert_eq!(p1.tags, vec!["rust", "go"]);
@@ -309,8 +284,8 @@ mod tests {
 
         let typed = "{name:str,attrs:map[str,int]}:(server,[(port,8080),(timeout,30)])";
         let untyped = "{name,attrs}:(server,[(port,8080),(timeout,30)])";
-        let c1: Config = from_str(typed).unwrap();
-        let c2: Config = from_str(untyped).unwrap();
+        let c1: Config = decode(typed).unwrap();
+        let c2: Config = decode(untyped).unwrap();
         assert_eq!(c1, c2);
         assert_eq!(c1.attrs["port"], 8080);
     }
@@ -326,15 +301,15 @@ mod tests {
 
         let typed = "{id:int,label:str,score:float}:(1,hello,95.5)";
         let untyped = "{id,label,score}:(1,hello,95.5)";
-        let r1: Record = from_str(typed).unwrap();
-        let r2: Record = from_str(untyped).unwrap();
+        let r1: Record = decode(typed).unwrap();
+        let r2: Record = decode(untyped).unwrap();
         assert_eq!(r1, r2);
 
         // Test with None values
         let typed_none = "{id:int,label:str,score:float}:(2,,)";
         let untyped_none = "{id,label,score}:(2,,)";
-        let r3: Record = from_str(typed_none).unwrap();
-        let r4: Record = from_str(untyped_none).unwrap();
+        let r3: Record = decode(typed_none).unwrap();
+        let r4: Record = decode(untyped_none).unwrap();
         assert_eq!(r3, r4);
         assert_eq!(r3.label, None);
         assert_eq!(r3.score, None);
@@ -366,8 +341,8 @@ mod tests {
 
         let typed = "{name:str,revenue:float,team:{lead:str,projects:[{name:str,tasks:[{title:str,done:bool}]}]}}:(Acme,500.5,(Alice,[(API,[(Design,true),(Code,false)])]))";
         let untyped = "{name,revenue,team:{lead,projects:[{name,tasks:[{title,done}]}]}}:(Acme,500.5,(Alice,[(API,[(Design,true),(Code,false)])]))";
-        let c1: Company = from_str(typed).unwrap();
-        let c2: Company = from_str(untyped).unwrap();
+        let c1: Company = decode(typed).unwrap();
+        let c2: Company = decode(untyped).unwrap();
         assert_eq!(c1, c2);
         assert_eq!(c1.name, "Acme");
         assert_eq!(c1.team.lead, "Alice");
@@ -391,22 +366,22 @@ mod tests {
         let partial = "{id:int,name,score:float,active}:(1,Alice,95.5,true)";
         let full = "{id:int,name:str,score:float,active:bool}:(1,Alice,95.5,true)";
         let none = "{id,name,score,active}:(1,Alice,95.5,true)";
-        let m1: Mixed = from_str(partial).unwrap();
-        let m2: Mixed = from_str(full).unwrap();
-        let m3: Mixed = from_str(none).unwrap();
+        let m1: Mixed = decode(partial).unwrap();
+        let m2: Mixed = decode(full).unwrap();
+        let m3: Mixed = decode(none).unwrap();
         assert_eq!(m1, m2);
         assert_eq!(m2, m3);
     }
 
     #[test]
     fn test_serializer_output_is_unannotated() {
-        // Verify that to_string outputs schema without type annotations
+        // Verify that encode outputs schema without type annotations
         let user = User {
             id: 1,
             name: "Alice".into(),
             active: true,
         };
-        let s = to_string(&user).unwrap();
+        let s = encode(&user).unwrap();
         assert_eq!(s, "{id,name,active}:(1,Alice,true)");
         // Confirm it does NOT contain type hints
         assert!(!s.contains(":int"));
@@ -415,36 +390,36 @@ mod tests {
     }
 
     // ===================================================================
-    // Typed serialization tests (to_string_typed / to_string_vec_typed)
+    // Typed serialization tests (encode_typed / encode_typed)
     // ===================================================================
 
     #[test]
-    fn test_to_string_typed_simple() {
+    fn test_encode_typed_simple() {
         let user = User {
             id: 1,
             name: "Alice".into(),
             active: true,
         };
-        let s = to_string_typed(&user).unwrap();
+        let s = encode_typed(&user).unwrap();
         assert_eq!(s, "{id:int,name:str,active:bool}:(1,Alice,true)");
     }
 
     #[test]
-    fn test_to_string_typed_roundtrip() {
+    fn test_encode_typed_roundtrip() {
         let user = User {
             id: 42,
             name: "Bob".into(),
             active: false,
         };
-        let s = to_string_typed(&user).unwrap();
+        let s = encode_typed(&user).unwrap();
         assert!(s.starts_with("{id:int,name:str,active:bool}:"));
         // Deserialize back
-        let user2: User = from_str(&s).unwrap();
+        let user2: User = decode(&s).unwrap();
         assert_eq!(user, user2);
     }
 
     #[test]
-    fn test_to_string_typed_floats() {
+    fn test_encode_typed_floats() {
         #[derive(Debug, Serialize, Deserialize, PartialEq)]
         struct Score {
             id: i64,
@@ -456,14 +431,14 @@ mod tests {
             value: 95.5,
             label: "good".into(),
         };
-        let out = to_string_typed(&s).unwrap();
+        let out = encode_typed(&s).unwrap();
         assert_eq!(out, "{id:int,value:float,label:str}:(1,95.5,good)");
-        let s2: Score = from_str(&out).unwrap();
+        let s2: Score = decode(&out).unwrap();
         assert_eq!(s, s2);
     }
 
     #[test]
-    fn test_to_string_typed_all_primitives() {
+    fn test_encode_typed_all_primitives() {
         #[derive(Debug, Serialize, Deserialize, PartialEq)]
         struct All {
             b: bool,
@@ -481,17 +456,17 @@ mod tests {
             c: 'A',
             s: "hello".into(),
         };
-        let out = to_string_typed(&val).unwrap();
+        let out = encode_typed(&val).unwrap();
         assert_eq!(
             out,
             "{b:bool,i:int,u:int,f:float,c:str,s:str}:(true,-42,100,3.15,A,hello)"
         );
-        let val2: All = from_str(&out).unwrap();
+        let val2: All = decode(&out).unwrap();
         assert_eq!(val, val2);
     }
 
     #[test]
-    fn test_to_string_typed_optional() {
+    fn test_encode_typed_optional() {
         #[derive(Debug, Serialize, Deserialize, PartialEq)]
         struct Opt {
             id: i64,
@@ -505,7 +480,7 @@ mod tests {
             label: Some("hello".into()),
             score: Some(95.5),
         };
-        let out1 = to_string_typed(&v1).unwrap();
+        let out1 = encode_typed(&v1).unwrap();
         assert_eq!(out1, "{id:int,label:str,score:float}:(1,hello,95.5)");
 
         // None values — type hint may not be emitted for None
@@ -514,19 +489,19 @@ mod tests {
             label: None,
             score: None,
         };
-        let out2 = to_string_typed(&v2).unwrap();
+        let out2 = encode_typed(&v2).unwrap();
         // None fields don't have type hints since no value is serialized
         assert_eq!(out2, "{id:int,label,score}:(2,,)");
 
         // Both roundtrip correctly
-        let v1b: Opt = from_str(&out1).unwrap();
+        let v1b: Opt = decode(&out1).unwrap();
         assert_eq!(v1, v1b);
-        let v2b: Opt = from_str(&out2).unwrap();
+        let v2b: Opt = decode(&out2).unwrap();
         assert_eq!(v2, v2b);
     }
 
     #[test]
-    fn test_to_string_typed_nested_struct() {
+    fn test_encode_typed_nested_struct() {
         // Nested structs: inner struct becomes a tuple, no type hint on it
         #[derive(Debug, Serialize, Deserialize, PartialEq)]
         struct Dept {
@@ -545,38 +520,23 @@ mod tests {
             },
             active: true,
         };
-        let out = to_string_typed(&e).unwrap();
+        let out = encode_typed(&e).unwrap();
         // dept is a nested struct — no simple type hint
         assert_eq!(
             out,
             "{name:str,dept,active:bool}:(Alice,(Engineering),true)"
         );
-        let e2: Employee = from_str(&out).unwrap();
+        let e2: Employee = decode(&out).unwrap();
         assert_eq!(e, e2);
     }
 
     #[test]
-    fn test_to_string_vec_typed() {
+    fn test_encode_typed() {
         #[derive(Debug, Serialize, Deserialize, PartialEq)]
         struct Row {
             id: i64,
             name: String,
             score: f64,
-        }
-        impl StructSchema for Row {
-            fn field_names() -> &'static [&'static str] {
-                &["id", "name", "score"]
-            }
-            fn field_types() -> &'static [&'static str] {
-                &["int", "str", "float"]
-            }
-            fn serialize_fields(&self, ser: &mut serialize::Serializer) -> Result<()> {
-                use serde::Serialize;
-                self.id.serialize(&mut *ser)?;
-                self.name.serialize(&mut *ser)?;
-                self.score.serialize(&mut *ser)?;
-                Ok(())
-            }
         }
         let rows = vec![
             Row {
@@ -591,32 +551,30 @@ mod tests {
             },
         ];
 
-        let untyped = to_string_vec(&rows).unwrap();
-        assert_eq!(untyped, "{id,name,score}:(1,Alice,95.5),(2,Bob,87.0)");
+        let untyped = encode(&rows).unwrap();
+        assert_eq!(untyped, "[{id,name,score}]:(1,Alice,95.5),(2,Bob,87.0)");
 
-        let typed = to_string_vec_typed(&rows).unwrap();
+        let typed = encode_typed(&rows).unwrap();
         assert_eq!(
             typed,
-            "{id:int,name:str,score:float}:(1,Alice,95.5),(2,Bob,87.0)"
+            "[{id:int,name:str,score:float}]:(1,Alice,95.5),(2,Bob,87.0)"
         );
 
         // Both deserialize identically
-        let r1: Vec<Row> = from_str_vec(&untyped).unwrap();
-        let r2: Vec<Row> = from_str_vec(&typed).unwrap();
+        let r1: Vec<Row> = decode(&untyped).unwrap();
+        let r2: Vec<Row> = decode(&typed).unwrap();
         assert_eq!(r1, r2);
     }
 
     #[test]
-    fn test_to_string_vec_typed_without_field_types() {
-        // StructSchema without field_types — falls back to unannotated
+    fn test_encode_typed_without_field_types() {
         let users = vec![User {
             id: 1,
             name: "Alice".into(),
             active: true,
         }];
 
-        let typed = to_string_vec_typed(&users).unwrap();
-        // No types since field_types() returns empty
-        assert_eq!(typed, "{id,name,active}:(1,Alice,true)");
+        let typed = encode_typed(&users).unwrap();
+        assert_eq!(typed, "[{id:int,name:str,active:bool}]:(1,Alice,true)");
     }
 }

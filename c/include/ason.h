@@ -12,8 +12,8 @@
  *     ASON_FIELD(User, name,   "name",   ASON_STR),
  *     ASON_FIELD(User, active, "active", ASON_BOOL))
  *
- *   ason_buf_t buf = ason_dump_User(&user);
- *   User u2 = {0}; ason_load_User(buf.data, buf.len, &u2);
+ *   ason_buf_t buf = ason_encode_User(&user);
+ *   User u2 = {0}; ason_decode_User(buf.data, buf.len, &u2);
  */
 
 #ifndef ASON_H
@@ -229,8 +229,8 @@ typedef enum {
  * Field descriptor
  * ============================================================================ */
 
-typedef void (*ason_dump_fn)(ason_buf_t* buf, const void* base, size_t offset);
-typedef ason_err_t (*ason_load_fn)(const char** pos, const char* end, void* base, size_t offset);
+typedef void (*ason_encode_fn)(ason_buf_t* buf, const void* base, size_t offset);
+typedef ason_err_t (*ason_decode_fn)(const char** pos, const char* end, void* base, size_t offset);
 
 typedef struct {
     const char*  name;
@@ -240,8 +240,8 @@ typedef struct {
     const char*  type_str;
     /* For ASON_STRUCT fields: pointer to sub-struct descriptor */
     const void*  sub_desc;
-    ason_dump_fn dump_fn;
-    ason_load_fn load_fn;
+    ason_encode_fn dump_fn;
+    ason_decode_fn load_fn;
 } ason_field_t;
 
 /* ============================================================================
@@ -771,70 +771,70 @@ ason_inline ason_err_t ason_parse_schema(const char** pos, const char* end,
  * Generic field dump/load functions
  * ============================================================================ */
 
-void ason_dump_bool(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_i8(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_i16(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_i32(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_i64(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_u8(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_u16(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_u32(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_u64(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_f32(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_f64(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_char(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_str(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_opt_i64(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_opt_str(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_opt_f64(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_vec_i64(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_vec_u64(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_vec_f64(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_vec_str(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_vec_bool(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_vec_vec_i64(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_map_si(ason_buf_t* buf, const void* base, size_t offset);
-void ason_dump_map_ss(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_bool(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_i8(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_i16(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_i32(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_i64(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_u8(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_u16(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_u32(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_u64(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_f32(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_f64(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_char(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_str(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_opt_i64(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_opt_str(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_opt_f64(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_vec_i64(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_vec_u64(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_vec_f64(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_vec_str(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_vec_bool(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_vec_vec_i64(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_map_si(ason_buf_t* buf, const void* base, size_t offset);
+void ason_encode_map_ss(ason_buf_t* buf, const void* base, size_t offset);
 
-ason_err_t ason_load_bool(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_i8(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_i16(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_i32(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_i64(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_u8(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_u16(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_u32(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_u64(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_f32(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_f64(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_char(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_str(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_opt_i64(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_opt_str(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_opt_f64(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_vec_i64(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_vec_u64(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_vec_f64(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_vec_str(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_vec_bool(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_vec_vec_i64(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_map_si(const char** pos, const char* end, void* base, size_t offset);
-ason_err_t ason_load_map_ss(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_bool(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_i8(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_i16(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_i32(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_i64(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_u8(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_u16(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_u32(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_u64(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_f32(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_f64(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_char(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_str(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_opt_i64(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_opt_str(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_opt_f64(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_vec_i64(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_vec_u64(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_vec_f64(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_vec_str(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_vec_bool(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_vec_vec_i64(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_map_si(const char** pos, const char* end, void* base, size_t offset);
+ason_err_t ason_decode_map_ss(const char** pos, const char* end, void* base, size_t offset);
 
 /* Generic struct dump/load via descriptor */
-void ason_dump_struct(ason_buf_t* buf, const void* obj, const ason_desc_t* desc);
-ason_err_t ason_load_struct(const char** pos, const char* end, void* obj, const ason_desc_t* desc);
+void ason_encode_struct(ason_buf_t* buf, const void* obj, const ason_desc_t* desc);
+ason_err_t ason_decode_struct(const char** pos, const char* end, void* obj, const ason_desc_t* desc);
 
 /* ============================================================================
  * ASON_FIELD macro — build a field descriptor
  * ============================================================================ */
 
-#define ASON_DUMP_FN(t) ason_dump_##t
-#define ASON_LOAD_FN(t) ason_load_##t
+#define ASON_DUMP_FN(t) ason_encode_##t
+#define ASON_LOAD_FN(t) ason_decode_##t
 
 /* C _Bool aliases: bool expands to _Bool before ## token pasting */
-#define ason_dump__Bool ason_dump_bool
-#define ason_load__Bool ason_load_bool
+#define ason_encode__Bool ason_encode_bool
+#define ason_decode__Bool ason_decode_bool
 #define ASON_TYPE_NAME__Bool "bool"
 #define ASON_TYPE_ENUM__Bool ASON_BOOL
 
@@ -907,7 +907,7 @@ ason_err_t ason_load_struct(const char** pos, const char* end, void* obj, const 
     static const ason_desc_t StructType##_ason_desc = { \
         #StructType, StructType##_ason_fields, nfields \
     }; \
-    static inline ason_buf_t ason_dump_##StructType(const StructType* obj) { \
+    static inline ason_buf_t ason_encode_##StructType(const StructType* obj) { \
         ason_buf_t buf = ason_buf_new(128); \
         ason_buf_push(&buf, '{'); \
         for (int i = 0; i < nfields; i++) { \
@@ -925,7 +925,7 @@ ason_err_t ason_load_struct(const char** pos, const char* end, void* obj, const 
                     StructType##_ason_fields[i].dump_fn(&buf, obj, \
                         StructType##_ason_fields[i].offset); \
                 } else { \
-                    ason_dump_struct(&buf, (const char*)obj + StructType##_ason_fields[i].offset, \
+                    ason_encode_struct(&buf, (const char*)obj + StructType##_ason_fields[i].offset, \
                                      (const ason_desc_t*)StructType##_ason_fields[i].sub_desc); \
                 } \
             } else { \
@@ -936,7 +936,7 @@ ason_err_t ason_load_struct(const char** pos, const char* end, void* obj, const 
         ason_buf_push(&buf, ')'); \
         return buf; \
     } \
-    static inline ason_buf_t ason_dump_typed_##StructType(const StructType* obj) { \
+    static inline ason_buf_t ason_encode_typed_##StructType(const StructType* obj) { \
         ason_buf_t buf = ason_buf_new(128); \
         ason_buf_push(&buf, '{'); \
         for (int i = 0; i < nfields; i++) { \
@@ -958,7 +958,7 @@ ason_err_t ason_load_struct(const char** pos, const char* end, void* obj, const 
                     StructType##_ason_fields[i].dump_fn(&buf, obj, \
                         StructType##_ason_fields[i].offset); \
                 } else { \
-                    ason_dump_struct(&buf, (const char*)obj + StructType##_ason_fields[i].offset, \
+                    ason_encode_struct(&buf, (const char*)obj + StructType##_ason_fields[i].offset, \
                                      (const ason_desc_t*)StructType##_ason_fields[i].sub_desc); \
                 } \
             } else { \
@@ -969,7 +969,7 @@ ason_err_t ason_load_struct(const char** pos, const char* end, void* obj, const 
         ason_buf_push(&buf, ')'); \
         return buf; \
     } \
-    static inline ason_err_t ason_load_##StructType(const char* input, size_t len, StructType* out) { \
+    static inline ason_err_t ason_decode_##StructType(const char* input, size_t len, StructType* out) { \
         const char* pos = input; \
         const char* end = input + len; \
         ason_skip_ws(&pos, end); \
@@ -1009,7 +1009,7 @@ ason_err_t ason_load_struct(const char** pos, const char* end, void* obj, const 
                         err = StructType##_ason_fields[fi].load_fn(&pos, end, out, \
                             StructType##_ason_fields[fi].offset); \
                     } else { \
-                        err = ason_load_struct(&pos, end, \
+                        err = ason_decode_struct(&pos, end, \
                             (char*)out + StructType##_ason_fields[fi].offset, \
                             (const ason_desc_t*)StructType##_ason_fields[fi].sub_desc); \
                     } \
@@ -1026,9 +1026,10 @@ ason_err_t ason_load_struct(const char** pos, const char* end, void* obj, const 
         if (pos < end && *pos == ')') pos++; \
         return ASON_OK; \
     } \
-    /* dump_typed_vec: {field:type,...}:(row1),(row2),... */ \
-    static inline ason_buf_t ason_dump_typed_vec_##StructType(const StructType* arr, size_t count) { \
+    /* encode_typed_vec: [{field:type,...}]:(row1),(row2),... */ \
+    static inline ason_buf_t ason_encode_typed_vec_##StructType(const StructType* arr, size_t count) { \
         ason_buf_t buf = ason_buf_new(count * 64 + 128); \
+        ason_buf_push(&buf, '['); \
         ason_buf_push(&buf, '{'); \
         for (int i = 0; i < nfields; i++) { \
             if (i > 0) ason_buf_push(&buf, ','); \
@@ -1040,6 +1041,7 @@ ason_err_t ason_load_struct(const char** pos, const char* end, void* obj, const 
             } \
         } \
         ason_buf_push(&buf, '}'); \
+        ason_buf_push(&buf, ']'); \
         ason_buf_push(&buf, ':'); \
         for (size_t r = 0; r < count; r++) { \
             if (r > 0) ason_buf_push(&buf, ','); \
@@ -1051,7 +1053,7 @@ ason_err_t ason_load_struct(const char** pos, const char* end, void* obj, const 
                         StructType##_ason_fields[i].dump_fn(&buf, &arr[r], \
                             StructType##_ason_fields[i].offset); \
                     } else { \
-                        ason_dump_struct(&buf, (const char*)&arr[r] + StructType##_ason_fields[i].offset, \
+                        ason_encode_struct(&buf, (const char*)&arr[r] + StructType##_ason_fields[i].offset, \
                                          (const ason_desc_t*)StructType##_ason_fields[i].sub_desc); \
                     } \
                 } else { \
@@ -1063,9 +1065,10 @@ ason_err_t ason_load_struct(const char** pos, const char* end, void* obj, const 
         } \
         return buf; \
     } \
-    /* dump_vec: {schema}:(row1),(row2),... */ \
-    static inline ason_buf_t ason_dump_vec_##StructType(const StructType* arr, size_t count) { \
+    /* encode_vec: [{schema}]:(row1),(row2),... */ \
+    static inline ason_buf_t ason_encode_vec_##StructType(const StructType* arr, size_t count) { \
         ason_buf_t buf = ason_buf_new(count * 64 + 128); \
+        ason_buf_push(&buf, '['); \
         ason_buf_push(&buf, '{'); \
         for (int i = 0; i < nfields; i++) { \
             if (i > 0) ason_buf_push(&buf, ','); \
@@ -1073,6 +1076,7 @@ ason_err_t ason_load_struct(const char** pos, const char* end, void* obj, const 
                             StructType##_ason_fields[i].name_len); \
         } \
         ason_buf_push(&buf, '}'); \
+        ason_buf_push(&buf, ']'); \
         ason_buf_push(&buf, ':'); \
         for (size_t r = 0; r < count; r++) { \
             if (r > 0) ason_buf_push(&buf, ','); \
@@ -1084,7 +1088,7 @@ ason_err_t ason_load_struct(const char** pos, const char* end, void* obj, const 
                         StructType##_ason_fields[i].dump_fn(&buf, &arr[r], \
                             StructType##_ason_fields[i].offset); \
                     } else { \
-                        ason_dump_struct(&buf, (const char*)&arr[r] + StructType##_ason_fields[i].offset, \
+                        ason_encode_struct(&buf, (const char*)&arr[r] + StructType##_ason_fields[i].offset, \
                                          (const ason_desc_t*)StructType##_ason_fields[i].sub_desc); \
                     } \
                 } else { \
@@ -1096,17 +1100,22 @@ ason_err_t ason_load_struct(const char** pos, const char* end, void* obj, const 
         } \
         return buf; \
     } \
-    /* load_vec */ \
-    static inline ason_err_t ason_load_vec_##StructType(const char* input, size_t len, \
+    /* decode_vec: [{schema}]:(row1),(row2),... */ \
+    static inline ason_err_t ason_decode_vec_##StructType(const char* input, size_t len, \
                                                          StructType** out, size_t* out_count) { \
         const char* pos = input; \
         const char* end = input + len; \
         ason_skip_ws(&pos, end); \
+        if (pos >= end || *pos != '[') return ASON_ERR_SYNTAX; \
+        pos++; \
         if (pos >= end || *pos != '{') return ASON_ERR_SYNTAX; \
         ason_schema_field_t schema[64]; \
         int schema_count = 0; \
         ason_err_t err = ason_parse_schema(&pos, end, schema, &schema_count, 64); \
         if (err != ASON_OK) return err; \
+        ason_skip_ws(&pos, end); \
+        if (pos >= end || *pos != ']') return ASON_ERR_SYNTAX; \
+        pos++; \
         ason_skip_ws(&pos, end); \
         if (pos >= end || *pos != ':') return ASON_ERR_SYNTAX; \
         pos++; \
@@ -1149,7 +1158,7 @@ ason_err_t ason_load_struct(const char** pos, const char* end, void* obj, const 
                             err = StructType##_ason_fields[fi].load_fn(&pos, end, elem, \
                                 StructType##_ason_fields[fi].offset); \
                         } else { \
-                            err = ason_load_struct(&pos, end, \
+                            err = ason_decode_struct(&pos, end, \
                                 (char*)elem + StructType##_ason_fields[fi].offset, \
                                 (const ason_desc_t*)StructType##_ason_fields[fi].sub_desc); \
                         } \
@@ -1186,16 +1195,16 @@ ason_err_t ason_load_struct(const char** pos, const char* end, void* obj, const 
 
 #define ASON_VEC_STRUCT_DEFINE(StructType) \
     ASON_VEC_DEFINE(ason_vec_##StructType, StructType) \
-    static inline void ason_dump_vec_struct_##StructType(ason_buf_t* buf, const void* base, size_t offset) { \
+    static inline void ason_encode_vec_struct_##StructType(ason_buf_t* buf, const void* base, size_t offset) { \
         const ason_vec_##StructType* v = (const ason_vec_##StructType*)((const char*)base + offset); \
         ason_buf_push(buf, '['); \
         for (size_t i = 0; i < v->len; i++) { \
             if (i > 0) ason_buf_push(buf, ','); \
-            ason_dump_struct(buf, &v->data[i], &StructType##_ason_desc); \
+            ason_encode_struct(buf, &v->data[i], &StructType##_ason_desc); \
         } \
         ason_buf_push(buf, ']'); \
     } \
-    static inline ason_err_t ason_load_vec_struct_##StructType(const char** pos, const char* end, void* base, size_t offset) { \
+    static inline ason_err_t ason_decode_vec_struct_##StructType(const char** pos, const char* end, void* base, size_t offset) { \
         ason_skip_ws(pos, end); \
         if (*pos >= end || **pos != '[') return ASON_ERR_SYNTAX; \
         (*pos)++; \
@@ -1216,7 +1225,7 @@ ason_err_t ason_load_struct(const char** pos, const char* end, void* obj, const 
                 v->data = (StructType*)realloc(v->data, v->cap * sizeof(StructType)); \
             } \
             memset(&v->data[v->len], 0, sizeof(StructType)); \
-            ason_err_t err = ason_load_struct(pos, end, &v->data[v->len], &StructType##_ason_desc); \
+            ason_err_t err = ason_decode_struct(pos, end, &v->data[v->len], &StructType##_ason_desc); \
             if (err != ASON_OK) return err; \
             v->len++; \
         } \
@@ -1227,8 +1236,8 @@ ason_err_t ason_load_struct(const char** pos, const char* end, void* obj, const 
 #define ASON_FIELD_VEC_STRUCT(StructType, member, fname, ElemType) \
     { fname, sizeof(fname) - 1, ASON_STRUCT, \
       offsetof(StructType, member), NULL, &ElemType##_ason_desc, \
-      (ason_dump_fn)ason_dump_vec_struct_##ElemType, \
-      (ason_load_fn)ason_load_vec_struct_##ElemType }
+      (ason_encode_fn)ason_encode_vec_struct_##ElemType, \
+      (ason_decode_fn)ason_decode_vec_struct_##ElemType }
 
 /* ============================================================================
  * Binary serialization / deserialization (ASON-BIN)
@@ -1337,76 +1346,76 @@ ason_inline ason_err_t ason_bin_read_ason_string(const char** pos, const char* e
     return ASON_OK;
 }
 
-/* Type-specific binary dump field helpers — same signature as ason_dump_fn */
-void ason_bin_dump_bool  (ason_buf_t* buf, const void* base, size_t off);
-void ason_bin_dump_i8    (ason_buf_t* buf, const void* base, size_t off);
-void ason_bin_dump_i16   (ason_buf_t* buf, const void* base, size_t off);
-void ason_bin_dump_i32   (ason_buf_t* buf, const void* base, size_t off);
-void ason_bin_dump_i64   (ason_buf_t* buf, const void* base, size_t off);
-void ason_bin_dump_u8    (ason_buf_t* buf, const void* base, size_t off);
-void ason_bin_dump_u16   (ason_buf_t* buf, const void* base, size_t off);
-void ason_bin_dump_u32   (ason_buf_t* buf, const void* base, size_t off);
-void ason_bin_dump_u64   (ason_buf_t* buf, const void* base, size_t off);
-void ason_bin_dump_f32   (ason_buf_t* buf, const void* base, size_t off);
-void ason_bin_dump_f64   (ason_buf_t* buf, const void* base, size_t off);
-void ason_bin_dump_str   (ason_buf_t* buf, const void* base, size_t off);
-void ason_bin_dump_vec_i64  (ason_buf_t* buf, const void* base, size_t off);
-void ason_bin_dump_vec_u64  (ason_buf_t* buf, const void* base, size_t off);
-void ason_bin_dump_vec_f64  (ason_buf_t* buf, const void* base, size_t off);
-void ason_bin_dump_vec_str  (ason_buf_t* buf, const void* base, size_t off);
-void ason_bin_dump_vec_bool (ason_buf_t* buf, const void* base, size_t off);
+/* Type-specific binary dump field helpers — same signature as ason_encode_fn */
+void ason_bin_encode_bool  (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_encode_i8    (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_encode_i16   (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_encode_i32   (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_encode_i64   (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_encode_u8    (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_encode_u16   (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_encode_u32   (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_encode_u64   (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_encode_f32   (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_encode_f64   (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_encode_str   (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_encode_vec_i64  (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_encode_vec_u64  (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_encode_vec_f64  (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_encode_vec_str  (ason_buf_t* buf, const void* base, size_t off);
+void ason_bin_encode_vec_bool (ason_buf_t* buf, const void* base, size_t off);
 
-ason_err_t ason_bin_load_bool  (const char** pos, const char* end, void* base, size_t off);
-ason_err_t ason_bin_load_i8    (const char** pos, const char* end, void* base, size_t off);
-ason_err_t ason_bin_load_i16   (const char** pos, const char* end, void* base, size_t off);
-ason_err_t ason_bin_load_i32   (const char** pos, const char* end, void* base, size_t off);
-ason_err_t ason_bin_load_i64   (const char** pos, const char* end, void* base, size_t off);
-ason_err_t ason_bin_load_u8    (const char** pos, const char* end, void* base, size_t off);
-ason_err_t ason_bin_load_u16   (const char** pos, const char* end, void* base, size_t off);
-ason_err_t ason_bin_load_u32   (const char** pos, const char* end, void* base, size_t off);
-ason_err_t ason_bin_load_u64   (const char** pos, const char* end, void* base, size_t off);
-ason_err_t ason_bin_load_f32   (const char** pos, const char* end, void* base, size_t off);
-ason_err_t ason_bin_load_f64   (const char** pos, const char* end, void* base, size_t off);
-ason_err_t ason_bin_load_str   (const char** pos, const char* end, void* base, size_t off);
-ason_err_t ason_bin_load_vec_i64  (const char** pos, const char* end, void* base, size_t off);
-ason_err_t ason_bin_load_vec_u64  (const char** pos, const char* end, void* base, size_t off);
-ason_err_t ason_bin_load_vec_f64  (const char** pos, const char* end, void* base, size_t off);
-ason_err_t ason_bin_load_vec_str  (const char** pos, const char* end, void* base, size_t off);
-ason_err_t ason_bin_load_vec_bool (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_decode_bool  (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_decode_i8    (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_decode_i16   (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_decode_i32   (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_decode_i64   (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_decode_u8    (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_decode_u16   (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_decode_u32   (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_decode_u64   (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_decode_f32   (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_decode_f64   (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_decode_str   (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_decode_vec_i64  (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_decode_vec_u64  (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_decode_vec_f64  (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_decode_vec_str  (const char** pos, const char* end, void* base, size_t off);
+ason_err_t ason_bin_decode_vec_bool (const char** pos, const char* end, void* base, size_t off);
 
 /* Generic struct binary dump/load using the existing descriptor */
-void       ason_bin_dump_struct(ason_buf_t* buf, const void* obj, const ason_desc_t* desc);
-ason_err_t ason_bin_load_struct(const char** pos, const char* end, void* obj, const ason_desc_t* desc);
+void       ason_bin_encode_struct(ason_buf_t* buf, const void* obj, const ason_desc_t* desc);
+ason_err_t ason_bin_decode_struct(const char** pos, const char* end, void* obj, const ason_desc_t* desc);
 
 /* Convenience binary-fn selectors (mirrors ASON_DUMP_FN / ASON_LOAD_FN) */
-#define ASON_BIN_DUMP_FN(t) ason_bin_dump_##t
-#define ASON_BIN_LOAD_FN(t) ason_bin_load_##t
-#define ason_bin_dump__Bool ason_bin_dump_bool
-#define ason_bin_load__Bool ason_bin_load_bool
+#define ASON_BIN_DUMP_FN(t) ason_bin_encode_##t
+#define ASON_BIN_LOAD_FN(t) ason_bin_decode_##t
+#define ason_bin_encode__Bool ason_bin_encode_bool
+#define ason_bin_decode__Bool ason_bin_decode_bool
 
 /* ASON_FIELDS_BIN adds binary dump/load to an already-declared ASON_FIELDS struct.
- * Use after ASON_FIELDS to inject ason_dump_bin_<T>, ason_load_bin_<T>, etc. */
+ * Use after ASON_FIELDS to inject ason_encode_bin_<T>, ason_decode_bin_<T>, etc. */
 #define ASON_FIELDS_BIN(StructType, nfields) \
-    static inline ason_buf_t ason_dump_bin_##StructType(const StructType* obj) { \
+    static inline ason_buf_t ason_encode_bin_##StructType(const StructType* obj) { \
         ason_buf_t buf = ason_buf_new(nfields * 16); \
-        ason_bin_dump_struct(&buf, obj, &StructType##_ason_desc); \
+        ason_bin_encode_struct(&buf, obj, &StructType##_ason_desc); \
         return buf; \
     } \
-    static inline ason_buf_t ason_dump_bin_vec_##StructType(const StructType* arr, size_t count) { \
+    static inline ason_buf_t ason_encode_bin_vec_##StructType(const StructType* arr, size_t count) { \
         ason_buf_t buf = ason_buf_new(count * nfields * 16 + 8); \
         uint32_t n = (uint32_t)count; \
         ason_bin_write_u32(&buf, n); \
         for (size_t i = 0; i < count; i++) { \
-            ason_bin_dump_struct(&buf, &arr[i], &StructType##_ason_desc); \
+            ason_bin_encode_struct(&buf, &arr[i], &StructType##_ason_desc); \
         } \
         return buf; \
     } \
-    static inline ason_err_t ason_load_bin_##StructType(const char* data, size_t len, StructType* out) { \
+    static inline ason_err_t ason_decode_bin_##StructType(const char* data, size_t len, StructType* out) { \
         const char* pos = data; \
         const char* end = data + len; \
-        return ason_bin_load_struct(&pos, end, out, &StructType##_ason_desc); \
+        return ason_bin_decode_struct(&pos, end, out, &StructType##_ason_desc); \
     } \
-    static inline ason_err_t ason_load_bin_vec_##StructType(const char* data, size_t len, \
+    static inline ason_err_t ason_decode_bin_vec_##StructType(const char* data, size_t len, \
                                                               StructType** out_arr, size_t* out_count) { \
         const char* pos = data; \
         const char* end = data + len; \
@@ -1416,7 +1425,7 @@ ason_err_t ason_bin_load_struct(const char** pos, const char* end, void* obj, co
         StructType* arr = (StructType*)calloc(count, sizeof(StructType)); \
         if (!arr) return ASON_ERR_ALLOC; \
         for (uint32_t i = 0; i < count; i++) { \
-            err = ason_bin_load_struct(&pos, end, &arr[i], &StructType##_ason_desc); \
+            err = ason_bin_decode_struct(&pos, end, &arr[i], &StructType##_ason_desc); \
             if (err != ASON_OK) { free(arr); return err; } \
         } \
         *out_arr = arr; \

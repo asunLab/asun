@@ -7,9 +7,9 @@ import (
 	"unsafe"
 )
 
-// UnmarshalBinary deserializes ASON-BIN format into a Go value.
+// DecodeBinary deserializes ASON-BIN format into a Go value.
 // It uses zero-copy for strings where possible.
-func UnmarshalBinary(data []byte, v any) error {
+func DecodeBinary(data []byte, v any) error {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
 		return &UnmarshalError{Message: "unmarshal target must be a non-nil pointer"}

@@ -12,7 +12,7 @@ pub struct Deserializer<'de> {
     field_index: usize,
 }
 
-pub fn from_str<'a, T: Deserialize<'a>>(s: &'a str) -> Result<T> {
+pub fn decode<'a, T: Deserialize<'a>>(s: &'a str) -> Result<T> {
     let mut de = Deserializer {
         input: s.as_bytes(),
         pos: 0,
@@ -31,57 +31,6 @@ pub fn from_str<'a, T: Deserialize<'a>>(s: &'a str) -> Result<T> {
     } else {
         Ok(value)
     }
-}
-
-/// Deserialize a Vec<T> from ASON with schema: `{field1,field2,...}:(v1,v2),(v3,v4)`
-pub fn from_str_vec<'a, T: Deserialize<'a>>(s: &'a str) -> Result<Vec<T>> {
-    let mut de = Deserializer {
-        input: s.as_bytes(),
-        pos: 0,
-        schema_fields: None,
-        field_index: 0,
-    };
-    de.skip_whitespace_and_comments();
-
-    // Parse schema
-    if de.peek_byte()? != b'{' {
-        return Err(Error::ExpectedOpenBrace);
-    }
-    let fields = de.parse_schema()?;
-
-    de.skip_whitespace_and_comments();
-    if de.next_byte()? != b':' {
-        return Err(Error::ExpectedColon);
-    }
-
-    de.schema_fields = Some(fields);
-
-    let mut results = Vec::new();
-    loop {
-        de.skip_whitespace_and_comments();
-        if de.pos >= de.input.len() {
-            break;
-        }
-        if de.peek_byte()? != b'(' {
-            break;
-        }
-        de.field_index = 0;
-        let val = T::deserialize(&mut de)?;
-        results.push(val);
-        de.skip_whitespace_and_comments();
-        if de.pos < de.input.len() && de.peek_byte().ok() == Some(b',') {
-            de.pos += 1;
-            de.skip_whitespace_and_comments();
-            if de.pos >= de.input.len() {
-                break;
-            }
-            if de.peek_byte().ok() != Some(b'(') {
-                break;
-            }
-        }
-    }
-
-    Ok(results)
 }
 
 impl<'de> Deserializer<'de> {
@@ -767,18 +716,42 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     #[inline]
     fn deserialize_seq<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         self.skip_whitespace_and_comments();
-        if self.next_byte()? != b'[' {
-            return Err(Error::ExpectedOpenBracket);
+        // [{schema}]:(v1,...),(v2,...) — struct array with shared schema
+        if self.peek_byte()? == b'['
+            && self.pos + 1 < self.input.len()
+            && self.input[self.pos + 1] == b'{'
+        {
+            self.pos += 1; // skip '['
+            let fields = self.parse_schema()?;
+            self.skip_whitespace_and_comments();
+            if self.next_byte()? != b']' {
+                return Err(Error::ExpectedCloseBracket);
+            }
+            self.skip_whitespace_and_comments();
+            if self.next_byte()? != b':' {
+                return Err(Error::ExpectedColon);
+            }
+            self.schema_fields = Some(fields);
+            let value = visitor.visit_seq(AsonVecAccess {
+                de: self,
+                first: true,
+            })?;
+            self.schema_fields = None;
+            Ok(value)
+        } else {
+            if self.next_byte()? != b'[' {
+                return Err(Error::ExpectedOpenBracket);
+            }
+            let value = visitor.visit_seq(AsonSeqAccess {
+                de: self,
+                first: true,
+            })?;
+            self.skip_whitespace_and_comments();
+            if self.pos < self.input.len() && self.input[self.pos] == b']' {
+                self.pos += 1;
+            }
+            Ok(value)
         }
-        let value = visitor.visit_seq(AsonSeqAccess {
-            de: self,
-            first: true,
-        })?;
-        self.skip_whitespace_and_comments();
-        if self.pos < self.input.len() && self.input[self.pos] == b']' {
-            self.pos += 1;
-        }
-        Ok(value)
     }
 
     #[inline]
@@ -1029,6 +1002,38 @@ impl<'a, 'de> SeqAccess<'de> for AsonSeqAccess<'a, 'de> {
             }
         }
         self.first = false;
+        seed.deserialize(&mut *self.de).map(Some)
+    }
+}
+
+// --- Vec<Struct> Access for [{schema}]: format ---
+struct AsonVecAccess<'a, 'de: 'a> {
+    de: &'a mut Deserializer<'de>,
+    first: bool,
+}
+
+impl<'a, 'de> SeqAccess<'de> for AsonVecAccess<'a, 'de> {
+    type Error = Error;
+
+    #[inline]
+    fn next_element_seed<T: DeserializeSeed<'de>>(&mut self, seed: T) -> Result<Option<T::Value>> {
+        self.de.skip_whitespace_and_comments();
+        if self.de.pos >= self.de.input.len() {
+            return Ok(None);
+        }
+        if !self.first {
+            if self.de.input[self.de.pos] == b',' {
+                self.de.pos += 1;
+                self.de.skip_whitespace_and_comments();
+            } else {
+                return Ok(None);
+            }
+        }
+        self.first = false;
+        if self.de.pos >= self.de.input.len() || self.de.input[self.de.pos] != b'(' {
+            return Ok(None);
+        }
+        self.de.field_index = 0;
         seed.deserialize(&mut *self.de).map(Some)
     }
 }

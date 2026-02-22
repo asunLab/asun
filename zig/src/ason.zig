@@ -283,34 +283,18 @@ const DEC_DIGITS: *const [200]u8 = "00010203040506070809101112131415161718192021
 pub fn encode(comptime T: type, value: T, allocator: Allocator) ![]const u8 {
     var w = Writer.init(allocator);
     errdefer w.deinit();
-    try serializeValue(T, value, &w, true);
-    return w.toOwnedSlice();
-}
-
-pub fn encodeVec(comptime T: type, values: []const T, allocator: Allocator) ![]const u8 {
-    var w = Writer.init(allocator);
-    errdefer w.deinit();
-
-    try writeSchema(T, &w, false);
-    try w.append(':');
-
-    for (values, 0..) |v, i| {
-        if (i > 0) try w.append(',');
-        try writeTupleData(T, v, &w);
-    }
-    return w.toOwnedSlice();
-}
-
-pub fn encodeVecTyped(comptime T: type, values: []const T, allocator: Allocator) ![]const u8 {
-    var w = Writer.init(allocator);
-    errdefer w.deinit();
-
-    try writeSchema(T, &w, true);
-    try w.append(':');
-
-    for (values, 0..) |v, i| {
-        if (i > 0) try w.append(',');
-        try writeTupleData(T, v, &w);
+    if (comptime isStructSlice(T)) {
+        const E = @typeInfo(T).pointer.child;
+        try w.append('[');
+        try writeSchema(E, &w, false);
+        try w.append(']');
+        try w.append(':');
+        for (value, 0..) |v, i| {
+            if (i > 0) try w.append(',');
+            try writeTupleData(E, v, &w);
+        }
+    } else {
+        try serializeValue(T, value, &w, false);
     }
     return w.toOwnedSlice();
 }
@@ -318,7 +302,19 @@ pub fn encodeVecTyped(comptime T: type, values: []const T, allocator: Allocator)
 pub fn encodeTyped(comptime T: type, value: T, allocator: Allocator) ![]const u8 {
     var w = Writer.init(allocator);
     errdefer w.deinit();
-    try serializeValue(T, value, &w, true);
+    if (comptime isStructSlice(T)) {
+        const E = @typeInfo(T).pointer.child;
+        try w.append('[');
+        try writeSchema(E, &w, true);
+        try w.append(']');
+        try w.append(':');
+        for (value, 0..) |v, i| {
+            if (i > 0) try w.append(',');
+            try writeTupleData(E, v, &w);
+        }
+    } else {
+        try serializeValue(T, value, &w, true);
+    }
     return w.toOwnedSlice();
 }
 
@@ -601,6 +597,13 @@ fn SliceChild(comptime T: type) type {
     return @typeInfo(T).pointer.child;
 }
 
+fn isStructSlice(comptime T: type) bool {
+    const info = @typeInfo(T);
+    if (info != .pointer) return false;
+    if (info.pointer.size != .slice) return false;
+    return @typeInfo(info.pointer.child) == .@"struct";
+}
+
 // ============================================================================
 // Text Deserializer (decode)
 // ============================================================================
@@ -609,50 +612,55 @@ pub fn decode(comptime T: type, input: []const u8, allocator: Allocator) !T {
     var parser = Parser{ .input = input, .pos = 0, .allocator = allocator };
     parser.skipWhitespaceAndComments();
 
-    if (parser.pos < parser.input.len and parser.input[parser.pos] == '{') {
-        try parser.skipSchema();
-        parser.skipWhitespaceAndComments();
-        if (parser.pos < parser.input.len and parser.input[parser.pos] == ':') {
-            parser.pos += 1;
-        }
-        parser.skipWhitespaceAndComments();
-    }
-
-    return parser.parseStruct(T);
-}
-
-pub fn decodeVec(comptime T: type, input: []const u8, allocator: Allocator) ![]T {
-    var parser = Parser{ .input = input, .pos = 0, .allocator = allocator };
-    parser.skipWhitespaceAndComments();
-
-    if (parser.pos < parser.input.len and parser.input[parser.pos] == '{') {
-        try parser.skipSchema();
-        parser.skipWhitespaceAndComments();
-        if (parser.pos < parser.input.len and parser.input[parser.pos] == ':') {
-            parser.pos += 1;
-        }
-        parser.skipWhitespaceAndComments();
-    }
-
-    var results: std.ArrayList(T) = .{};
-    errdefer results.deinit(allocator);
-
-    while (parser.pos < parser.input.len) {
-        parser.skipWhitespaceAndComments();
-        if (parser.pos >= parser.input.len) break;
-        if (parser.input[parser.pos] != '(') break;
-
-        const val = try parser.parseStruct(T);
-        try results.append(allocator, val);
-
-        parser.skipWhitespaceAndComments();
-        if (parser.pos < parser.input.len and parser.input[parser.pos] == ',') {
+    if (comptime isStructSlice(T)) {
+        const E = @typeInfo(T).pointer.child;
+        if (parser.pos < parser.input.len and parser.input[parser.pos] == '[') {
             parser.pos += 1;
             parser.skipWhitespaceAndComments();
         }
-    }
+        if (parser.pos < parser.input.len and parser.input[parser.pos] == '{') {
+            try parser.skipSchema();
+            parser.skipWhitespaceAndComments();
+        }
+        if (parser.pos < parser.input.len and parser.input[parser.pos] == ']') {
+            parser.pos += 1;
+            parser.skipWhitespaceAndComments();
+        }
+        if (parser.pos < parser.input.len and parser.input[parser.pos] == ':') {
+            parser.pos += 1;
+            parser.skipWhitespaceAndComments();
+        }
 
-    return results.toOwnedSlice(allocator);
+        var results: std.ArrayList(E) = .{};
+        errdefer results.deinit(allocator);
+
+        while (parser.pos < parser.input.len) {
+            parser.skipWhitespaceAndComments();
+            if (parser.pos >= parser.input.len) break;
+            if (parser.input[parser.pos] != '(') break;
+
+            const val = try parser.parseStruct(E);
+            try results.append(allocator, val);
+
+            parser.skipWhitespaceAndComments();
+            if (parser.pos < parser.input.len and parser.input[parser.pos] == ',') {
+                parser.pos += 1;
+                parser.skipWhitespaceAndComments();
+            }
+        }
+
+        return results.toOwnedSlice(allocator);
+    } else {
+        if (parser.pos < parser.input.len and parser.input[parser.pos] == '{') {
+            try parser.skipSchema();
+            parser.skipWhitespaceAndComments();
+            if (parser.pos < parser.input.len and parser.input[parser.pos] == ':') {
+                parser.pos += 1;
+            }
+            parser.skipWhitespaceAndComments();
+        }
+        return parser.parseStruct(T);
+    }
 }
 
 const Parser = struct {
@@ -935,16 +943,14 @@ const Parser = struct {
 pub fn encodeBinary(comptime T: type, value: T, allocator: Allocator) ![]u8 {
     var w = Writer.init(allocator);
     errdefer w.deinit();
-    try binSerialize(T, value, &w);
-    return w.toOwnedSlice();
-}
-
-pub fn encodeBinaryVec(comptime T: type, values: []const T, allocator: Allocator) ![]u8 {
-    var w = Writer.init(allocator);
-    errdefer w.deinit();
-    try binWriteU32(&w, @intCast(values.len));
-    for (values) |v| {
-        try binSerialize(T, v, &w);
+    if (comptime isStructSlice(T)) {
+        const E = @typeInfo(T).pointer.child;
+        try binWriteU32(&w, @intCast(value.len));
+        for (value) |v| {
+            try binSerialize(E, v, &w);
+        }
+    } else {
+        try binSerialize(T, value, &w);
     }
     return w.toOwnedSlice();
 }
@@ -1038,18 +1044,18 @@ fn binWriteU32(w: *Writer, v: u32) !void {
 
 pub fn decodeBinary(comptime T: type, data: []const u8, allocator: Allocator) !T {
     var reader = BinReader{ .data = data, .pos = 0, .allocator = allocator };
-    return reader.readValue(T);
-}
-
-pub fn decodeBinaryVec(comptime T: type, data: []const u8, allocator: Allocator) ![]T {
-    var reader = BinReader{ .data = data, .pos = 0, .allocator = allocator };
-    const count = try reader.readU32();
-    var result = try std.ArrayList(T).initCapacity(allocator, count);
-    errdefer result.deinit(allocator);
-    for (0..count) |_| {
-        try result.append(allocator, try reader.readValue(T));
+    if (comptime isStructSlice(T)) {
+        const E = @typeInfo(T).pointer.child;
+        const count = try reader.readU32();
+        var result = try std.ArrayList(E).initCapacity(allocator, count);
+        errdefer result.deinit(allocator);
+        for (0..count) |_| {
+            try result.append(allocator, try reader.readValue(E));
+        }
+        return result.toOwnedSlice(allocator);
+    } else {
+        return reader.readValue(T);
     }
-    return result.toOwnedSlice(allocator);
 }
 
 const BinReader = struct {
@@ -1212,19 +1218,17 @@ const BinReader = struct {
 pub fn jsonEncode(comptime T: type, value: T, allocator: Allocator) ![]const u8 {
     var w = Writer.init(allocator);
     errdefer w.deinit();
-    try jsonSerialize(T, value, &w);
-    return w.toOwnedSlice();
-}
-
-pub fn jsonEncodeVec(comptime T: type, values: []const T, allocator: Allocator) ![]const u8 {
-    var w = Writer.init(allocator);
-    errdefer w.deinit();
-    try w.append('[');
-    for (values, 0..) |v, i| {
-        if (i > 0) try w.append(',');
-        try jsonSerialize(T, v, &w);
+    if (comptime isStructSlice(T)) {
+        const E = @typeInfo(T).pointer.child;
+        try w.append('[');
+        for (value, 0..) |v, i| {
+            if (i > 0) try w.append(',');
+            try jsonSerialize(E, v, &w);
+        }
+        try w.append(']');
+    } else {
+        try jsonSerialize(T, value, &w);
     }
-    try w.append(']');
     return w.toOwnedSlice();
 }
 
@@ -1312,12 +1316,12 @@ fn jsonWriteString(w: *Writer, s: []const u8) !void {
 /// Minimal JSON decoder
 pub fn jsonDecode(comptime T: type, input: []const u8, allocator: Allocator) !T {
     var p = JsonParser{ .input = input, .pos = 0, .allocator = allocator };
-    return p.parseValue(T);
-}
-
-pub fn jsonDecodeVec(comptime T: type, input: []const u8, allocator: Allocator) ![]T {
-    var p = JsonParser{ .input = input, .pos = 0, .allocator = allocator };
-    return p.parseJsonArray(T);
+    if (comptime isStructSlice(T)) {
+        const E = @typeInfo(T).pointer.child;
+        return p.parseJsonArray(E);
+    } else {
+        return p.parseValue(T);
+    }
 }
 
 const JsonParser = struct {
@@ -1631,9 +1635,9 @@ test "binary vec roundtrip" {
         .{ .id = 1, .name = "Alice", .active = true },
         .{ .id = 2, .name = "Bob", .active = false },
     };
-    const bin = try encodeBinaryVec(User, &users, allocator);
+    const bin = try encodeBinary([]const User, &users, allocator);
     defer allocator.free(bin);
-    const decoded = try decodeBinaryVec(User, bin, allocator);
+    const decoded = try decodeBinary([]User, bin, allocator);
     defer allocator.free(decoded);
     try std.testing.expectEqual(@as(usize, 2), decoded.len);
     try std.testing.expectEqualStrings("Alice", decoded[0].name);

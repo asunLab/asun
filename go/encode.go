@@ -357,23 +357,37 @@ func indexOf(s string, c byte) int {
 
 // Marshal serializes a struct to ASON format.
 // Output: {field1,field2,...}:(val1,val2,...)
-func Marshal(v any) ([]byte, error) {
-	return marshalInner(v, false)
+// Encode serializes a struct or slice of structs to ASON format.
+// Single struct output: {field1,field2,...}:(val1,val2,...)
+// Slice output: [{field1,field2,...}]:(val1,val2,...),(val3,val4,...)
+func Encode(v any) ([]byte, error) {
+	return encodeInner(v, false)
 }
 
-// MarshalTyped serializes a struct to ASON format with type annotations.
-// Output: {field1:type1,field2:type2,...}:(val1,val2,...)
-func MarshalTyped(v any) ([]byte, error) {
-	return marshalInner(v, true)
+// EncodeTyped serializes a struct or slice of structs to ASON format with type annotations.
+// Single: {field1:type1,field2:type2,...}:(val1,val2,...)
+// Slice: [{field1:type1,...}]:(val1,val2,...),(val3,val4,...)
+func EncodeTyped(v any) ([]byte, error) {
+	return encodeInner(v, true)
 }
 
-func marshalInner(v any, typed bool) ([]byte, error) {
+func encodeInner(v any, typed bool) ([]byte, error) {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() == reflect.Ptr {
 		rv = rv.Elem()
 	}
+	// Auto-detect slice of structs
+	if rv.Kind() == reflect.Slice {
+		elemType := rv.Type().Elem()
+		for elemType.Kind() == reflect.Ptr {
+			elemType = elemType.Elem()
+		}
+		if elemType.Kind() == reflect.Struct {
+			return encodeSliceInner(v, typed, nil, nil)
+		}
+	}
 	if rv.Kind() != reflect.Struct {
-		return nil, &MarshalError{"Marshal requires a struct"}
+		return nil, &MarshalError{"Encode requires a struct or slice of structs"}
 	}
 
 	bp := getBuf()
@@ -426,37 +440,22 @@ func marshalInner(v any, typed bool) ([]byte, error) {
 	return result, nil
 }
 
-// MarshalSlice serializes a slice of structs to ASON format.
-// Output: {field1,field2,...}:(v1,v2,...),(v3,v4,...)
-func MarshalSlice(v any) ([]byte, error) {
-	return marshalSliceInner(v, false, nil, nil)
-}
-
-// MarshalSliceTyped serializes a slice of structs with type annotations.
-// Output: {field1:type1,field2:type2,...}:(v1,v2,...),(v3,v4,...)
-func MarshalSliceTyped(v any, fieldTypes []string) ([]byte, error) {
-	return marshalSliceInner(v, true, nil, fieldTypes)
-}
-
-// MarshalSliceFields serializes a slice of structs with explicit field names.
-func MarshalSliceFields(v any, fieldNames []string) ([]byte, error) {
-	return marshalSliceInner(v, false, fieldNames, nil)
-}
-
-func marshalSliceInner(v any, typed bool, fieldNames []string, fieldTypes []string) ([]byte, error) {
+// encodeSliceInner serializes a slice of structs to ASON format.
+// Output: [{field1,field2,...}]:(v1,v2,...),(v3,v4,...)
+func encodeSliceInner(v any, typed bool, fieldNames []string, fieldTypes []string) ([]byte, error) {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() == reflect.Ptr {
 		rv = rv.Elem()
 	}
 	if rv.Kind() != reflect.Slice {
-		return nil, &MarshalError{"MarshalSlice requires a slice"}
+		return nil, &MarshalError{"Encode requires a slice of structs"}
 	}
 	elemType := rv.Type().Elem()
 	for elemType.Kind() == reflect.Ptr {
 		elemType = elemType.Elem()
 	}
 	if elemType.Kind() != reflect.Struct {
-		return nil, &MarshalError{"MarshalSlice requires a slice of structs"}
+		return nil, &MarshalError{"Encode requires a slice of structs"}
 	}
 
 	si := getStructInfo(elemType)
@@ -473,7 +472,36 @@ func marshalSliceInner(v any, typed bool, fieldNames []string, fieldTypes []stri
 		}
 	}
 
-	buf = append(buf, '{')
+	// Auto-detect field types from first element if typed mode and no explicit types
+	if typed && fieldTypes == nil && rv.Len() > 0 {
+		first := rv.Index(0)
+		if first.Kind() == reflect.Ptr {
+			first = first.Elem()
+		}
+		fieldTypes = make([]string, len(si.fields))
+		for i, fi := range si.fields {
+			fv := first.FieldByIndex(fi.index)
+			for fv.Kind() == reflect.Ptr {
+				if fv.IsNil() {
+					break
+				}
+				fv = fv.Elem()
+			}
+			switch fv.Kind() {
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+				reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				fieldTypes[i] = "int"
+			case reflect.Float32, reflect.Float64:
+				fieldTypes[i] = "float"
+			case reflect.Bool:
+				fieldTypes[i] = "bool"
+			case reflect.String:
+				fieldTypes[i] = "str"
+			}
+		}
+	}
+
+	buf = append(buf, '[', '{')
 	for i, name := range names {
 		if i > 0 {
 			buf = append(buf, ',')
@@ -484,7 +512,7 @@ func marshalSliceInner(v any, typed bool, fieldNames []string, fieldTypes []stri
 			buf = append(buf, fieldTypes[i]...)
 		}
 	}
-	buf = append(buf, '}', ':')
+	buf = append(buf, '}', ']', ':')
 
 	// Data rows
 	for i := 0; i < rv.Len(); i++ {

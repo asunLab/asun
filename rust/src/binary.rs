@@ -1,7 +1,7 @@
 //! ASON Binary Format (ASON-BIN)
 //!
 //! A high-performance binary encoding for ASON data structures.
-//! Provides `to_bin` and `from_bin` for zero-overhead struct ↔ bytes conversion.
+//! Provides `encode_binary` and `decode_binary` for zero-overhead struct ↔ bytes conversion.
 //!
 //! ## Wire Format (all integers little-endian)
 //!
@@ -57,25 +57,12 @@ use serde::{Deserialize, Serialize};
 /// # Example
 /// ```rust,ignore
 /// let user = User { id: 1, name: "Alice".into(), active: true };
-/// let bytes = ason::to_bin(&user)?;
+/// let bytes = ason::encode_binary(&user)?;
 /// ```
 #[inline]
-pub fn to_bin<T: Serialize>(value: &T) -> Result<Vec<u8>> {
+pub fn encode_binary<T: Serialize>(value: &T) -> Result<Vec<u8>> {
     let mut ser = BinarySerializer::with_capacity(256);
     value.serialize(&mut ser)?;
-    Ok(ser.buf)
-}
-
-/// Serialize a slice of values to a `Vec<u8>`: `u32 LE count` + `[element × count]`.
-///
-/// More efficient than multiple `to_bin` calls — allocates once.
-#[inline]
-pub fn to_bin_vec<T: Serialize>(values: &[T]) -> Result<Vec<u8>> {
-    let mut ser = BinarySerializer::with_capacity(values.len() * 64 + 4);
-    ser.write_u32(values.len() as u32);
-    for v in values {
-        v.serialize(&mut ser)?;
-    }
     Ok(ser.buf)
 }
 
@@ -86,27 +73,13 @@ pub fn to_bin_vec<T: Serialize>(values: &[T]) -> Result<Vec<u8>> {
 ///
 /// # Example
 /// ```rust,ignore
-/// let user: User = ason::from_bin(&bytes)?;
+/// let user: User = ason::decode_binary(&bytes)?;
 /// ```
 #[inline]
-pub fn from_bin<'de, T: Deserialize<'de>>(data: &'de [u8]) -> Result<T> {
+pub fn decode_binary<'de, T: Deserialize<'de>>(data: &'de [u8]) -> Result<T> {
     let mut de = BinaryDeserializer::new(data);
     let v = T::deserialize(&mut de)?;
     Ok(v)
-}
-
-/// Deserialize a `Vec<T>` from binary bytes produced by `to_bin_vec`.
-///
-/// Reads a leading `u32 LE` count then deserializes that many elements.
-#[inline]
-pub fn from_bin_vec<'de, T: Deserialize<'de>>(data: &'de [u8]) -> Result<Vec<T>> {
-    let mut de = BinaryDeserializer::new(data);
-    let count = de.read_u32()? as usize;
-    let mut out = Vec::with_capacity(count);
-    for _ in 0..count {
-        out.push(T::deserialize(&mut de)?);
-    }
-    Ok(out)
 }
 
 // ============================================================================
@@ -1094,8 +1067,8 @@ mod tests {
     #[test]
     fn test_user_roundtrip() {
         let u = User { id: 42, name: "Alice".into(), score: 9.5, active: true };
-        let bytes = to_bin(&u).unwrap();
-        let u2: User = from_bin(&bytes).unwrap();
+        let bytes = encode_binary(&u).unwrap();
+        let u2: User = decode_binary(&bytes).unwrap();
         assert_eq!(u, u2);
     }
 
@@ -1114,8 +1087,8 @@ mod tests {
             f32v: 3.15,
             f64v: 2.718281828,
         };
-        let bytes = to_bin(&v).unwrap();
-        let v2: AllPrims = from_bin(&bytes).unwrap();
+        let bytes = encode_binary(&v).unwrap();
+        let v2: AllPrims = decode_binary(&bytes).unwrap();
         assert_eq!(v, v2);
     }
 
@@ -1123,10 +1096,10 @@ mod tests {
     fn test_option_some_none() {
         let a = WithOption { id: 1, label: Some("hello".into()) };
         let b = WithOption { id: 2, label: None };
-        let b1 = to_bin(&a).unwrap();
-        let b2 = to_bin(&b).unwrap();
-        let a2: WithOption = from_bin(&b1).unwrap();
-        let b3: WithOption = from_bin(&b2).unwrap();
+        let b1 = encode_binary(&a).unwrap();
+        let b2 = encode_binary(&b).unwrap();
+        let a2: WithOption = decode_binary(&b1).unwrap();
+        let b3: WithOption = decode_binary(&b2).unwrap();
         assert_eq!(a, a2);
         assert_eq!(b, b3);
     }
@@ -1134,8 +1107,8 @@ mod tests {
     #[test]
     fn test_vec_roundtrip() {
         let v = WithVec { name: "stats".into(), scores: vec![10, 20, 30, 40, 50] };
-        let bytes = to_bin(&v).unwrap();
-        let v2: WithVec = from_bin(&bytes).unwrap();
+        let bytes = encode_binary(&v).unwrap();
+        let v2: WithVec = decode_binary(&bytes).unwrap();
         assert_eq!(v, v2);
     }
 
@@ -1145,8 +1118,8 @@ mod tests {
             User { id: 1, name: "Alice".into(), score: 9.0, active: true },
             User { id: 2, name: "Bob".into(), score: 7.5, active: false },
         ];
-        let bytes = to_bin_vec(&users).unwrap();
-        let users2: Vec<User> = from_bin_vec(&bytes).unwrap();
+        let bytes = encode_binary(&users).unwrap();
+        let users2: Vec<User> = decode_binary(&bytes).unwrap();
         assert_eq!(users, users2);
     }
 
@@ -1159,8 +1132,8 @@ mod tests {
         let mut m = M { data: HashMap::new() };
         m.data.insert("a".into(), 1);
         m.data.insert("b".into(), 2);
-        let bytes = to_bin(&m).unwrap();
-        let m2: M = from_bin(&bytes).unwrap();
+        let bytes = encode_binary(&m).unwrap();
+        let m2: M = decode_binary(&bytes).unwrap();
         assert_eq!(m, m2);
     }
 
@@ -1174,8 +1147,8 @@ mod tests {
             Custom(u8, u8, u8),
         }
         for c in [Color::Red, Color::Green, Color::Blue, Color::Custom(10, 20, 30)] {
-            let bytes = to_bin(&c).unwrap();
-            let c2: Color = from_bin(&bytes).unwrap();
+            let bytes = encode_binary(&c).unwrap();
+            let c2: Color = decode_binary(&bytes).unwrap();
             assert_eq!(c, c2);
         }
     }
@@ -1185,7 +1158,7 @@ mod tests {
         let users: Vec<User> = (0..100)
             .map(|i| User { id: i, name: format!("User_{}", i), score: i as f64 * 0.5, active: i % 2 == 0 })
             .collect();
-        let bin = to_bin_vec(&users).unwrap();
+        let bin = encode_binary(&users).unwrap();
         let json = serde_json::to_string(&users).unwrap();
         // Binary should be significantly smaller
         assert!(bin.len() < json.len(), "bin={} json={}", bin.len(), json.len());

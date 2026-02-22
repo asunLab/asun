@@ -21,12 +21,12 @@ func TestBinaryRoundtrip(t *testing.T) {
 		Tags:   []string{"rust", "go"},
 		Score:  9.8,
 	}
-	b, err := MarshalBinary(&u)
+	b, err := EncodeBinary(&u)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var u2 BinUser
-	err = UnmarshalBinary(b, &u2)
+	err = DecodeBinary(b, &u2)
 	if err != nil {
 		t.Fatal(err)
 	}

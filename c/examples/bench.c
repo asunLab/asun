@@ -659,7 +659,7 @@ static BenchResult bench_flat(size_t count, int iterations) {
     t0 = now_ms();
     for (int i = 0; i < iterations; i++) {
         ason_buf_free(&ason_buf);
-        ason_buf = ason_dump_vec_BUser(users, count);
+        ason_buf = ason_encode_vec_BUser(users, count);
     }
     double ason_ser = now_ms() - t0;
 
@@ -679,7 +679,7 @@ static BenchResult bench_flat(size_t count, int iterations) {
     for (int i = 0; i < iterations; i++) {
         size_t n = 0;
         BUser* r = NULL;
-        ason_err_t err = ason_load_vec_BUser(ason_buf.data, ason_buf.len, &r, &n);
+        ason_err_t err = ason_decode_vec_BUser(ason_buf.data, ason_buf.len, &r, &n);
         assert(err == ASON_OK);
         assert(n == count);
         for (size_t j = 0; j < n; j++) free_buser(&r[j]);
@@ -692,7 +692,7 @@ static BenchResult bench_flat(size_t count, int iterations) {
     t0 = now_ms();
     for (int i = 0; i < iterations; i++) {
         ason_buf_free(&ason_bin_buf);
-        ason_bin_buf = ason_dump_bin_vec_BUser(users, count);
+        ason_bin_buf = ason_encode_bin_vec_BUser(users, count);
     }
     double ason_bin_ser = now_ms() - t0;
 
@@ -701,7 +701,7 @@ static BenchResult bench_flat(size_t count, int iterations) {
     for (int i = 0; i < iterations; i++) {
         size_t n = 0;
         BUser* r = NULL;
-        ason_err_t err = ason_load_bin_vec_BUser(ason_bin_buf.data, ason_bin_buf.len, &r, &n);
+        ason_err_t err = ason_decode_bin_vec_BUser(ason_bin_buf.data, ason_bin_buf.len, &r, &n);
         assert(err == ASON_OK);
         assert(n == count);
         for (size_t j = 0; j < n; j++) free_buser(&r[j]);
@@ -759,7 +759,7 @@ static BenchResult bench_all_types(size_t count, int iterations) {
     for (int iter = 0; iter < iterations; iter++) {
         for (size_t i = 0; i < count; i++) {
             ason_buf_free(&ason_bufs[i]);
-            ason_bufs[i] = ason_dump_BAllTypes(&items[i]);
+            ason_bufs[i] = ason_encode_BAllTypes(&items[i]);
         }
     }
     double ason_ser = now_ms() - t0;
@@ -772,7 +772,7 @@ static BenchResult bench_all_types(size_t count, int iterations) {
     for (int iter = 0; iter < iterations; iter++) {
         for (size_t i = 0; i < count; i++) {
             BAllTypes tmp = {0};
-            ason_err_t err = ason_load_BAllTypes(ason_bufs[i].data, ason_bufs[i].len, &tmp);
+            ason_err_t err = ason_decode_BAllTypes(ason_bufs[i].data, ason_bufs[i].len, &tmp);
             assert(err == ASON_OK);
             free_balltypes(&tmp);
         }
@@ -785,7 +785,7 @@ static BenchResult bench_all_types(size_t count, int iterations) {
     for (int iter = 0; iter < iterations; iter++) {
         for (size_t i = 0; i < count; i++) {
             ason_buf_free(&ason_bin_bufs[i]);
-            ason_bin_bufs[i] = ason_dump_bin_BAllTypes(&items[i]);
+            ason_bin_bufs[i] = ason_encode_bin_BAllTypes(&items[i]);
         }
     }
     double ason_bin_ser = now_ms() - t0;
@@ -795,7 +795,7 @@ static BenchResult bench_all_types(size_t count, int iterations) {
     for (int iter = 0; iter < iterations; iter++) {
         for (size_t i = 0; i < count; i++) {
             BAllTypes tmp = {0};
-            ason_err_t err = ason_load_bin_BAllTypes(ason_bin_bufs[i].data, ason_bin_bufs[i].len, &tmp);
+            ason_err_t err = ason_decode_bin_BAllTypes(ason_bin_bufs[i].data, ason_bin_bufs[i].len, &tmp);
             assert(err == ASON_OK);
             free_balltypes(&tmp);
         }
@@ -846,7 +846,7 @@ static BenchResult bench_deep(size_t count, int iterations) {
     for (int iter = 0; iter < iterations; iter++) {
         for (size_t i = 0; i < count; i++) {
             ason_buf_free(&ason_bufs[i]);
-            ason_bufs[i] = ason_dump_BCompany(&companies[i]);
+            ason_bufs[i] = ason_encode_BCompany(&companies[i]);
         }
     }
     double ason_ser = now_ms() - t0;
@@ -867,7 +867,7 @@ static BenchResult bench_deep(size_t count, int iterations) {
     for (int iter = 0; iter < iterations; iter++) {
         for (size_t i = 0; i < count; i++) {
             BCompany tmp = {0};
-            ason_err_t err = ason_load_BCompany(ason_bufs[i].data, ason_bufs[i].len, &tmp);
+            ason_err_t err = ason_decode_BCompany(ason_bufs[i].data, ason_bufs[i].len, &tmp);
             assert(err == ASON_OK);
             free_bcompany(&tmp);
         }
@@ -880,7 +880,7 @@ static BenchResult bench_deep(size_t count, int iterations) {
     for (int iter = 0; iter < iterations; iter++) {
         for (size_t i = 0; i < count; i++) {
             ason_buf_free(&ason_bin_bufs[i]);
-            ason_bin_bufs[i] = ason_dump_bin_BCompany(&companies[i]);
+            ason_bin_bufs[i] = ason_encode_bin_BCompany(&companies[i]);
         }
     }
     double ason_bin_ser = now_ms() - t0;
@@ -890,7 +890,7 @@ static BenchResult bench_deep(size_t count, int iterations) {
     for (int iter = 0; iter < iterations; iter++) {
         for (size_t i = 0; i < count; i++) {
             BCompany tmp = {0};
-            ason_err_t err = ason_load_bin_BCompany(ason_bin_bufs[i].data, ason_bin_bufs[i].len, &tmp);
+            ason_err_t err = ason_decode_bin_BCompany(ason_bin_bufs[i].data, ason_bin_bufs[i].len, &tmp);
             assert(err == ASON_OK);
             free_bcompany(&tmp);
         }
@@ -900,7 +900,7 @@ static BenchResult bench_deep(size_t count, int iterations) {
     /* Verify */
     for (size_t i = 0; i < count; i++) {
         BCompany tmp = {0};
-        ason_err_t err = ason_load_BCompany(ason_bufs[i].data, ason_bufs[i].len, &tmp);
+        ason_err_t err = ason_decode_BCompany(ason_bufs[i].data, ason_bufs[i].len, &tmp);
         assert(err == ASON_OK);
         assert(strcmp(tmp.name.data, companies[i].name.data) == 0);
         free_bcompany(&tmp);
@@ -989,9 +989,9 @@ int main(void) {
 
         double t0 = now_ms();
         for (int i = 0; i < 10000; i++) {
-            ason_buf_t buf = ason_dump_BUser(&user);
+            ason_buf_t buf = ason_encode_BUser(&user);
             BUser r = {0};
-            ason_load_BUser(buf.data, buf.len, &r);
+            ason_decode_BUser(buf.data, buf.len, &r);
             ason_buf_free(&buf);
             free_buser(&r);
         }
@@ -1034,7 +1034,7 @@ int main(void) {
         ason_buf_t untyped_buf = {0};
         for (int i = 0; i < ser_iters; i++) {
             ason_buf_free(&untyped_buf);
-            untyped_buf = ason_dump_vec_BUser(users, count);
+            untyped_buf = ason_encode_vec_BUser(users, count);
         }
         double untyped_ms = now_ms() - t0;
 
@@ -1042,7 +1042,7 @@ int main(void) {
         ason_buf_t typed_buf = {0};
         for (int i = 0; i < ser_iters; i++) {
             ason_buf_free(&typed_buf);
-            typed_buf = ason_dump_typed_vec_BUser(users, count);
+            typed_buf = ason_encode_typed_vec_BUser(users, count);
         }
         double typed_ms = now_ms() - t0;
 
@@ -1062,14 +1062,14 @@ int main(void) {
     {
         size_t count = 1000;
         BUser* users = generate_users(count);
-        ason_buf_t untyped_buf = ason_dump_vec_BUser(users, count);
-        ason_buf_t typed_buf = ason_dump_typed_vec_BUser(users, count);
+        ason_buf_t untyped_buf = ason_encode_vec_BUser(users, count);
+        ason_buf_t typed_buf = ason_encode_typed_vec_BUser(users, count);
         int de_iters = 200;
 
         double t0 = now_ms();
         for (int i = 0; i < de_iters; i++) {
             BUser* r = NULL; size_t n = 0;
-            ason_load_vec_BUser(untyped_buf.data, untyped_buf.len, &r, &n);
+            ason_decode_vec_BUser(untyped_buf.data, untyped_buf.len, &r, &n);
             for (size_t j = 0; j < n; j++) free_buser(&r[j]);
             free(r);
         }
@@ -1078,7 +1078,7 @@ int main(void) {
         t0 = now_ms();
         for (int i = 0; i < de_iters; i++) {
             BUser* r = NULL; size_t n = 0;
-            ason_load_vec_BUser(typed_buf.data, typed_buf.len, &r, &n);
+            ason_decode_vec_BUser(typed_buf.data, typed_buf.len, &r, &n);
             for (size_t j = 0; j < n; j++) free_buser(&r[j]);
             free(r);
         }
@@ -1101,7 +1101,7 @@ int main(void) {
         size_t count = 1000;
         BUser* users = generate_users(count);
         ason_buf_t json_buf = json_serialize_users(users, count);
-        ason_buf_t ason_buf = ason_dump_vec_BUser(users, count);
+        ason_buf_t ason_buf = ason_encode_vec_BUser(users, count);
         int iters = 100;
 
         double t0 = now_ms();
@@ -1109,7 +1109,7 @@ int main(void) {
         double json_ser_dur = (now_ms() - t0) / 1000.0;
 
         t0 = now_ms();
-        for (int i = 0; i < iters; i++) { ason_buf_t b = ason_dump_vec_BUser(users, count); ason_buf_free(&b); }
+        for (int i = 0; i < iters; i++) { ason_buf_t b = ason_encode_vec_BUser(users, count); ason_buf_free(&b); }
         double ason_ser_dur = (now_ms() - t0) / 1000.0;
 
         t0 = now_ms();
@@ -1122,7 +1122,7 @@ int main(void) {
         t0 = now_ms();
         for (int i = 0; i < iters; i++) {
             size_t n = 0; BUser* r = NULL;
-            ason_load_vec_BUser(ason_buf.data, ason_buf.len, &r, &n);
+            ason_decode_vec_BUser(ason_buf.data, ason_buf.len, &r, &n);
             for (size_t j = 0; j < n; j++) free_buser(&r[j]); free(r);
         }
         double ason_de_dur = (now_ms() - t0) / 1000.0;

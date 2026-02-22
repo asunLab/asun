@@ -48,18 +48,18 @@ pub fn main() !void {
         .{ .id = 2, .name = "Bob", .active = false },
         .{ .id = 3, .name = "Carol Smith", .active = true },
     };
-    const ason_vec = try ason.encodeVec(User, &users, gpa);
+    const ason_vec = try ason.encode([]const User, &users, gpa);
     defer gpa.free(ason_vec);
     print("4. Serialize vec (schema-driven):\n  {s}\n\n", .{ason_vec});
 
     // 5. Serialize vec with type annotations
-    const typed_vec = try ason.encodeVecTyped(User, &users, gpa);
+    const typed_vec = try ason.encodeTyped([]const User, &users, gpa);
     defer gpa.free(typed_vec);
     print("5. Serialize vec with type annotations:\n  {s}\n\n", .{typed_vec});
 
     // 6. Deserialize vec
-    const input6 = "{id:int,name:str,active:bool}:(1,Alice,true),(2,Bob,false),(3,\"Carol Smith\",true)";
-    const users6 = try ason.decodeVec(User, input6, gpa);
+    const input6 = "[{id:int,name:str,active:bool}]:(1,Alice,true),(2,Bob,false),(3,\"Carol Smith\",true)";
+    const users6 = try ason.decode([]User, input6, gpa);
     defer {
         for (users6) |u| gpa.free(u.name);
         gpa.free(users6);
@@ -72,12 +72,12 @@ pub fn main() !void {
     // 7. Multiline format
     print("\n7. Multiline format:\n", .{});
     const multiline =
-        \\{id:int, name:str, active:bool}:
+        \\[{id:int, name:str, active:bool}]:
         \\  (1, Alice, true),
         \\  (2, Bob, false),
         \\  (3, "Carol Smith", true)
     ;
-    const users7 = try ason.decodeVec(User, multiline, gpa);
+    const users7 = try ason.decode([]User, multiline, gpa);
     defer {
         for (users7) |u| gpa.free(u.name);
         gpa.free(users7);
@@ -116,21 +116,21 @@ pub fn main() !void {
 
     // 9. Vec roundtrip (ASON-text vs ASON-bin vs JSON)
     print("\n9. Vec roundtrip (ASON-text vs ASON-bin vs JSON):\n", .{});
-    const vec_ason = try ason.encodeVec(User, &users, gpa);
+    const vec_ason = try ason.encode([]const User, &users, gpa);
     defer gpa.free(vec_ason);
-    const vec_bin = try ason.encodeBinaryVec(User, &users, gpa);
+    const vec_bin = try ason.encodeBinary([]const User, &users, gpa);
     defer gpa.free(vec_bin);
-    const vec_json = try ason.jsonEncodeVec(User, &users, gpa);
+    const vec_json = try ason.jsonEncode([]const User, &users, gpa);
     defer gpa.free(vec_json);
 
-    const v1 = try ason.decodeVec(User, vec_ason, gpa);
+    const v1 = try ason.decode([]User, vec_ason, gpa);
     defer {
         for (v1) |u| gpa.free(u.name);
         gpa.free(v1);
     }
-    const v2 = try ason.decodeBinaryVec(User, vec_bin, gpa);
+    const v2 = try ason.decodeBinary([]User, vec_bin, gpa);
     defer gpa.free(v2);
-    const v3 = try ason.jsonDecodeVec(User, vec_json, gpa);
+    const v3 = try ason.jsonDecode([]User, vec_json, gpa);
     defer {
         for (v3) |u| gpa.free(u.name);
         gpa.free(v3);

@@ -223,7 +223,7 @@ fn benchFlat(alloc: Allocator, count: usize, iterations: u32) !void {
     var json_str: []const u8 = "";
     var timer = try Timer.start();
     for (0..iterations) |_| {
-        json_str = try ason.jsonEncodeVec(User, users, alloc);
+        json_str = try ason.jsonEncode([]const User, users, alloc);
     }
     const json_ser_ms = elapsedMs(&timer);
 
@@ -231,7 +231,7 @@ fn benchFlat(alloc: Allocator, count: usize, iterations: u32) !void {
     var ason_str: []const u8 = "";
     timer = try Timer.start();
     for (0..iterations) |_| {
-        ason_str = try ason.encodeVec(User, users, alloc);
+        ason_str = try ason.encode([]const User, users, alloc);
     }
     const ason_ser_ms = elapsedMs(&timer);
 
@@ -239,28 +239,28 @@ fn benchFlat(alloc: Allocator, count: usize, iterations: u32) !void {
     var bin_buf: []u8 = "";
     timer = try Timer.start();
     for (0..iterations) |_| {
-        bin_buf = try ason.encodeBinaryVec(User, users, alloc);
+        bin_buf = try ason.encodeBinary([]const User, users, alloc);
     }
     const bin_ser_ms = elapsedMs(&timer);
 
     // JSON deserialize
     timer = try Timer.start();
     for (0..iterations) |_| {
-        _ = try ason.jsonDecodeVec(User, json_str, alloc);
+        _ = try ason.jsonDecode([]User, json_str, alloc);
     }
     const json_de_ms = elapsedMs(&timer);
 
     // ASON deserialize
     timer = try Timer.start();
     for (0..iterations) |_| {
-        _ = try ason.decodeVec(User, ason_str, alloc);
+        _ = try ason.decode([]User, ason_str, alloc);
     }
     const ason_de_ms = elapsedMs(&timer);
 
     // BIN deserialize
     timer = try Timer.start();
     for (0..iterations) |_| {
-        _ = try ason.decodeBinaryVec(User, bin_buf, alloc);
+        _ = try ason.decodeBinary([]User, bin_buf, alloc);
     }
     const bin_de_ms = elapsedMs(&timer);
 
@@ -404,7 +404,7 @@ fn benchDeep(alloc: Allocator, count: usize, iterations: u32) !void {
     var bin_buf: []u8 = "";
     timer = try Timer.start();
     for (0..iterations) |_| {
-        bin_buf = try ason.encodeBinaryVec(Company, companies, alloc);
+        bin_buf = try ason.encodeBinary([]const Company, companies, alloc);
     }
     const bin_ser_ms = elapsedMs(&timer);
 
@@ -434,7 +434,7 @@ fn benchDeep(alloc: Allocator, count: usize, iterations: u32) !void {
 
     timer = try Timer.start();
     for (0..iterations) |_| {
-        _ = try ason.decodeBinaryVec(Company, bin_buf, alloc);
+        _ = try ason.decodeBinary([]Company, bin_buf, alloc);
     }
     const bin_de_ms = elapsedMs(&timer);
 
@@ -571,34 +571,34 @@ fn benchThroughput(alloc: Allocator) !void {
     const users = try generateUsers(alloc, 1000);
     const iters: u32 = 100;
 
-    const json_1k = try ason.jsonEncodeVec(User, users, alloc);
-    const ason_1k = try ason.encodeVec(User, users, alloc);
+    const json_1k = try ason.jsonEncode([]const User, users, alloc);
+    const ason_1k = try ason.encode([]const User, users, alloc);
 
     // JSON serialize
     var timer = try Timer.start();
     for (0..iters) |_| {
-        _ = try ason.jsonEncodeVec(User, users, alloc);
+        _ = try ason.jsonEncode([]const User, users, alloc);
     }
     const json_ser_ms = elapsedMs(&timer);
 
     // ASON serialize
     timer = try Timer.start();
     for (0..iters) |_| {
-        _ = try ason.encodeVec(User, users, alloc);
+        _ = try ason.encode([]const User, users, alloc);
     }
     const ason_ser_ms = elapsedMs(&timer);
 
     // JSON deserialize
     timer = try Timer.start();
     for (0..iters) |_| {
-        _ = try ason.jsonDecodeVec(User, json_1k, alloc);
+        _ = try ason.jsonDecode([]User, json_1k, alloc);
     }
     const json_de_ms = elapsedMs(&timer);
 
     // ASON deserialize
     timer = try Timer.start();
     for (0..iters) |_| {
-        _ = try ason.decodeVec(User, ason_1k, alloc);
+        _ = try ason.decode([]User, ason_1k, alloc);
     }
     const ason_de_ms = elapsedMs(&timer);
 
@@ -675,20 +675,20 @@ pub fn main() !void {
     print("--- Section 6: Typed vs Untyped Serialization ---\n\n", .{});
     {
         const users_1k = try generateUsers(alloc, 1000);
-        const untyped_str = try ason.encodeVec(User, users_1k, alloc);
-        const typed_str = try ason.encodeVecTyped(User, users_1k, alloc);
+        const untyped_str = try ason.encode([]const User, users_1k, alloc);
+        const typed_str = try ason.encodeTyped([]const User, users_1k, alloc);
 
         const ser_iters: u32 = 200;
 
         var timer = try Timer.start();
         for (0..ser_iters) |_| {
-            _ = try ason.encodeVec(User, users_1k, alloc);
+            _ = try ason.encode([]const User, users_1k, alloc);
         }
         const untyped_ms = elapsedMs(&timer);
 
         timer = try Timer.start();
         for (0..ser_iters) |_| {
-            _ = try ason.encodeVecTyped(User, users_1k, alloc);
+            _ = try ason.encodeTyped([]const User, users_1k, alloc);
         }
         const typed_ms = elapsedMs(&timer);
 

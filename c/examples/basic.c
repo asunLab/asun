@@ -47,13 +47,13 @@ int main(void) {
     /* 1. Serialize a single struct */
     printf("1. Serialize single struct:\n");
     User user = {1, ason_string_from("Alice"), true};
-    ason_buf_t buf = ason_dump_User(&user);
+    ason_buf_t buf = ason_encode_User(&user);
     printf("   %.*s\n\n", (int)buf.len, buf.data);
     ason_buf_free(&buf);
 
     /* 2. Serialize with type annotations */
     printf("2. Serialize with type annotations:\n");
-    buf = ason_dump_typed_User(&user);
+    buf = ason_encode_typed_User(&user);
     printf("   %.*s\n\n", (int)buf.len, buf.data);
     assert(buf.len > 0);
     ason_buf_free(&buf);
@@ -63,7 +63,7 @@ int main(void) {
     {
         const char* input = "{id:int,name:str,active:bool}:(1,Alice,true)";
         User u2 = {0};
-        ason_err_t err = ason_load_User(input, strlen(input), &u2);
+        ason_err_t err = ason_decode_User(input, strlen(input), &u2);
         assert(err == ASON_OK);
         printf("   id=%lld name=%s active=%s\n\n",
                (long long)u2.id, u2.name.data, u2.active ? "true" : "false");
@@ -78,7 +78,7 @@ int main(void) {
             {2, ason_string_from("Bob"), false},
             {3, ason_string_from("Carol Smith"), true},
         };
-        buf = ason_dump_vec_User(users, 3);
+        buf = ason_encode_vec_User(users, 3);
         printf("   %.*s\n\n", (int)buf.len, buf.data);
         ason_buf_free(&buf);
         for (int i = 0; i < 3; i++) ason_string_free(&users[i].name);
@@ -87,10 +87,10 @@ int main(void) {
     /* 5. Deserialize vec */
     printf("5. Deserialize vec:\n");
     {
-        const char* input = "{id:int,name:str,active:bool}:(1,Alice,true),(2,Bob,false),(3,\"Carol Smith\",true)";
+        const char* input = "[{id:int,name:str,active:bool}]:(1,Alice,true),(2,Bob,false),(3,\"Carol Smith\",true)";
         User* users = NULL;
         size_t count = 0;
-        ason_err_t err = ason_load_vec_User(input, strlen(input), &users, &count);
+        ason_err_t err = ason_decode_vec_User(input, strlen(input), &users, &count);
         assert(err == ASON_OK);
         for (size_t i = 0; i < count; i++) {
             printf("   id=%lld name=%s active=%s\n",
@@ -105,10 +105,10 @@ int main(void) {
     /* 6. Multiline format */
     printf("6. Multiline format:\n");
     {
-        const char* input = "{id, name, active}:\n  (1, Alice, true),\n  (2, Bob, false),\n  (3, \"Carol Smith\", true)";
+        const char* input = "[{id, name, active}]:\n  (1, Alice, true),\n  (2, Bob, false),\n  (3, \"Carol Smith\", true)";
         User* users = NULL;
         size_t count = 0;
-        ason_err_t err = ason_load_vec_User(input, strlen(input), &users, &count);
+        ason_err_t err = ason_decode_vec_User(input, strlen(input), &users, &count);
         assert(err == ASON_OK);
         for (size_t i = 0; i < count; i++) {
             printf("   id=%lld name=%s active=%s\n",
@@ -125,9 +125,9 @@ int main(void) {
     {
         User orig = {42, ason_string_from("Test User"), true};
         /* ASON text roundtrip */
-        buf = ason_dump_User(&orig);
+        buf = ason_encode_User(&orig);
         User decoded = {0};
-        ason_err_t err = ason_load_User(buf.data, buf.len, &decoded);
+        ason_err_t err = ason_decode_User(buf.data, buf.len, &decoded);
         assert(err == ASON_OK);
         assert(decoded.id == 42);
         assert(strcmp(decoded.name.data, "Test User") == 0);
@@ -136,9 +136,9 @@ int main(void) {
         ason_string_free(&decoded.name);
 
         /* ASON binary roundtrip */
-        ason_buf_t bin = ason_dump_bin_User(&orig);
+        ason_buf_t bin = ason_encode_bin_User(&orig);
         User decoded_bin = {0};
-        err = ason_load_bin_User(bin.data, bin.len, &decoded_bin);
+        err = ason_decode_bin_User(bin.data, bin.len, &decoded_bin);
         assert(err == ASON_OK);
         assert(decoded_bin.id == 42);
         assert(strcmp(decoded_bin.name.data, "Test User") == 0);
@@ -158,7 +158,7 @@ int main(void) {
     {
         const char* input1 = "{id,label}:(1,hello)";
         Item item1 = {0};
-        ason_err_t err = ason_load_Item(input1, strlen(input1), &item1);
+        ason_err_t err = ason_decode_Item(input1, strlen(input1), &item1);
         assert(err == ASON_OK);
         printf("   with value: id=%lld label=%s\n",
                (long long)item1.id, item1.label.has_value ? item1.label.value.data : "(null)");
@@ -166,7 +166,7 @@ int main(void) {
 
         const char* input2 = "{id,label}:(2,)";
         Item item2 = {0};
-        err = ason_load_Item(input2, strlen(input2), &item2);
+        err = ason_decode_Item(input2, strlen(input2), &item2);
         assert(err == ASON_OK);
         assert(!item2.label.has_value);
         printf("   with null:  id=%lld label=%s\n\n",
@@ -178,7 +178,7 @@ int main(void) {
     {
         const char* input = "{name,tags}:(Alice,[rust,go,python])";
         Tagged t = {0};
-        ason_err_t err = ason_load_Tagged(input, strlen(input), &t);
+        ason_err_t err = ason_decode_Tagged(input, strlen(input), &t);
         assert(err == ASON_OK);
         printf("   name=%s tags=[", t.name.data);
         for (size_t i = 0; i < t.tags.len; i++) {
@@ -196,7 +196,7 @@ int main(void) {
     {
         const char* input = "/* user list */ {id,name,active}:(1,Alice,true)";
         User u = {0};
-        ason_err_t err = ason_load_User(input, strlen(input), &u);
+        ason_err_t err = ason_decode_User(input, strlen(input), &u);
         assert(err == ASON_OK);
         printf("   id=%lld name=%s active=%s\n\n",
                (long long)u.id, u.name.data, u.active ? "true" : "false");

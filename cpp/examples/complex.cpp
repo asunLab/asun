@@ -296,7 +296,7 @@ int main() {
 
   // 1. Nested struct
   std::cout << "1. Nested struct:\n";
-  auto emp = ason::load<Employee>(
+  auto emp = ason::decode<Employee>(
       "{id,name,dept:{title},skills,active}:(1,Alice,(Manager),[rust],true)");
   std::cout << "   Employee{id=" << emp.id << ", name=" << emp.name
             << ", dept=" << emp.dept.title << ", skills=[";
@@ -310,17 +310,17 @@ int main() {
   // 2. Vec with nested structs
   std::cout << "2. Vec with nested structs:\n";
   auto input2 = std::string_view(
-      "{id:int,name:str,dept:{title:str},skills:[str],active:bool}:\n"
+      "[{id:int,name:str,dept:{title:str},skills:[str],active:bool}]:\n"
       "  (1, Alice, (Manager), [Rust, Go], true),\n"
       "  (2, Bob, (Engineer), [Python], false),\n"
       "  (3, \"Carol Smith\", (Director), [Leadership, Strategy], true)");
-  auto employees = ason::load_vec<Employee>(input2);
+  auto employees = ason::decode<std::vector<Employee>>(input2);
   for (auto &e : employees)
     std::cout << "   Employee{id=" << e.id << ", name=" << e.name << "}\n";
 
   // 3. Map/Dict field
   std::cout << "\n3. Map/Dict field:\n";
-  auto wm = ason::load<WithMap>("{name,attrs}:(Alice,[(age,30),(score,95)])");
+  auto wm = ason::decode<WithMap>("{name,attrs}:(Alice,[(age,30),(score,95)])");
   std::cout << "   name=" << wm.name << ", attrs={";
   for (auto &[k, v] : wm.attrs)
     std::cout << k << ":" << v << " ";
@@ -331,9 +331,9 @@ int main() {
   // 4. Nested struct roundtrip
   std::cout << "\n4. Nested struct roundtrip:\n";
   Nested nested{"Alice", {"NYC", 10001}};
-  auto s4 = ason::dump(nested);
+  auto s4 = ason::encode(nested);
   std::cout << "   serialized:   " << s4 << "\n";
-  auto deserialized4 = ason::load<Nested>(s4);
+  auto deserialized4 = ason::decode<Nested>(s4);
   assert(deserialized4.name == "Alice");
   assert(deserialized4.addr.city == "NYC");
   assert(deserialized4.addr.zip == 10001);
@@ -342,27 +342,27 @@ int main() {
   // 5. Escaped strings
   std::cout << "\n5. Escaped strings:\n";
   Note note{"say \"hi\", then (wave)\tnewline\nend"};
-  auto s5 = ason::dump(note);
+  auto s5 = ason::encode(note);
   std::cout << "   serialized:   " << s5 << "\n";
-  auto note2 = ason::load<Note>(s5);
+  auto note2 = ason::decode<Note>(s5);
   assert(note.text == note2.text);
   std::cout << "   ✓ escape roundtrip OK\n";
 
   // 6. Float fields
   std::cout << "\n6. Float fields:\n";
   Measurement m{2, 95.0, "score"};
-  auto s6 = ason::dump(m);
+  auto s6 = ason::encode(m);
   std::cout << "   serialized: " << s6 << "\n";
-  auto m2 = ason::load<Measurement>(s6);
+  auto m2 = ason::decode<Measurement>(s6);
   assert(m2.id == 2 && m2.value == 95.0 && m2.label == "score");
   std::cout << "   ✓ float roundtrip OK\n";
 
   // 7. Negative numbers
   std::cout << "\n7. Negative numbers:\n";
   Nums n{-42, -3.15, -9223372036854775807LL};
-  auto s7 = ason::dump(n);
+  auto s7 = ason::encode(n);
   std::cout << "   serialized:   " << s7 << "\n";
-  auto n2 = ason::load<Nums>(s7);
+  auto n2 = ason::decode<Nums>(s7);
   assert(n2.a == -42 && n2.c == -9223372036854775807LL);
   std::cout << "   ✓ negative roundtrip OK\n";
 
@@ -387,9 +387,9 @@ int main() {
   all.vec_str = {"alpha", "beta gamma", "delta"};
   all.nested_vec = {{1, 2}, {3, 4, 5}};
 
-  auto s8 = ason::dump(all);
+  auto s8 = ason::encode(all);
   std::cout << "   serialized (" << s8.size() << " bytes):\n   " << s8 << "\n";
-  auto all2 = ason::load<AllTypes>(s8);
+  auto all2 = ason::decode<AllTypes>(s8);
   assert(all2.b == all.b);
   assert(all2.i64v == all.i64v);
   assert(all2.u64v == all.u64v);
@@ -469,7 +469,7 @@ int main() {
                           }},
                  }},
       }};
-  auto s10 = ason::dump(country);
+  auto s10 = ason::encode(country);
   std::cout << "   serialized (" << s10.size() << " bytes)\n";
   std::cout << "   first 200 chars: " << s10.substr(0, 200) << "...\n";
   assert(country2.name == "Rustland");
@@ -480,8 +480,8 @@ int main() {
   std::cout << "   ✓ 5-level ASON-text roundtrip OK\n";
 
   // ASON binary roundtrip
-  auto bin10 = ason::dump_bin(country);
-  auto country_bin = ason::load_bin<Country>(bin10);
+  auto bin10 = ason::encode_bin(country);
+  auto country_bin = ason::decode_bin<Country>(bin10);
   assert(country_bin.name == "Rustland");
   std::cout << "   ✓ 5-level ASON-bin roundtrip OK\n";
   std::cout << "   ASON text: " << s10.size()
@@ -539,7 +539,7 @@ int main() {
                       Planet{"Mars", 3389.5, false, {}},
                   }},
           }}}};
-  auto s11 = ason::dump(universe);
+  auto s11 = ason::encode(universe);
   std::cout << "   serialized (" << s11.size() << " bytes)\n";
   assert(universe2.name == "Observable");
   assert(universe2.galaxies[0]
@@ -552,8 +552,8 @@ int main() {
   std::cout << "   ✓ 7-level ASON-text roundtrip OK\n";
 
   // ASON binary roundtrip
-  auto bin11 = ason::dump_bin(universe);
-  auto universe_bin = ason::load_bin<Universe>(bin11);
+  auto bin11 = ason::encode_bin(universe);
+  auto universe_bin = ason::decode_bin<Universe>(bin11);
   assert(universe_bin.name == "Observable");
   std::cout << "   ✓ 7-level ASON-bin roundtrip OK\n";
   std::cout << "   ASON text: " << s11.size()
@@ -575,7 +575,7 @@ int main() {
        {"DATABASE_URL", "postgres://localhost:5432/mydb"},
        {"SECRET_KEY", "abc123!@#"}},
   };
-  auto s12 = ason::dump(config);
+  auto s12 = ason::encode(config);
   std::cout << "   serialized (" << s12.size() << " bytes):\n   " << s12
             << "\n";
   assert(config2.log.file.has_value());
@@ -583,8 +583,8 @@ int main() {
   std::cout << "   ✓ config ASON-text roundtrip OK\n";
 
   // ASON binary roundtrip
-  auto bin12 = ason::dump_bin(config);
-  auto config_bin = ason::load_bin<ServiceConfig>(bin12);
+  auto bin12 = ason::encode_bin(config);
+  auto config_bin = ason::decode_bin<ServiceConfig>(bin12);
   assert(config_bin.name == "my-service");
   std::cout << "   ✓ config ASON-bin roundtrip OK\n";
   std::cout << "   ASON text: " << s12.size()
@@ -631,8 +631,8 @@ int main() {
       }
       c.regions.push_back(reg);
     }
-    auto cs = ason::dump(c);
-    auto c2 = ason::load<Country>(cs);
+    auto cs = ason::encode(c);
+    auto c2 = ason::decode<Country>(cs);
     assert(c2.name == c.name);
     total_ason_bytes += cs.size();
   }
@@ -659,7 +659,7 @@ int main() {
 
   // 14. Deep schema type hints
   std::cout << "\n14. Deserialize with nested schema type hints:\n";
-  auto c14 = ason::load<Country>(
+  auto c14 = ason::decode<Country>(
       "{name:str,code:str,population:int,gdp_trillion:float,"
       "regions:[{name:str,cities:[{name:str,population:int,area_km2:float,"
       "districts:[{name:str,population:int,streets:[{name:str,length_km:float,"
@@ -675,22 +675,22 @@ int main() {
   // 15. Typed serialization
   std::cout << "\n15. Typed serialization:\n";
   Employee emp15{1, "Alice", {"Engineering"}, {"Rust", "Go"}, true};
-  auto user_typed = ason::dump_typed(emp15);
+  auto user_typed = ason::encode_typed(emp15);
   std::cout << "   nested struct: " << user_typed << "\n";
-  auto emp_back = ason::load<Employee>(user_typed);
+  auto emp_back = ason::decode<Employee>(user_typed);
   assert(emp_back.name == "Alice");
   std::cout << "   ✓ typed nested struct roundtrip OK\n";
 
-  auto all_typed = ason::dump_typed(all);
+  auto all_typed = ason::encode_typed(all);
   std::cout << "   all-types (" << all_typed.size() << " bytes)\n";
-  auto all_back = ason::load<AllTypes>(all_typed);
+  auto all_back = ason::decode<AllTypes>(all_typed);
   assert(all_back.b == all.b);
   assert(all_back.i64v == all.i64v);
   std::cout << "   ✓ typed all-types roundtrip OK\n";
 
-  auto config_typed = ason::dump_typed(config);
+  auto config_typed = ason::encode_typed(config);
   std::cout << "   config (" << config_typed.size() << " bytes)\n";
-  auto config_back = ason::load<ServiceConfig>(config_typed);
+  auto config_back = ason::decode<ServiceConfig>(config_typed);
   assert(config_back.name == config.name);
   std::cout << "   ✓ typed config roundtrip OK\n";
 
@@ -703,27 +703,27 @@ int main() {
   // 16. Edge cases
   std::cout << "\n16. Edge cases:\n";
   WithVec wv{{}};
-  auto sw = ason::dump(wv);
+  auto sw = ason::encode(wv);
   std::cout << "   empty vec: " << sw << "\n";
-  auto wv2 = ason::load<WithVec>(sw);
+  auto wv2 = ason::decode<WithVec>(sw);
   assert(wv2.items.empty());
 
   Special sp{"tabs\there, newlines\nhere, quotes\"and\\backslash"};
-  auto ss = ason::dump(sp);
+  auto ss = ason::encode(sp);
   std::cout << "   special chars: " << ss << "\n";
-  auto sp2 = ason::load<Special>(ss);
+  auto sp2 = ason::decode<Special>(ss);
   assert(sp.val == sp2.val);
 
   Special sp3{"true"};
-  auto ss3 = ason::dump(sp3);
+  auto ss3 = ason::encode(sp3);
   std::cout << "   bool-like string: " << ss3 << "\n";
-  auto sp4 = ason::load<Special>(ss3);
+  auto sp4 = ason::decode<Special>(ss3);
   assert(sp3.val == sp4.val);
 
   Special sp5{"12345"};
-  auto ss5 = ason::dump(sp5);
+  auto ss5 = ason::encode(sp5);
   std::cout << "   number-like string: " << ss5 << "\n";
-  auto sp6 = ason::load<Special>(ss5);
+  auto sp6 = ason::decode<Special>(ss5);
   assert(sp5.val == sp6.val);
   std::cout << "   ✓ all edge cases OK\n";
 
@@ -731,9 +731,9 @@ int main() {
   std::cout << "\n17. Triple-nested arrays:\n";
   Matrix3D m3;
   m3.data = {{{1, 2}, {3, 4}}, {{5, 6, 7}, {8}}};
-  auto sm3 = ason::dump(m3);
+  auto sm3 = ason::encode(m3);
   std::cout << "   " << sm3 << "\n";
-  auto m3b = ason::load<Matrix3D>(sm3);
+  auto m3b = ason::decode<Matrix3D>(sm3);
   assert(m3b.data.size() == 2);
   assert(m3b.data[0][0] == std::vector<int64_t>({1, 2}));
   assert(m3b.data[1][0] == std::vector<int64_t>({5, 6, 7}));
@@ -741,7 +741,7 @@ int main() {
 
   // 18. Comments
   std::cout << "\n18. Comments:\n";
-  auto emp18 = ason::load<Employee>("{id,name,dept:{title},skills,active}:/* "
+  auto emp18 = ason::decode<Employee>("{id,name,dept:{title},skills,active}:/* "
                                     "inline */ (1,Alice,(HR),[rust],true)");
   std::cout << "   with inline comment: Employee{id=" << emp18.id
             << ", name=" << emp18.name << "}\n";
