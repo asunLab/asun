@@ -25,9 +25,6 @@ target_link_libraries(complex_example ason m)
 add_executable(bench examples/bench.c)
 target_link_libraries(bench ason m)
 
-add_executable(binary examples/binary.c)
-target_link_libraries(binary ason m)
-
 # Tests
 add_executable(ason_test tests/ason_test.c)
 target_link_libraries(ason_test ason m)

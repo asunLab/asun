@@ -17,6 +17,7 @@ ASON_FIELDS(User, 3,
     ASON_FIELD(User, id,     "id",     i64),
     ASON_FIELD(User, name,   "name",   str),
     ASON_FIELD(User, active, "active", bool))
+ASON_FIELDS_BIN(User, 3)
 
 typedef struct {
     int64_t id;
@@ -119,10 +120,11 @@ int main(void) {
         printf("\n");
     }
 
-    /* 7. Roundtrip */
-    printf("7. Roundtrip test:\n");
+    /* 7. Roundtrip (ASON-text + ASON-bin) */
+    printf("7. Roundtrip (ASON-text vs ASON-bin):\n");
     {
         User orig = {42, ason_string_from("Test User"), true};
+        /* ASON text roundtrip */
         buf = ason_dump_User(&orig);
         User decoded = {0};
         ason_err_t err = ason_load_User(buf.data, buf.len, &decoded);
@@ -130,15 +132,25 @@ int main(void) {
         assert(decoded.id == 42);
         assert(strcmp(decoded.name.data, "Test User") == 0);
         assert(decoded.active == true);
-        printf("   original:     id=%lld name=%s active=%s\n",
-               (long long)orig.id, orig.name.data, orig.active ? "true" : "false");
-        printf("   serialized:   %.*s\n", (int)buf.len, buf.data);
-        printf("   deserialized: id=%lld name=%s active=%s\n",
-               (long long)decoded.id, decoded.name.data, decoded.active ? "true" : "false");
-        printf("   roundtrip OK\n\n");
-        ason_buf_free(&buf);
-        ason_string_free(&orig.name);
+        printf("   ASON text:    %.*s (%zu B)\n", (int)buf.len, buf.data, buf.len);
         ason_string_free(&decoded.name);
+
+        /* ASON binary roundtrip */
+        ason_buf_t bin = ason_dump_bin_User(&orig);
+        User decoded_bin = {0};
+        err = ason_load_bin_User(bin.data, bin.len, &decoded_bin);
+        assert(err == ASON_OK);
+        assert(decoded_bin.id == 42);
+        assert(strcmp(decoded_bin.name.data, "Test User") == 0);
+        assert(decoded_bin.active == true);
+        printf("   ASON binary:  %zu B\n", bin.len);
+        printf("   BIN is %.0f%% smaller than text\n",
+               (1.0 - (double)bin.len / (double)buf.len) * 100.0);
+        printf("   \xe2\x9c\x93 both formats roundtrip OK\n\n");
+        ason_buf_free(&buf);
+        ason_buf_free(&bin);
+        ason_string_free(&orig.name);
+        ason_string_free(&decoded_bin.name);
     }
 
     /* 8. Optional fields */
