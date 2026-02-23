@@ -326,7 +326,17 @@ fn writeSchema(comptime T: type, w: *Writer, typed: bool) !void {
             inline for (s.fields, 0..) |field, i| {
                 if (i > 0) try w.append(',');
                 try w.appendSlice(field.name);
-                if (typed) {
+                const FT = comptime unwrapOptional(field.type);
+                if (comptime @typeInfo(FT) == .@"struct") {
+                    // Always output nested struct schema: field:{f1,f2,...}
+                    try w.append(':');
+                    try writeSchema(FT, w, typed);
+                } else if (comptime isStructSlice(FT)) {
+                    // Always output nested struct-array schema: field:[{f1,f2,...}]
+                    try w.appendSlice(":[");
+                    try writeSchema(@typeInfo(FT).pointer.child, w, typed);
+                    try w.append(']');
+                } else if (typed) {
                     try w.append(':');
                     try writeTypeHint(field.type, w);
                 }
@@ -397,24 +407,10 @@ fn writeTupleData(comptime T: type, value: T, w: *Writer) !void {
 fn serializeValue(comptime T: type, value: T, w: *Writer, typed: bool) !void {
     const info = @typeInfo(T);
     switch (info) {
-        .@"struct" => |s| {
-            try w.append('{');
-            inline for (s.fields, 0..) |field, i| {
-                if (i > 0) try w.append(',');
-                try w.appendSlice(field.name);
-                if (typed) {
-                    try w.append(':');
-                    try writeTypeHint(field.type, w);
-                }
-            }
-            try w.appendSlice("}:");
-
-            try w.append('(');
-            inline for (s.fields, 0..) |field, i| {
-                if (i > 0) try w.append(',');
-                try serializeField(field.type, @field(value, field.name), w);
-            }
-            try w.append(')');
+        .@"struct" => {
+            try writeSchema(T, w, typed);
+            try w.append(':');
+            try writeTupleData(T, value, w);
         },
         else => return error.UnsupportedType,
     }
@@ -602,6 +598,14 @@ fn isStructSlice(comptime T: type) bool {
     if (info != .pointer) return false;
     if (info.pointer.size != .slice) return false;
     return @typeInfo(info.pointer.child) == .@"struct";
+}
+
+/// Unwrap an optional type to its child; returns T unchanged if not optional.
+fn unwrapOptional(comptime T: type) type {
+    return switch (@typeInfo(T)) {
+        .optional => |o| o.child,
+        else => T,
+    };
 }
 
 // ============================================================================

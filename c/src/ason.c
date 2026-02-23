@@ -634,6 +634,51 @@ ason_err_t ason_decode_map_ss(const char** pos, const char* end, void* base, siz
  * Generic struct dump/load via descriptor
  * ============================================================================ */
 
+void ason_write_schema(ason_buf_t* buf, const ason_desc_t* desc) {
+    ason_buf_push(buf, '{');
+    for (int i = 0; i < desc->field_count; i++) {
+        if (i > 0) ason_buf_push(buf, ',');
+        const ason_field_t* f = &desc->fields[i];
+        ason_buf_append(buf, f->name, f->name_len);
+        if (f->type == ASON_STRUCT && f->sub_desc) {
+            ason_buf_push(buf, ':');
+            if (f->dump_fn) {
+                /* vec-of-struct: write :[{...}] */
+                ason_buf_push(buf, '[');
+                ason_write_schema(buf, (const ason_desc_t*)f->sub_desc);
+                ason_buf_push(buf, ']');
+            } else {
+                /* direct struct: write :{...} */
+                ason_write_schema(buf, (const ason_desc_t*)f->sub_desc);
+            }
+        }
+    }
+    ason_buf_push(buf, '}');
+}
+
+void ason_write_schema_typed(ason_buf_t* buf, const ason_desc_t* desc) {
+    ason_buf_push(buf, '{');
+    for (int i = 0; i < desc->field_count; i++) {
+        if (i > 0) ason_buf_push(buf, ',');
+        const ason_field_t* f = &desc->fields[i];
+        ason_buf_append(buf, f->name, f->name_len);
+        if (f->type == ASON_STRUCT && f->sub_desc) {
+            ason_buf_push(buf, ':');
+            if (f->dump_fn) {
+                ason_buf_push(buf, '[');
+                ason_write_schema_typed(buf, (const ason_desc_t*)f->sub_desc);
+                ason_buf_push(buf, ']');
+            } else {
+                ason_write_schema_typed(buf, (const ason_desc_t*)f->sub_desc);
+            }
+        } else if (f->type_str) {
+            ason_buf_push(buf, ':');
+            ason_buf_appends(buf, f->type_str);
+        }
+    }
+    ason_buf_push(buf, '}');
+}
+
 void ason_encode_struct(ason_buf_t* buf, const void* obj, const ason_desc_t* desc) {
     ason_buf_push(buf, '(');
     for (int i = 0; i < desc->field_count; i++) {

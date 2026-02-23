@@ -53,7 +53,9 @@ public final class Ason {
             writeSchemaFieldsTyped(buf, meta.fields, value);
             buf.append('}');
         } else {
-            buf.appendBytes(meta.schemaBytes, 0, meta.schemaBytes.length);
+            buf.append('{');
+            writeSchemaFields(buf, meta.fields);
+            buf.append('}');
         }
         buf.append(':');
         writeTuple(buf, value, meta);
@@ -73,7 +75,9 @@ public final class Ason {
             writeSchemaFieldsTyped(buf, meta.fields, first);
             buf.append('}'); buf.append(']');
         } else {
-            buf.appendBytes(meta.schemaBytesVec, 0, meta.schemaBytesVec.length);
+            buf.append('['); buf.append('{');
+            writeSchemaFields(buf, meta.fields);
+            buf.append('}'); buf.append(']');
         }
         buf.append(':');
         for (int i = 0; i < list.size(); i++) {
@@ -83,13 +87,61 @@ public final class Ason {
         return buf.toStringUtf8AndClose();
     }
 
+    /**
+     * Write recursive schema fields (untyped): name, or name:{nested}, or name:[{nested}]
+     */
+    private static void writeSchemaFields(ByteBuffer buf, FieldMeta[] fields) {
+        for (int i = 0; i < fields.length; i++) {
+            if (i > 0) buf.append(',');
+            FieldMeta fm = fields[i];
+            buf.appendBytes(fm.nameBytes, 0, fm.nameBytes.length);
+            if (fm.typeTag == FieldMeta.T_STRUCT && fm.nestedMeta != null) {
+                buf.append(':');
+                buf.append('{');
+                writeSchemaFields(buf, fm.nestedMeta.fields);
+                buf.append('}');
+            } else if (fm.typeTag == FieldMeta.T_LIST && fm.listElemMeta != null) {
+                buf.append(':');
+                buf.append('['); buf.append('{');
+                writeSchemaFields(buf, fm.listElemMeta.fields);
+                buf.append('}'); buf.append(']');
+            }
+        }
+    }
+
+    /**
+     * Write recursive schema fields (typed): name:type, or name:{nested}, or name:[{nested}]
+     */
+    @SuppressWarnings("unchecked")
     private static void writeSchemaFieldsTyped(ByteBuffer buf, FieldMeta[] fields, Object sample) {
         for (int i = 0; i < fields.length; i++) {
             if (i > 0) buf.append(',');
             FieldMeta fm = fields[i];
             buf.appendBytes(fm.nameBytes, 0, fm.nameBytes.length);
-            String hint = typeHintField(fm, sample);
-            if (hint != null) { buf.append(':'); buf.appendAscii(hint); }
+            if (fm.typeTag == FieldMeta.T_STRUCT && fm.nestedMeta != null) {
+                buf.append(':');
+                buf.append('{');
+                Object nestedObj = sample != null ? fm.get(sample) : null;
+                if (nestedObj != null) {
+                    writeSchemaFieldsTyped(buf, fm.nestedMeta.fields, nestedObj);
+                } else {
+                    writeSchemaFields(buf, fm.nestedMeta.fields);
+                }
+                buf.append('}');
+            } else if (fm.typeTag == FieldMeta.T_LIST && fm.listElemMeta != null) {
+                buf.append(':');
+                buf.append('['); buf.append('{');
+                List<?> listSample = sample != null ? (List<?>) fm.get(sample) : null;
+                if (listSample != null && !listSample.isEmpty()) {
+                    writeSchemaFieldsTyped(buf, fm.listElemMeta.fields, listSample.getFirst());
+                } else {
+                    writeSchemaFields(buf, fm.listElemMeta.fields);
+                }
+                buf.append('}'); buf.append(']');
+            } else {
+                String hint = typeHintField(fm, sample);
+                if (hint != null) { buf.append(':'); buf.appendAscii(hint); }
+            }
         }
     }
 

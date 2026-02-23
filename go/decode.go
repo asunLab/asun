@@ -352,7 +352,24 @@ func (d *decoder) unmarshalTuple(rv reflect.Value, si *structInfo, fieldMap []in
 		}
 	}
 
+	// Skip any remaining values (source struct may have more fields than target)
 	d.skipWhitespaceAndComments()
+	for d.pos < len(d.data) && d.data[d.pos] != ')' {
+		if d.data[d.pos] == ',' {
+			d.pos++
+			d.skipWhitespaceAndComments()
+			if d.pos < len(d.data) && d.data[d.pos] == ')' {
+				break
+			}
+		}
+		if d.pos < len(d.data) && d.data[d.pos] != ')' {
+			if err := d.skipValue(); err != nil {
+				return err
+			}
+			d.skipWhitespaceAndComments()
+		}
+	}
+
 	if d.pos < len(d.data) && d.data[d.pos] == ')' {
 		d.pos++
 	}

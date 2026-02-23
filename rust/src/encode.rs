@@ -159,6 +159,9 @@ pub struct Encoder {
     top_seq_data_start: usize,
     top_seq_fields: Option<Vec<&'static str>>,
     top_seq_field_types: Option<Vec<Option<&'static str>>>,
+    top_seq_field_schemas: Option<Vec<Option<Vec<u8>>>>,
+    /// Schema fragment bubbled up from nested struct/seq-of-struct serializers.
+    nested_schema: Option<Vec<u8>>,
 }
 
 pub fn encode<T: Serialize>(value: &T) -> Result<String> {
@@ -172,6 +175,8 @@ pub fn encode<T: Serialize>(value: &T) -> Result<String> {
         top_seq_data_start: 0,
         top_seq_fields: None,
         top_seq_field_types: None,
+        top_seq_field_schemas: None,
+        nested_schema: None,
     };
     value.serialize(&mut serializer)?;
     Ok(unsafe { String::from_utf8_unchecked(serializer.buf) })
@@ -191,6 +196,8 @@ pub fn encode_typed<T: Serialize>(value: &T) -> Result<String> {
         top_seq_data_start: 0,
         top_seq_fields: None,
         top_seq_field_types: None,
+        top_seq_field_schemas: None,
+        nested_schema: None,
     };
     value.serialize(&mut serializer)?;
     Ok(unsafe { String::from_utf8_unchecked(serializer.buf) })
@@ -420,11 +427,7 @@ impl<'a> ser::Serializer for &'a mut Encoder {
         })
     }
 
-    fn serialize_tuple_struct(
-        self,
-        _name: &'static str,
-        _len: usize,
-    ) -> Result<TupleEncoder<'a>> {
+    fn serialize_tuple_struct(self, _name: &'static str, _len: usize) -> Result<TupleEncoder<'a>> {
         self.push_separator();
         self.buf.push(b'(');
         Ok(TupleEncoder {
@@ -472,6 +475,7 @@ impl<'a> ser::Serializer for &'a mut Encoder {
                 ser: self,
                 fields: Vec::with_capacity(len),
                 field_types: Vec::with_capacity(len),
+                field_schemas: Vec::with_capacity(len),
                 is_top: true,
                 capture_for_seq: false,
                 first: true,
@@ -482,8 +486,9 @@ impl<'a> ser::Serializer for &'a mut Encoder {
             self.buf.push(b'(');
             Ok(StructEncoder {
                 ser: self,
-                fields: if capture_for_seq { Vec::with_capacity(len) } else { Vec::new() },
-                field_types: if capture_for_seq { Vec::with_capacity(len) } else { Vec::new() },
+                fields: Vec::with_capacity(len),
+                field_types: Vec::with_capacity(len),
+                field_schemas: Vec::with_capacity(len),
                 is_top: false,
                 capture_for_seq,
                 first: true,
@@ -507,6 +512,7 @@ impl<'a> ser::Serializer for &'a mut Encoder {
             ser: self,
             fields: Vec::new(),
             field_types: Vec::new(),
+            field_schemas: Vec::new(),
             is_top: false,
             capture_for_seq: false,
             first: true,
@@ -551,7 +557,17 @@ impl<'a> ser::SerializeSeq for SeqEncoder<'a> {
                         self.ser.buf.push(b',');
                     }
                     self.ser.buf.extend_from_slice(f.as_bytes());
-                    if self.ser.typed {
+                    // Nested schema takes priority over type hint
+                    let has_nested = self
+                        .ser
+                        .top_seq_field_schemas
+                        .as_ref()
+                        .and_then(|schemas| schemas.get(i))
+                        .and_then(|s| s.as_ref());
+                    if let Some(schema) = has_nested {
+                        self.ser.buf.push(b':');
+                        self.ser.buf.extend_from_slice(schema);
+                    } else if self.ser.typed {
                         if let Some(ref field_types) = self.ser.top_seq_field_types {
                             if let Some(Some(type_hint)) = field_types.get(i) {
                                 self.ser.buf.push(b':');
@@ -572,6 +588,14 @@ impl<'a> ser::SerializeSeq for SeqEncoder<'a> {
             self.ser.in_top_seq = false;
         } else {
             self.ser.buf.push(b']');
+            // If elements were structs, wrap their schema in [...] and bubble up
+            if let Some(schema) = self.ser.nested_schema.take() {
+                let mut wrapped = Vec::with_capacity(schema.len() + 2);
+                wrapped.push(b'[');
+                wrapped.extend_from_slice(&schema);
+                wrapped.push(b']');
+                self.ser.nested_schema = Some(wrapped);
+            }
         }
         self.ser.first = false;
         Ok(())
@@ -686,6 +710,8 @@ pub struct StructEncoder<'a> {
     fields: Vec<&'static str>,
     /// Type hints collected for each field (only when typed mode is on)
     field_types: Vec<Option<&'static str>>,
+    /// Nested schema fragments for struct/vec-of-struct fields
+    field_schemas: Vec<Option<Vec<u8>>>,
     is_top: bool,
     capture_for_seq: bool,
     first: bool,
@@ -702,12 +728,14 @@ impl<'a> ser::SerializeStruct for StructEncoder<'a> {
         key: &'static str,
         value: &T,
     ) -> Result<()> {
-        if self.is_top || self.capture_for_seq {
-            self.fields.push(key);
-            if self.ser.typed {
-                self.ser.current_type_hint = None;
-            }
+        // Always capture field names for recursive schema generation
+        self.fields.push(key);
+        if self.ser.typed {
+            self.ser.current_type_hint = None;
         }
+        // Clear nested schema before serializing value
+        self.ser.nested_schema = None;
+
         if !self.first {
             self.ser.buf.push(b',');
         }
@@ -715,7 +743,10 @@ impl<'a> ser::SerializeStruct for StructEncoder<'a> {
         self.ser.first = true;
         self.ser.in_tuple = true;
         value.serialize(&mut *self.ser)?;
-        if (self.is_top || self.capture_for_seq) && self.ser.typed {
+
+        // Capture nested schema (set by nested StructEncoder or SeqEncoder)
+        self.field_schemas.push(self.ser.nested_schema.take());
+        if self.ser.typed {
             self.field_types.push(self.ser.current_type_hint.take());
         }
         Ok(())
@@ -732,8 +763,11 @@ impl<'a> ser::SerializeStruct for StructEncoder<'a> {
                     self.ser.buf.push(b',');
                 }
                 self.ser.buf.extend_from_slice(f.as_bytes());
-                // Append type hint if available (typed mode)
-                if self.ser.typed {
+                // Nested schema takes priority over type hint
+                if let Some(Some(schema)) = self.field_schemas.get(i) {
+                    self.ser.buf.push(b':');
+                    self.ser.buf.extend_from_slice(schema);
+                } else if self.ser.typed {
                     if let Some(type_hint) = self.field_types.get(i).and_then(|t| *t) {
                         self.ser.buf.push(b':');
                         self.ser.buf.extend_from_slice(type_hint.as_bytes());
@@ -747,9 +781,31 @@ impl<'a> ser::SerializeStruct for StructEncoder<'a> {
             self.ser.first = false;
             if self.capture_for_seq {
                 self.ser.top_seq_fields = Some(self.fields);
+                self.ser.top_seq_field_schemas = Some(self.field_schemas);
                 if self.ser.typed {
                     self.ser.top_seq_field_types = Some(self.field_types);
                 }
+            } else {
+                // Build schema fragment for parent to consume
+                let mut schema = Vec::with_capacity(64);
+                schema.push(b'{');
+                for (i, f) in self.fields.iter().enumerate() {
+                    if i > 0 {
+                        schema.push(b',');
+                    }
+                    schema.extend_from_slice(f.as_bytes());
+                    if let Some(Some(nested)) = self.field_schemas.get(i) {
+                        schema.push(b':');
+                        schema.extend_from_slice(nested);
+                    } else if self.ser.typed {
+                        if let Some(type_hint) = self.field_types.get(i).and_then(|t| *t) {
+                            schema.push(b':');
+                            schema.extend_from_slice(type_hint.as_bytes());
+                        }
+                    }
+                }
+                schema.push(b'}');
+                self.ser.nested_schema = Some(schema);
             }
             if self.ser.typed {
                 self.ser.current_type_hint = None;
@@ -783,5 +839,3 @@ impl<'a> ser::SerializeStructVariant for StructEncoder<'a> {
         Ok(())
     }
 }
-
-

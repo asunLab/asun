@@ -226,6 +226,25 @@ public class AsonTest {
         assertEquals("Manager", e.dept.title);
     }
 
+    @Test void testNestedStructEncode() {
+        Employee e = new Employee("Alice", new Dept("Manager"));
+        String s = Ason.encode(e);
+        assertEquals("{name,dept:{title}}:(Alice,(Manager))", s);
+    }
+
+    @Test void testNestedStructEncodeTyped() {
+        Employee e = new Employee("Alice", new Dept("Manager"));
+        String s = Ason.encodeTyped(e);
+        assertEquals("{name:str,dept:{title:str}}:(Alice,(Manager))", s);
+    }
+
+    @Test void testNestedStructRoundtrip() {
+        Employee original = new Employee("Bob", new Dept("Engineering"));
+        String s = Ason.encode(original);
+        Employee decoded = Ason.decode(s, Employee.class);
+        assertEquals(original, decoded);
+    }
+
     @Test void testFloatField() {
         Score s = Ason.decode("{id,value}:(1,95.5)", Score.class);
         assertEquals(1, s.id);

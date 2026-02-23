@@ -825,6 +825,10 @@ ason_err_t ason_decode_map_ss(const char** pos, const char* end, void* base, siz
 void ason_encode_struct(ason_buf_t* buf, const void* obj, const ason_desc_t* desc);
 ason_err_t ason_decode_struct(const char** pos, const char* end, void* obj, const ason_desc_t* desc);
 
+/* Recursive schema writers */
+void ason_write_schema(ason_buf_t* buf, const ason_desc_t* desc);
+void ason_write_schema_typed(ason_buf_t* buf, const ason_desc_t* desc);
+
 /* ============================================================================
  * ASON_FIELD macro — build a field descriptor
  * ============================================================================ */
@@ -909,13 +913,7 @@ ason_err_t ason_decode_struct(const char** pos, const char* end, void* obj, cons
     }; \
     static inline ason_buf_t ason_encode_##StructType(const StructType* obj) { \
         ason_buf_t buf = ason_buf_new(128); \
-        ason_buf_push(&buf, '{'); \
-        for (int i = 0; i < nfields; i++) { \
-            if (i > 0) ason_buf_push(&buf, ','); \
-            ason_buf_append(&buf, StructType##_ason_fields[i].name, \
-                            StructType##_ason_fields[i].name_len); \
-        } \
-        ason_buf_push(&buf, '}'); \
+        ason_write_schema(&buf, &StructType##_ason_desc); \
         ason_buf_push(&buf, ':'); \
         ason_buf_push(&buf, '('); \
         for (int i = 0; i < nfields; i++) { \
@@ -938,17 +936,7 @@ ason_err_t ason_decode_struct(const char** pos, const char* end, void* obj, cons
     } \
     static inline ason_buf_t ason_encode_typed_##StructType(const StructType* obj) { \
         ason_buf_t buf = ason_buf_new(128); \
-        ason_buf_push(&buf, '{'); \
-        for (int i = 0; i < nfields; i++) { \
-            if (i > 0) ason_buf_push(&buf, ','); \
-            ason_buf_append(&buf, StructType##_ason_fields[i].name, \
-                            StructType##_ason_fields[i].name_len); \
-            if (StructType##_ason_fields[i].type_str) { \
-                ason_buf_push(&buf, ':'); \
-                ason_buf_appends(&buf, StructType##_ason_fields[i].type_str); \
-            } \
-        } \
-        ason_buf_push(&buf, '}'); \
+        ason_write_schema_typed(&buf, &StructType##_ason_desc); \
         ason_buf_push(&buf, ':'); \
         ason_buf_push(&buf, '('); \
         for (int i = 0; i < nfields; i++) { \
@@ -1030,17 +1018,7 @@ ason_err_t ason_decode_struct(const char** pos, const char* end, void* obj, cons
     static inline ason_buf_t ason_encode_typed_vec_##StructType(const StructType* arr, size_t count) { \
         ason_buf_t buf = ason_buf_new(count * 64 + 128); \
         ason_buf_push(&buf, '['); \
-        ason_buf_push(&buf, '{'); \
-        for (int i = 0; i < nfields; i++) { \
-            if (i > 0) ason_buf_push(&buf, ','); \
-            ason_buf_append(&buf, StructType##_ason_fields[i].name, \
-                            StructType##_ason_fields[i].name_len); \
-            if (StructType##_ason_fields[i].type_str) { \
-                ason_buf_push(&buf, ':'); \
-                ason_buf_appends(&buf, StructType##_ason_fields[i].type_str); \
-            } \
-        } \
-        ason_buf_push(&buf, '}'); \
+        ason_write_schema_typed(&buf, &StructType##_ason_desc); \
         ason_buf_push(&buf, ']'); \
         ason_buf_push(&buf, ':'); \
         for (size_t r = 0; r < count; r++) { \
@@ -1069,13 +1047,7 @@ ason_err_t ason_decode_struct(const char** pos, const char* end, void* obj, cons
     static inline ason_buf_t ason_encode_vec_##StructType(const StructType* arr, size_t count) { \
         ason_buf_t buf = ason_buf_new(count * 64 + 128); \
         ason_buf_push(&buf, '['); \
-        ason_buf_push(&buf, '{'); \
-        for (int i = 0; i < nfields; i++) { \
-            if (i > 0) ason_buf_push(&buf, ','); \
-            ason_buf_append(&buf, StructType##_ason_fields[i].name, \
-                            StructType##_ason_fields[i].name_len); \
-        } \
-        ason_buf_push(&buf, '}'); \
+        ason_write_schema(&buf, &StructType##_ason_desc); \
         ason_buf_push(&buf, ']'); \
         ason_buf_push(&buf, ':'); \
         for (size_t r = 0; r < count; r++) { \

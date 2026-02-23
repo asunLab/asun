@@ -1,13 +1,13 @@
 pub mod binary;
 pub mod decode;
-pub mod error;
 pub mod encode;
+pub mod error;
 pub mod simd;
 
-pub use binary::{encode_binary, decode_binary};
+pub use binary::{decode_binary, encode_binary};
 pub use decode::decode;
-pub use error::{Error, Result};
 pub use encode::{encode, encode_typed};
+pub use error::{Error, Result};
 
 #[cfg(test)]
 mod tests {
@@ -521,10 +521,10 @@ mod tests {
             active: true,
         };
         let out = encode_typed(&e).unwrap();
-        // dept is a nested struct — no simple type hint
+        // dept is a nested struct — recursive schema included
         assert_eq!(
             out,
-            "{name:str,dept,active:bool}:(Alice,(Engineering),true)"
+            "{name:str,dept:{title:str},active:bool}:(Alice,(Engineering),true)"
         );
         let e2: Employee = decode(&out).unwrap();
         assert_eq!(e, e2);

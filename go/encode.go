@@ -263,13 +263,15 @@ func appendStr(buf []byte, s string) []byte {
 // ---------------------------------------------------------------------------
 
 type fieldInfo struct {
-	name   string
-	index  []int
-	tagged bool
+	name      string
+	index     []int
+	tagged    bool
+	fieldType reflect.Type // resolved field type (for schema generation)
 }
 
 type structInfo struct {
-	fields []fieldInfo
+	fields     []fieldInfo
+	structType reflect.Type // the struct type these fields belong to
 }
 
 var structCache sync.Map // map[reflect.Type]*structInfo
@@ -291,7 +293,7 @@ func buildStructInfo(t reflect.Type) *structInfo {
 		if !f.IsExported() {
 			continue
 		}
-		fi := fieldInfo{index: f.Index}
+		fi := fieldInfo{index: f.Index, fieldType: f.Type}
 
 		// Check ason tag first, then json tag
 		if tag, ok := f.Tag.Lookup("ason"); ok {
@@ -339,7 +341,7 @@ func buildStructInfo(t reflect.Type) *structInfo {
 
 		fields = append(fields, fi)
 	}
-	return &structInfo{fields: fields}
+	return &structInfo{fields: fields, structType: t}
 }
 
 func indexOf(s string, c byte) int {
@@ -349,6 +351,106 @@ func indexOf(s string, c byte) int {
 		}
 	}
 	return -1
+}
+
+// ---------------------------------------------------------------------------
+// Recursive schema generation
+// ---------------------------------------------------------------------------
+
+// appendStructSchema writes {field1,field2,...} for a struct type.
+// For nested struct/slice-of-struct fields, it recurses into the nested schema.
+func appendStructSchema(buf []byte, si *structInfo, typed bool) []byte {
+	buf = append(buf, '{')
+	for i, fi := range si.fields {
+		if i > 0 {
+			buf = append(buf, ',')
+		}
+		buf = appendFieldSchema(buf, fi, typed)
+	}
+	buf = append(buf, '}')
+	return buf
+}
+
+// appendFieldSchema writes a field's name and optional schema/type annotation.
+// Struct and slice-of-struct fields always get nested schema (structural info).
+// Primitive fields only get type annotations in typed mode.
+func appendFieldSchema(buf []byte, fi fieldInfo, typed bool) []byte {
+	buf = append(buf, fi.name...)
+
+	ft := fi.fieldType
+	for ft.Kind() == reflect.Ptr {
+		ft = ft.Elem()
+	}
+
+	switch ft.Kind() {
+	case reflect.Struct:
+		// Always output nested struct schema: field:{f1,f2,...}
+		nested := getStructInfo(ft)
+		buf = append(buf, ':')
+		buf = appendStructSchema(buf, nested, typed)
+	case reflect.Slice:
+		elemType := ft.Elem()
+		for elemType.Kind() == reflect.Ptr {
+			elemType = elemType.Elem()
+		}
+		if elemType.Kind() == reflect.Struct {
+			// Always output nested struct-array schema: field:[{f1,f2,...}]
+			nested := getStructInfo(elemType)
+			buf = append(buf, ':')
+			buf = append(buf, '[')
+			buf = appendStructSchema(buf, nested, typed)
+			buf = append(buf, ']')
+		} else if typed {
+			hint := typeHintForKind(elemType.Kind())
+			if hint != "" {
+				buf = append(buf, ':', '[')
+				buf = append(buf, hint...)
+				buf = append(buf, ']')
+			}
+		}
+	case reflect.Map:
+		if typed {
+			keyHint := typeHintForKind(ft.Key().Kind())
+			valType := ft.Elem()
+			for valType.Kind() == reflect.Ptr {
+				valType = valType.Elem()
+			}
+			valHint := typeHintForKind(valType.Kind())
+			if keyHint != "" && valHint != "" {
+				buf = append(buf, ':')
+				buf = append(buf, "map["...)
+				buf = append(buf, keyHint...)
+				buf = append(buf, ',')
+				buf = append(buf, valHint...)
+				buf = append(buf, ']')
+			}
+		}
+	default:
+		if typed {
+			hint := typeHintForKind(ft.Kind())
+			if hint != "" {
+				buf = append(buf, ':')
+				buf = append(buf, hint...)
+			}
+		}
+	}
+	return buf
+}
+
+func typeHintForKind(k reflect.Kind) string {
+	switch k {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return "int"
+	case reflect.Float32, reflect.Float64:
+		return "float"
+	case reflect.Bool:
+		return "bool"
+	case reflect.String:
+		return "str"
+	default:
+		return ""
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -383,7 +485,7 @@ func encodeInner(v any, typed bool) ([]byte, error) {
 			elemType = elemType.Elem()
 		}
 		if elemType.Kind() == reflect.Struct {
-			return encodeSliceInner(v, typed, nil, nil)
+			return encodeSliceInner(v, typed)
 		}
 	}
 	if rv.Kind() != reflect.Struct {
@@ -398,37 +500,19 @@ func encodeInner(v any, typed bool) ([]byte, error) {
 	// Serialize data first into a temp region
 	dataBuf := make([]byte, 0, 128)
 	dataBuf = append(dataBuf, '(')
-	var typeHints []string
-	if typed {
-		typeHints = make([]string, 0, len(si.fields))
-	}
 
 	for i, fi := range si.fields {
 		if i > 0 {
 			dataBuf = append(dataBuf, ',')
 		}
 		fv := rv.FieldByIndex(fi.index)
-		hint := ""
-		dataBuf, hint = marshalFieldValue(dataBuf, fv, typed)
-		if typed {
-			typeHints = append(typeHints, hint)
-		}
+		dataBuf, _ = marshalFieldValue(dataBuf, fv, false)
 	}
 	dataBuf = append(dataBuf, ')')
 
-	// Build schema header
-	buf = append(buf, '{')
-	for i, fi := range si.fields {
-		if i > 0 {
-			buf = append(buf, ',')
-		}
-		buf = append(buf, fi.name...)
-		if typed && i < len(typeHints) && typeHints[i] != "" {
-			buf = append(buf, ':')
-			buf = append(buf, typeHints[i]...)
-		}
-	}
-	buf = append(buf, '}', ':')
+	// Build schema header (recursive — includes nested struct schemas)
+	buf = appendStructSchema(buf, si, typed)
+	buf = append(buf, ':')
 
 	// Append data
 	buf = append(buf, dataBuf...)
@@ -442,7 +526,7 @@ func encodeInner(v any, typed bool) ([]byte, error) {
 
 // encodeSliceInner serializes a slice of structs to ASON format.
 // Output: [{field1,field2,...}]:(v1,v2,...),(v3,v4,...)
-func encodeSliceInner(v any, typed bool, fieldNames []string, fieldTypes []string) ([]byte, error) {
+func encodeSliceInner(v any, typed bool) ([]byte, error) {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() == reflect.Ptr {
 		rv = rv.Elem()
@@ -463,56 +547,10 @@ func encodeSliceInner(v any, typed bool, fieldNames []string, fieldTypes []strin
 	bp := getBuf()
 	buf := *bp
 
-	// Schema header
-	names := fieldNames
-	if names == nil {
-		names = make([]string, len(si.fields))
-		for i, fi := range si.fields {
-			names[i] = fi.name
-		}
-	}
-
-	// Auto-detect field types from first element if typed mode and no explicit types
-	if typed && fieldTypes == nil && rv.Len() > 0 {
-		first := rv.Index(0)
-		if first.Kind() == reflect.Ptr {
-			first = first.Elem()
-		}
-		fieldTypes = make([]string, len(si.fields))
-		for i, fi := range si.fields {
-			fv := first.FieldByIndex(fi.index)
-			for fv.Kind() == reflect.Ptr {
-				if fv.IsNil() {
-					break
-				}
-				fv = fv.Elem()
-			}
-			switch fv.Kind() {
-			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-				reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-				fieldTypes[i] = "int"
-			case reflect.Float32, reflect.Float64:
-				fieldTypes[i] = "float"
-			case reflect.Bool:
-				fieldTypes[i] = "bool"
-			case reflect.String:
-				fieldTypes[i] = "str"
-			}
-		}
-	}
-
-	buf = append(buf, '[', '{')
-	for i, name := range names {
-		if i > 0 {
-			buf = append(buf, ',')
-		}
-		buf = append(buf, name...)
-		if typed && i < len(fieldTypes) && fieldTypes[i] != "" {
-			buf = append(buf, ':')
-			buf = append(buf, fieldTypes[i]...)
-		}
-	}
-	buf = append(buf, '}', ']', ':')
+	// Schema header (recursive — includes nested struct schemas)
+	buf = append(buf, '[')
+	buf = appendStructSchema(buf, si, typed)
+	buf = append(buf, ']', ':')
 
 	// Data rows
 	for i := 0; i < rv.Len(); i++ {

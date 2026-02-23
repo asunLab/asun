@@ -1157,10 +1157,52 @@ load_bin_value(const char*& pos, const char* end, T& out) {
 // Public API
 // ============================================================================
 
-// is_vector trait
+// is_vector / is_optional traits
 namespace detail {
 template <typename T> struct is_vector : std::false_type {};
 template <typename T> struct is_vector<std::vector<T>> : std::true_type {};
+template <typename T> struct is_optional : std::false_type {};
+template <typename T> struct is_optional<std::optional<T>> : std::true_type {};
+
+// write_field_schema: recursively write schema annotation for a field type.
+// Struct fields get :{f1,f2,...}, vector<struct> fields get :[{f1,f2,...}],
+// primitives get :type only in typed mode.
+template <typename FieldType>
+inline void write_field_schema(std::string& buf, bool typed) {
+    using T = std::decay_t<FieldType>;
+    if constexpr (AsonFields<T>::defined) {
+        // Nested struct: field:{f1,f2,...}
+        buf.push_back(':');
+        buf.push_back('{');
+        AsonFields<T>::write_schema(buf, typed);
+        buf.push_back('}');
+    } else if constexpr (is_vector<T>::value) {
+        using Elem = typename T::value_type;
+        if constexpr (AsonFields<Elem>::defined) {
+            // Vector of structs: field:[{f1,f2,...}]
+            buf.append(":[{", 3);
+            AsonFields<Elem>::write_schema(buf, typed);
+            buf.append("}]", 2);
+        } else if (typed) {
+            auto tn = TypeName<Elem>::value;
+            if (tn) { buf.push_back(':'); buf.push_back('['); buf.append(tn); buf.push_back(']'); }
+        }
+    } else if constexpr (is_optional<T>::value) {
+        using Inner = typename T::value_type;
+        if constexpr (AsonFields<Inner>::defined) {
+            buf.push_back(':');
+            buf.push_back('{');
+            AsonFields<Inner>::write_schema(buf, typed);
+            buf.push_back('}');
+        } else if (typed) {
+            auto tn = TypeName<Inner>::value;
+            if (tn) { buf.push_back(':'); buf.append(tn); }
+        }
+    } else if (typed) {
+        auto tn = TypeName<T>::value;
+        if (tn) { buf.push_back(':'); buf.append(tn); }
+    }
+}
 } // namespace detail
 
 // encode: struct -> ASON string  {field1,field2,...}:(val1,val2,...)
@@ -1373,8 +1415,7 @@ T decode_bin(std::string_view input) {
 #define ASON_SCHEMA_ITEM_1(idx, f) \
     if (idx > 0) buf.push_back(','); \
     buf.append(ASON_FIELD_NAME f); \
-    if (typed) { auto tn = ::ason::detail::TypeName<decltype(std::declval<Self>().ASON_FIELD_MEMBER f)>::value; \
-                 if (tn) { buf.push_back(':'); buf.append(tn); } }
+    ::ason::detail::write_field_schema<decltype(std::declval<Self>().ASON_FIELD_MEMBER f)>(buf, typed);
 
 // Per-field dump (idx-based, for use with ASON_FOR_EACH)
 #define ASON_DUMP_ITEM_1(idx, f) \

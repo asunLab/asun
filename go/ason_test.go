@@ -535,7 +535,7 @@ func TestEncodeTypedOptional(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(out2) != "{id:int,label,score}:(2,,)" {
+	if string(out2) != "{id:int,label:str,score:float}:(2,,)" {
 		t.Fatalf("got %q", out2)
 	}
 }
@@ -554,7 +554,7 @@ func TestEncodeTypedNestedStruct(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expect := "{name:str,dept,active:bool}:(Alice,(Engineering),true)"
+	expect := "{name:str,dept:{title:str},active:bool}:(Alice,(Engineering),true)"
 	if string(got) != expect {
 		t.Fatalf("got %q, want %q", got, expect)
 	}
