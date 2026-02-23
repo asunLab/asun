@@ -1,0 +1,58 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'io.ason'
+version = '1.0.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    sourceCompatibility = JavaVersion.toVersion(25)
+    targetCompatibility = JavaVersion.toVersion(25)
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.12.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    implementation 'com.google.code.gson:gson:2.11.0'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs += ['--add-modules', 'jdk.incubator.vector']
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+    jvmArgs += ['--add-modules', 'jdk.incubator.vector']
+    testLogging {
+        events 'PASSED', 'SKIPPED', 'FAILED'
+        showStandardStreams = true
+        exceptionFormat = 'full'
+    }
+}
+
+tasks.withType(JavaExec).configureEach {
+    jvmArgs += ['--add-modules', 'jdk.incubator.vector']
+}
+
+application {
+    mainClass = 'io.ason.examples.BasicExample'
+}
+
+// Example tasks
+['BasicExample', 'ComplexExample', 'BenchExample'].each { name ->
+    tasks.register("run${name}", JavaExec) {
+        group = 'application'
+        description = "Run ${name}"
+        classpath = sourceSets.main.runtimeClasspath
+        mainClass = "io.ason.examples.${name}"
+        jvmArgs += ['--add-modules', 'jdk.incubator.vector']
+    }
+}
