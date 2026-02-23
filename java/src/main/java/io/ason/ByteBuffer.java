@@ -4,33 +4,55 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 /**
- * Minimal resizable byte buffer for zero-copy ASON encoding.
- * Avoids StringBuilder and intermediate String allocations.
+ * Resizable byte buffer with ThreadLocal reuse for zero-allocation ASON encoding.
+ * Inspired by fastjson's SerializeWriter ThreadLocal buffer pattern.
  */
 final class ByteBuffer {
+    private static final int INITIAL_SIZE = 4096;
+    private static final int MAX_REUSE_SIZE = 1024 * 1024; // 1MB
+
+    private static final ThreadLocal<byte[]> BUF_LOCAL =
+            ThreadLocal.withInitial(() -> new byte[INITIAL_SIZE]);
+
     byte[] data;
     int len;
+    boolean hasNonAscii; // track if any non-ASCII byte was written
 
-    ByteBuffer(int initialCapacity) {
-        data = new byte[initialCapacity];
+    ByteBuffer() {
+        data = BUF_LOCAL.get();
         len = 0;
+        hasNonAscii = false;
+    }
+
+    ByteBuffer(int hint) {
+        byte[] cached = BUF_LOCAL.get();
+        data = (hint <= cached.length) ? cached : new byte[hint];
+        len = 0;
+        hasNonAscii = false;
+    }
+
+    /** Return buffer to ThreadLocal pool for reuse. */
+    void close() {
+        if (data.length <= MAX_REUSE_SIZE) {
+            BUF_LOCAL.set(data);
+        }
     }
 
     void ensureCapacity(int additional) {
         int required = len + additional;
         if (required > data.length) {
-            int newCap = Math.max(data.length * 2, required);
+            int newCap = Math.max(data.length << 1, required); // 2x growth
             data = Arrays.copyOf(data, newCap);
         }
     }
 
     void append(byte b) {
-        ensureCapacity(1);
+        if (len >= data.length) ensureCapacity(1);
         data[len++] = b;
     }
 
     void append(char c) {
-        ensureCapacity(1);
+        if (len >= data.length) ensureCapacity(1);
         data[len++] = (byte) c;
     }
 
@@ -42,7 +64,27 @@ final class ByteBuffer {
 
     void appendStr(String s) {
         byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
+        if (!hasNonAscii) {
+            for (byte b : bytes) { if (b < 0) { hasNonAscii = true; break; } }
+        }
         appendBytes(bytes, 0, bytes.length);
+    }
+
+    /** Write known-ASCII string by char iteration — avoids byte[] allocation. */
+    void appendAscii(String s) {
+        int slen = s.length();
+        ensureCapacity(slen);
+        for (int i = 0; i < slen; i++) {
+            data[len++] = (byte) s.charAt(i);
+        }
+    }
+
+    /** Write string chars directly to buffer — assumes all chars < 128 (ASCII). */
+    void appendCharsAsBytes(String s, int slen) {
+        ensureCapacity(slen);
+        for (int i = 0; i < slen; i++) {
+            data[len++] = (byte) s.charAt(i);
+        }
     }
 
     void appendLEU16(int v) {
@@ -76,6 +118,22 @@ final class ByteBuffer {
     }
 
     String toStringUtf8() {
-        return new String(data, 0, len, StandardCharsets.UTF_8);
+        return new String(data, 0, len,
+                hasNonAscii ? StandardCharsets.UTF_8 : StandardCharsets.ISO_8859_1);
+    }
+
+    /** Return string and recycle buffer to ThreadLocal pool. */
+    String toStringUtf8AndClose() {
+        String s = new String(data, 0, len,
+                hasNonAscii ? StandardCharsets.UTF_8 : StandardCharsets.ISO_8859_1);
+        close();
+        return s;
+    }
+
+    /** Return bytes and recycle buffer to ThreadLocal pool. */
+    byte[] toBytesAndClose() {
+        byte[] result = Arrays.copyOf(data, len);
+        close();
+        return result;
     }
 }

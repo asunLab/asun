@@ -1,5 +1,6 @@
 package io.ason;
 
+import io.ason.ClassMeta.FieldMeta;
 import java.lang.reflect.*;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -115,16 +116,11 @@ final class AsonBinary {
                 writeObject(buf, entry.getValue(), valClass, valType);
             }
         } else {
-            // Struct: write fields in order
-            Field[] fields = Ason.getFields(type);
-            for (Field f : fields) {
-                try {
-                    f.setAccessible(true);
-                    Object fv = f.get(value);
-                    writeObject(buf, fv, f.getType(), f.getGenericType());
-                } catch (IllegalAccessException e) {
-                    throw new AsonException("Failed to read field: " + f.getName(), e);
-                }
+            // Struct: write fields in order using ClassMeta
+            ClassMeta meta = ClassMeta.of(type);
+            for (FieldMeta fm : meta.fields) {
+                Object fv = fm.get(value);
+                writeObject(buf, fv, fm.type, fm.genericType);
             }
         }
     }
@@ -222,19 +218,14 @@ final class AsonBinary {
             return (T) map;
         }
 
-        // Struct: read fields in order
-        try {
-            T obj = type.getDeclaredConstructor().newInstance();
-            Field[] fields = Ason.getFields(type);
-            for (Field f : fields) {
-                f.setAccessible(true);
-                Object val = readObject(data, pos, f.getType(), f.getGenericType());
-                f.set(obj, val);
-            }
-            return obj;
-        } catch (ReflectiveOperationException e) {
-            throw new AsonException("Failed to create instance of " + type.getName(), e);
+        // Struct: read fields in order using ClassMeta
+        ClassMeta meta = ClassMeta.of(type);
+        Object obj = meta.newInstance();
+        for (FieldMeta fm : meta.fields) {
+            Object val = readObject(data, pos, fm.type, fm.genericType);
+            fm.set(obj, val);
         }
+        return (T) obj;
     }
 
     // ========================================================================

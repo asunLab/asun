@@ -1,16 +1,23 @@
 package io.ason;
 
+import io.ason.ClassMeta.FieldMeta;
 import java.lang.reflect.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
- * ASON text decoder — reflection-based, zero-copy where possible.
- * Parses both single struct ({schema}:(data)) and struct arrays ([{schema}]:(d1),(d2),...).
+ * ASON text decoder — MethodHandle-based, zero-copy where possible.
+ * Uses ClassMeta for fast field access via invokeExact.
  */
 final class AsonDecoder {
     private final byte[] input;
     private int pos;
+
+    // Direct double parsing: POW10[i] = 10^i
+    private static final double[] POW10 = {
+        1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9,
+        1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18
+    };
 
     AsonDecoder(byte[] input) {
         this.input = input;
@@ -23,26 +30,20 @@ final class AsonDecoder {
 
     <T> T decodeSingle(Class<T> clazz) {
         skipWhitespaceAndComments();
-        // Detect format: [{schema}]: or {schema}:
         if (pos < input.length && input[pos] == '[') {
-            // [{schema}]:(d1),(d2),... => take first element only
             List<T> list = decodeListInternal(clazz);
             if (list.isEmpty()) throw new AsonException("Empty array, cannot decode single");
             return list.getFirst();
         }
 
-        Field[] fields = Ason.getFields(clazz);
-        // Check if starts with {schema}:
+        ClassMeta meta = ClassMeta.of(clazz);
         if (pos < input.length && input[pos] == '{') {
-            // Parse and skip schema
             skipSchema();
             skipWhitespaceAndComments();
             expect(':');
             skipWhitespaceAndComments();
-        } else if (pos < input.length && input[pos] == '(') {
-            // Schema-less tuple: positional fields
         }
-        return parseTuple(clazz, fields);
+        return parseTuple(clazz, meta);
     }
 
     <T> List<T> decodeList(Class<T> clazz) {
@@ -50,36 +51,31 @@ final class AsonDecoder {
         return decodeListInternal(clazz);
     }
 
+    @SuppressWarnings("unchecked")
     private <T> List<T> decodeListInternal(Class<T> clazz) {
-        Field[] fields = Ason.getFields(clazz);
-        // [{schema}]:(d1),(d2),...
+        ClassMeta meta = ClassMeta.of(clazz);
         if (pos < input.length && input[pos] == '[') {
-            pos++; // skip '['
+            pos++;
             skipSchema();
-            skipWhitespaceAndComments();
+            skipWs();
             expect(']');
-            skipWhitespaceAndComments();
+            skipWs();
             expect(':');
-            skipWhitespaceAndComments();
+            skipWs();
 
-            List<T> result = new ArrayList<>();
+            // Pre-size ArrayList based on remaining input / estimated tuple size
+            int estimatedSize = Math.max(16, (input.length - pos) / (meta.fields.length * 5 + 3));
+            List<T> result = new ArrayList<>(estimatedSize);
             while (pos < input.length) {
-                skipWhitespaceAndComments();
+                if (pos < input.length && input[pos] <= ' ') skipWs();
                 if (pos >= input.length || input[pos] != '(') break;
-                result.add(parseTuple(clazz, fields));
-                skipWhitespaceAndComments();
-                if (pos < input.length && input[pos] == ',') {
-                    pos++;
-                }
+                result.add(parseTuple(clazz, meta));
+                if (pos < input.length && input[pos] == ',') pos++;
             }
             return result;
         }
         throw new AsonException("Expected '[' for list format");
     }
-
-    // ========================================================================
-    // Schema parsing (skip only — field mapping done by reflection)
-    // ========================================================================
 
     private void skipSchema() {
         expect('{');
@@ -92,50 +88,120 @@ final class AsonDecoder {
     }
 
     // ========================================================================
-    // Tuple parsing
+    // Tuple parsing — type-tag dispatched with invokeExact setters
     // ========================================================================
 
     @SuppressWarnings("unchecked")
-    private <T> T parseTuple(Class<T> clazz, Field[] fields) {
+    private <T> T parseTuple(Class<T> clazz, ClassMeta meta) {
         expect('(');
-        try {
-            T obj = clazz.getDeclaredConstructor().newInstance();
-            for (int i = 0; i < fields.length; i++) {
-                if (i > 0) {
-                    skipWhitespaceAndComments();
-                    if (pos < input.length && input[pos] == ',') {
-                        pos++;
-                    } else if (pos < input.length && input[pos] == ')') {
-                        break;
+        Object obj = meta.newInstance();
+        FieldMeta[] fields = meta.fields;
+        final byte[] inp = this.input; // local copy for JIT
+
+        for (int i = 0; i < fields.length; i++) {
+            if (i > 0) {
+                // Fast: check comma without ws skip first (compact format has no ws)
+                if (pos < inp.length && inp[pos] == ',') {
+                    pos++;
+                } else {
+                    skipWs();
+                    if (pos < inp.length && inp[pos] == ',') pos++;
+                    else if (pos < inp.length && inp[pos] == ')') break;
+                    else break;
+                }
+            }
+
+            // Skip whitespace before value (usually no-op for compact format)
+            if (pos < inp.length && inp[pos] <= ' ') skipWs();
+
+            FieldMeta fm = fields[i];
+            // Handle empty values
+            if (pos >= inp.length) continue;
+            byte b = inp[pos];
+            if (b == ',' || b == ')' || b == ']') continue;
+
+            switch (fm.typeTag) {
+                case FieldMeta.T_BOOLEAN -> {
+                    boolean v = parseBool();
+                    if (fm.isPrimitive) fm.setBoolean(obj, v);
+                    else fm.set(obj, v);
+                }
+                case FieldMeta.T_INT -> {
+                    int v = (int) parseLong();
+                    if (fm.isPrimitive) fm.setInt(obj, v);
+                    else fm.set(obj, v);
+                }
+                case FieldMeta.T_LONG -> {
+                    long v = parseLong();
+                    if (fm.isPrimitive) fm.setLong(obj, v);
+                    else fm.set(obj, v);
+                }
+                case FieldMeta.T_SHORT -> {
+                    short v = (short) parseLong();
+                    if (fm.isPrimitive) fm.setShort(obj, v);
+                    else fm.set(obj, v);
+                }
+                case FieldMeta.T_BYTE -> {
+                    byte v = (byte) parseLong();
+                    if (fm.isPrimitive) fm.setByte(obj, v);
+                    else fm.set(obj, v);
+                }
+                case FieldMeta.T_FLOAT -> {
+                    float v = (float) parseDoubleDirect();
+                    if (fm.isPrimitive) fm.setFloat(obj, v);
+                    else fm.set(obj, v);
+                }
+                case FieldMeta.T_DOUBLE -> {
+                    double v = parseDoubleDirect();
+                    if (fm.isPrimitive) fm.setDouble(obj, v);
+                    else fm.set(obj, v);
+                }
+                case FieldMeta.T_CHAR -> {
+                    String s = parseStringValue();
+                    char v = s.isEmpty() ? '\0' : s.charAt(0);
+                    if (fm.isPrimitive) fm.setChar(obj, v);
+                    else fm.set(obj, v);
+                }
+                case FieldMeta.T_STRING -> fm.set(obj, parseStringValue());
+                case FieldMeta.T_OPTIONAL -> {
+                    if (atValueEnd()) {
+                        fm.set(obj, Optional.empty());
+                    } else {
+                        Type innerType = fm.elemType != null ? fm.elemType : Object.class;
+                        Class<?> innerClass = fm.elemClass != null ? fm.elemClass : Object.class;
+                        Object inner = parseFieldValue(innerClass, innerType);
+                        fm.set(obj, Optional.ofNullable(inner));
                     }
                 }
-                skipWhitespaceAndComments();
-                Object value = parseFieldValue(fields[i].getType(), fields[i].getGenericType());
-                fields[i].setAccessible(true);
-                fields[i].set(obj, value);
+                case FieldMeta.T_LIST -> fm.set(obj, parseListField(fm));
+                case FieldMeta.T_MAP -> fm.set(obj, parseMap(fm.genericType));
+                default -> {
+                    // T_STRUCT
+                    if (inp[pos] == '(') {
+                        ClassMeta nested = fm.nestedMeta != null ? fm.nestedMeta : ClassMeta.of(fm.type);
+                        fm.set(obj, parseTuple(fm.type, nested));
+                    } else {
+                        fm.set(obj, parseFieldValue(fm.type, fm.genericType));
+                    }
+                }
             }
-            skipWhitespaceAndComments();
-            if (pos < input.length && input[pos] == ')') pos++;
-            return obj;
-        } catch (ReflectiveOperationException e) {
-            throw new AsonException("Failed to create instance of " + clazz.getName(), e);
         }
+        skipWs();
+        if (pos < inp.length && inp[pos] == ')') pos++;
+        return (T) obj;
     }
 
     // ========================================================================
-    // Value parsing
+    // Value parsing (for generic/nested contexts)
     // ========================================================================
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private Object parseFieldValue(Class<?> type, Type genericType) {
-        skipWhitespaceAndComments();
+        skipWs();
         if (pos >= input.length) return null;
 
-        // Optional<T>
         if (type == Optional.class) {
-            if (atValueEnd()) {
-                return Optional.empty();
-            }
+            if (atValueEnd()) return Optional.empty();
             Type innerType = Object.class;
             if (genericType instanceof ParameterizedType pt) {
                 innerType = pt.getActualTypeArguments()[0];
@@ -145,70 +211,36 @@ final class AsonDecoder {
             return Optional.ofNullable(inner);
         }
 
-        // Null/empty for value end
-        if (atValueEnd()) {
-            return defaultValue(type);
-        }
+        if (atValueEnd()) return defaultValue(type);
 
         byte b = input[pos];
 
-        // boolean
-        if (type == boolean.class || type == Boolean.class) {
-            return parseBool();
-        }
-
-        // Integer types
-        if (type == int.class || type == Integer.class) {
-            return (int) parseLong();
-        }
-        if (type == long.class || type == Long.class) {
-            return parseLong();
-        }
-        if (type == short.class || type == Short.class) {
-            return (short) parseLong();
-        }
-        if (type == byte.class || type == Byte.class) {
-            return (byte) parseLong();
-        }
-
-        // Float types
-        if (type == float.class || type == Float.class) {
-            return (float) parseDouble();
-        }
-        if (type == double.class || type == Double.class) {
-            return parseDouble();
-        }
-
-        // String
-        if (type == String.class) {
-            return parseStringValue();
-        }
-
-        // char
+        if (type == boolean.class || type == Boolean.class) return parseBool();
+        if (type == int.class || type == Integer.class) return (int) parseLong();
+        if (type == long.class || type == Long.class) return parseLong();
+        if (type == short.class || type == Short.class) return (short) parseLong();
+        if (type == byte.class || type == Byte.class) return (byte) parseLong();
+        if (type == float.class || type == Float.class) return (float) parseDoubleDirect();
+        if (type == double.class || type == Double.class) return parseDoubleDirect();
+        if (type == String.class) return parseStringValue();
         if (type == char.class || type == Character.class) {
             String s = parseStringValue();
             return s.isEmpty() ? '\0' : s.charAt(0);
         }
+        if (List.class.isAssignableFrom(type)) return parseList(genericType);
+        if (Map.class.isAssignableFrom(type)) return parseMap(genericType);
 
-        // List<T>
-        if (List.class.isAssignableFrom(type)) {
-            return parseList(genericType);
-        }
-
-        // Map<K,V>
-        if (Map.class.isAssignableFrom(type)) {
-            return parseMap(genericType);
-        }
-
-        // Nested struct
         if (b == '(') {
-            Field[] fields = Ason.getFields(type);
-            return parseTuple(type, fields);
+            ClassMeta nested = ClassMeta.of(type);
+            return parseTuple(type, nested);
         }
 
-        // Fallback: string
         return parseStringValue();
     }
+
+    // ========================================================================
+    // Primitive parsers
+    // ========================================================================
 
     private boolean parseBool() {
         if (pos + 4 <= input.length && input[pos] == 't' && input[pos + 1] == 'r'
@@ -240,30 +272,77 @@ final class AsonDecoder {
         return negative ? -val : val;
     }
 
-    private double parseDouble() {
+    /**
+     * Direct double parsing: avoids String allocation for simple decimals.
+     * Falls back to Double.parseDouble for scientific notation.
+     */
+    private double parseDoubleDirect() {
         int start = pos;
-        if (pos < input.length && input[pos] == '-') pos++;
-        while (pos < input.length && input[pos] >= '0' && input[pos] <= '9') pos++;
+        boolean negative = false;
+        if (pos < input.length && input[pos] == '-') { negative = true; pos++; }
+
+        long intPart = 0;
+        int intDigits = 0;
+        while (pos < input.length) {
+            int d = input[pos] - '0';
+            if (d < 0 || d > 9) break;
+            intPart = intPart * 10 + d;
+            pos++;
+            intDigits++;
+        }
+
         if (pos < input.length && input[pos] == '.') {
             pos++;
-            while (pos < input.length && input[pos] >= '0' && input[pos] <= '9') pos++;
+            long fracVal = 0;
+            int fracDigits = 0;
+            while (pos < input.length) {
+                int d = input[pos] - '0';
+                if (d < 0 || d > 9) break;
+                fracVal = fracVal * 10 + d;
+                pos++;
+                fracDigits++;
+            }
+            // Check for scientific notation
+            if (pos < input.length && (input[pos] == 'e' || input[pos] == 'E')) {
+                return parseDoubleFallback(start);
+            }
+            if (fracDigits > 0 && fracDigits < POW10.length) {
+                double v = intPart + fracVal / POW10[fracDigits];
+                return negative ? -v : v;
+            }
+            // Fallback for very long fractions
+            return parseDoubleFallback(start);
         }
-        // Scientific notation
+
+        // Check for scientific notation
+        if (pos < input.length && (input[pos] == 'e' || input[pos] == 'E')) {
+            return parseDoubleFallback(start);
+        }
+
+        if (intDigits == 0) throw new AsonException("Expected number at pos " + pos);
+        return negative ? -(double) intPart : (double) intPart;
+    }
+
+    private double parseDoubleFallback(int start) {
+        // Already advanced pos past some digits; continue scanning
         if (pos < input.length && (input[pos] == 'e' || input[pos] == 'E')) {
             pos++;
             if (pos < input.length && (input[pos] == '+' || input[pos] == '-')) pos++;
             while (pos < input.length && input[pos] >= '0' && input[pos] <= '9') pos++;
         }
-        if (pos == start) throw new AsonException("Expected number at pos " + pos);
         return Double.parseDouble(new String(input, start, pos - start, StandardCharsets.US_ASCII));
     }
 
+    // ========================================================================
+    // String parsing
+    // ========================================================================
+
     private String parseStringValue() {
-        skipWhitespaceAndComments();
-        if (pos >= input.length || atValueEnd()) return "";
-        if (input[pos] == '"') {
-            return parseQuotedString();
-        }
+        // Caller already skipped whitespace
+        if (pos >= input.length) return "";
+        byte b = input[pos];
+        if (b == ',' || b == ')' || b == ']') return "";
+        if (b == '"') return parseQuotedString();
         return parsePlainString();
     }
 
@@ -271,17 +350,20 @@ final class AsonDecoder {
         pos++; // skip '"'
         int start = pos;
 
-        // SIMD fast scan for closing quote or backslash
         int hit = SimdUtils.findQuoteOrBackslash(input, pos, input.length - pos);
         int hitPos = pos + hit;
         if (hitPos < input.length && input[hitPos] == '"') {
-            // No escapes — fast path
-            String s = new String(input, start, hitPos - start, StandardCharsets.UTF_8);
+            // Fast path: no escapes — check if ASCII-only for faster String construction
+            boolean ascii = true;
+            for (int i = start; i < hitPos; i++) {
+                if (input[i] < 0) { ascii = false; break; }
+            }
+            String s = new String(input, start, hitPos - start,
+                ascii ? StandardCharsets.ISO_8859_1 : StandardCharsets.UTF_8);
             pos = hitPos + 1;
             return s;
         }
 
-        // Slow path: has escapes
         StringBuilder sb = new StringBuilder(hitPos - start + 16);
         if (hitPos > start) {
             sb.append(new String(input, start, hitPos - start, StandardCharsets.UTF_8));
@@ -318,7 +400,6 @@ final class AsonDecoder {
                     default -> throw new AsonException("Invalid escape: \\" + (char) esc);
                 }
             } else {
-                // After escape, bulk scan for next special
                 int nextHit = SimdUtils.findQuoteOrBackslash(input, pos, input.length - pos);
                 int nextPos = pos + nextHit;
                 if (nextPos > pos) {
@@ -335,20 +416,63 @@ final class AsonDecoder {
 
     private String parsePlainString() {
         int start = pos;
+        boolean hasEscape = false;
+        boolean hasNonAscii = false;
         while (pos < input.length) {
             byte b = input[pos];
             if (b == ',' || b == ')' || b == ']') break;
-            if (b == '\\') {
-                pos += 2;
-            } else {
+            if (b == '\\') { hasEscape = true; pos += 2; }
+            else {
+                if (b < 0) hasNonAscii = true; // high bit set = non-ASCII UTF-8
                 pos++;
             }
         }
-        String raw = new String(input, start, pos - start, StandardCharsets.UTF_8).trim();
-        if (raw.contains("\\")) {
-            return unescapePlain(raw);
-        }
+        // Trim trailing whitespace (skip leading — already skipped by caller)
+        int end = pos;
+        while (end > start && (input[end - 1] == ' ' || input[end - 1] == '\t')) end--;
+        // Skip leading whitespace
+        int s = start;
+        while (s < end && (input[s] == ' ' || input[s] == '\t')) s++;
+
+        String raw = new String(input, s, end - s,
+            hasNonAscii ? StandardCharsets.UTF_8 : StandardCharsets.ISO_8859_1);
+        if (hasEscape) return unescapePlain(raw);
         return raw;
+    }
+
+    // ========================================================================
+    // Collection parsing
+    // ========================================================================
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private List<?> parseListField(FieldMeta fm) {
+        expect('[');
+        Class<?> elemClass = fm.elemClass != null ? fm.elemClass : Object.class;
+        Type elemType = fm.elemType != null ? fm.elemType : Object.class;
+        ClassMeta nestedMeta = fm.listElemMeta; // may be null for non-struct elements
+
+        List<Object> result = new ArrayList<>();
+        boolean first = true;
+        while (pos < input.length) {
+            skipWs();
+            if (pos < input.length && input[pos] == ']') { pos++; return result; }
+            if (!first) {
+                if (pos < input.length && input[pos] == ',') {
+                    pos++;
+                    skipWs();
+                    if (pos < input.length && input[pos] == ']') { pos++; return result; }
+                }
+            }
+            first = false;
+            skipWs();
+
+            if (nestedMeta != null && input[pos] == '(') {
+                result.add(parseTuple(elemClass, nestedMeta));
+            } else {
+                result.add(parseFieldValue(elemClass, elemType));
+            }
+        }
+        return result;
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -359,40 +483,34 @@ final class AsonDecoder {
             elemType = pt.getActualTypeArguments()[0];
         }
         Class<?> elemClass;
-        if (elemType instanceof Class<?> c) {
-            elemClass = c;
-        } else if (elemType instanceof ParameterizedType pt) {
-            elemClass = (Class<?>) pt.getRawType();
-        } else {
-            elemClass = Object.class;
-        }
+        if (elemType instanceof Class<?> c) { elemClass = c; }
+        else if (elemType instanceof ParameterizedType pt) { elemClass = (Class<?>) pt.getRawType(); }
+        else { elemClass = Object.class; }
+
         List<Object> result = new ArrayList<>();
         boolean first = true;
+
+        // Hoist struct checks and ClassMeta lookup out of the loop
+        boolean isStruct = !isPrimitive(elemClass)
+            && !List.class.isAssignableFrom(elemClass)
+            && !Map.class.isAssignableFrom(elemClass);
+        ClassMeta nestedMeta = isStruct ? ClassMeta.of(elemClass) : null;
+
         while (pos < input.length) {
-            skipWhitespaceAndComments();
-            if (pos < input.length && input[pos] == ']') {
-                pos++;
-                return result;
-            }
+            skipWs();
+            if (pos < input.length && input[pos] == ']') { pos++; return result; }
             if (!first) {
                 if (pos < input.length && input[pos] == ',') {
                     pos++;
-                    skipWhitespaceAndComments();
-                    if (pos < input.length && input[pos] == ']') {
-                        pos++;
-                        return result;
-                    }
+                    skipWs();
+                    if (pos < input.length && input[pos] == ']') { pos++; return result; }
                 }
             }
             first = false;
-            skipWhitespaceAndComments();
+            skipWs();
 
-            // Check if it might be a nested struct list [{schema}]
-            if (input[pos] == '(' && !isPrimitive(elemClass)
-                && !List.class.isAssignableFrom(elemClass)
-                && !Map.class.isAssignableFrom(elemClass)) {
-                Field[] fields = Ason.getFields(elemClass);
-                result.add(parseTuple(elemClass, fields));
+            if (nestedMeta != null && input[pos] == '(') {
+                result.add(parseTuple(elemClass, nestedMeta));
             } else {
                 result.add(parseFieldValue(elemClass, elemType));
             }
@@ -403,43 +521,35 @@ final class AsonDecoder {
     @SuppressWarnings("unchecked")
     private Map<?, ?> parseMap(Type genericType) {
         expect('[');
-        Type keyType = String.class;
-        Type valType = Object.class;
+        Type keyType = String.class, valType = Object.class;
         if (genericType instanceof ParameterizedType pt) {
             Type[] args = pt.getActualTypeArguments();
-            keyType = args[0];
-            valType = args[1];
+            keyType = args[0]; valType = args[1];
         }
         Class<?> keyClass = (keyType instanceof Class<?> c) ? c : String.class;
         Class<?> valClass = (valType instanceof Class<?> c) ? c : Object.class;
+
         Map<Object, Object> result = new LinkedHashMap<>();
         boolean first = true;
         while (pos < input.length) {
-            skipWhitespaceAndComments();
-            if (pos < input.length && input[pos] == ']') {
-                pos++;
-                return result;
-            }
+            skipWs();
+            if (pos < input.length && input[pos] == ']') { pos++; return result; }
             if (!first) {
                 if (pos < input.length && input[pos] == ',') {
                     pos++;
-                    skipWhitespaceAndComments();
-                    if (pos < input.length && input[pos] == ']') {
-                        pos++;
-                        return result;
-                    }
+                    skipWs();
+                    if (pos < input.length && input[pos] == ']') { pos++; return result; }
                 }
             }
             first = false;
-            // Expect (key,value)
             expect('(');
-            skipWhitespaceAndComments();
+            skipWs();
             Object key = parseFieldValue(keyClass, keyType);
-            skipWhitespaceAndComments();
+            skipWs();
             if (pos < input.length && input[pos] == ',') pos++;
-            skipWhitespaceAndComments();
+            skipWs();
             Object val = parseFieldValue(valClass, valType);
-            skipWhitespaceAndComments();
+            skipWs();
             if (pos < input.length && input[pos] == ')') pos++;
             result.put(key, val);
         }
@@ -447,30 +557,36 @@ final class AsonDecoder {
     }
 
     // ========================================================================
-    // Utility methods
+    // Utility
     // ========================================================================
 
     private void skipWhitespaceAndComments() {
         while (true) {
-            // Skip whitespace
             while (pos < input.length) {
                 byte b = input[pos];
+                if (b > ' ') break; // fast path: most chars > 0x20
                 if (b != ' ' && b != '\t' && b != '\n' && b != '\r') break;
                 pos++;
             }
-            // Skip /* ... */ comments
             if (pos + 1 < input.length && input[pos] == '/' && input[pos + 1] == '*') {
                 pos += 2;
                 while (pos + 1 < input.length) {
-                    if (input[pos] == '*' && input[pos + 1] == '/') {
-                        pos += 2;
-                        break;
-                    }
+                    if (input[pos] == '*' && input[pos + 1] == '/') { pos += 2; break; }
                     pos++;
                 }
             } else {
                 break;
             }
+        }
+    }
+
+    // Lean whitespace skip — no comment check (for hot paths)
+    private void skipWs() {
+        while (pos < input.length) {
+            byte b = input[pos];
+            if (b > ' ') return; // fast: most non-ws chars > 0x20
+            if (b != ' ' && b != '\t' && b != '\n' && b != '\r') return;
+            pos++;
         }
     }
 
@@ -532,10 +648,7 @@ final class AsonDecoder {
                             i += 4;
                         }
                     }
-                    default -> {
-                        sb.append('\\');
-                        sb.append(next);
-                    }
+                    default -> { sb.append('\\'); sb.append(next); }
                 }
             } else {
                 sb.append(c);

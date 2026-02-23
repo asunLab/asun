@@ -1,8 +1,8 @@
 package io.ason.examples;
 
 import io.ason.Ason;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.TypeReference;
 import java.util.*;
 
 public class BenchExample {
@@ -20,13 +20,18 @@ public class BenchExample {
         public boolean active;
         public String role;
         public String city;
-        public User() {}
-        @Override public boolean equals(Object o) {
-            if (!(o instanceof User u)) return false;
+
+        public User() {
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof User u))
+                return false;
             return id == u.id && age == u.age && active == u.active
-                && Double.compare(u.score, score) == 0
-                && Objects.equals(name, u.name) && Objects.equals(email, u.email)
-                && Objects.equals(role, u.role) && Objects.equals(city, u.city);
+                    && Double.compare(u.score, score) == 0
+                    && Objects.equals(name, u.name) && Objects.equals(email, u.email)
+                    && Objects.equals(role, u.role) && Objects.equals(city, u.city);
         }
     }
 
@@ -36,11 +41,16 @@ public class BenchExample {
         public long priority;
         public boolean done;
         public double hours;
-        public Task() {}
-        @Override public boolean equals(Object o) {
-            if (!(o instanceof Task t)) return false;
+
+        public Task() {
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof Task t))
+                return false;
             return id == t.id && priority == t.priority && done == t.done
-                && Double.compare(t.hours, hours) == 0 && Objects.equals(title, t.title);
+                    && Double.compare(t.hours, hours) == 0 && Objects.equals(title, t.title);
         }
     }
 
@@ -49,11 +59,17 @@ public class BenchExample {
         public double budget;
         public boolean active;
         public List<Task> tasks;
-        public Project() { tasks = new ArrayList<>(); }
-        @Override public boolean equals(Object o) {
-            if (!(o instanceof Project p)) return false;
+
+        public Project() {
+            tasks = new ArrayList<>();
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof Project p))
+                return false;
             return active == p.active && Double.compare(p.budget, budget) == 0
-                && Objects.equals(name, p.name) && Objects.equals(tasks, p.tasks);
+                    && Objects.equals(name, p.name) && Objects.equals(tasks, p.tasks);
         }
     }
 
@@ -62,11 +78,17 @@ public class BenchExample {
         public String lead;
         public long size;
         public List<Project> projects;
-        public Team() { projects = new ArrayList<>(); }
-        @Override public boolean equals(Object o) {
-            if (!(o instanceof Team t)) return false;
+
+        public Team() {
+            projects = new ArrayList<>();
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof Team t))
+                return false;
             return size == t.size && Objects.equals(name, t.name)
-                && Objects.equals(lead, t.lead) && Objects.equals(projects, t.projects);
+                    && Objects.equals(lead, t.lead) && Objects.equals(projects, t.projects);
         }
     }
 
@@ -75,11 +97,17 @@ public class BenchExample {
         public String location;
         public long headcount;
         public List<Team> teams;
-        public Division() { teams = new ArrayList<>(); }
-        @Override public boolean equals(Object o) {
-            if (!(o instanceof Division d)) return false;
+
+        public Division() {
+            teams = new ArrayList<>();
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof Division d))
+                return false;
             return headcount == d.headcount && Objects.equals(name, d.name)
-                && Objects.equals(location, d.location) && Objects.equals(teams, d.teams);
+                    && Objects.equals(location, d.location) && Objects.equals(teams, d.teams);
         }
     }
 
@@ -90,13 +118,20 @@ public class BenchExample {
         public boolean isPublic;
         public List<Division> divisions;
         public List<String> tags;
-        public Company() { divisions = new ArrayList<>(); tags = new ArrayList<>(); }
-        @Override public boolean equals(Object o) {
-            if (!(o instanceof Company c)) return false;
+
+        public Company() {
+            divisions = new ArrayList<>();
+            tags = new ArrayList<>();
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof Company c))
+                return false;
             return founded == c.founded && isPublic == c.isPublic
-                && Double.compare(c.revenueM, revenueM) == 0
-                && Objects.equals(name, c.name) && Objects.equals(divisions, c.divisions)
-                && Objects.equals(tags, c.tags);
+                    && Double.compare(c.revenueM, revenueM) == 0
+                    && Objects.equals(name, c.name) && Objects.equals(divisions, c.divisions)
+                    && Objects.equals(tags, c.tags);
         }
     }
 
@@ -104,9 +139,9 @@ public class BenchExample {
     // Data generators
     // ========================================================================
 
-    static final String[] NAMES = {"Alice", "Bob", "Carol", "David", "Eve", "Frank", "Grace", "Hank"};
-    static final String[] ROLES = {"engineer", "designer", "manager", "analyst"};
-    static final String[] CITIES = {"NYC", "LA", "Chicago", "Houston", "Phoenix"};
+    static final String[] NAMES = { "Alice", "Bob", "Carol", "David", "Eve", "Frank", "Grace", "Hank" };
+    static final String[] ROLES = { "engineer", "designer", "manager", "analyst" };
+    static final String[] CITIES = { "NYC", "LA", "Chicago", "Houston", "Phoenix" };
 
     static List<User> generateUsers(int n) {
         List<User> users = new ArrayList<>(n);
@@ -126,7 +161,7 @@ public class BenchExample {
     }
 
     static List<Company> generateCompanies(int n) {
-        String[] locs = {"NYC", "London", "Tokyo", "Berlin"};
+        String[] locs = { "NYC", "London", "Tokyo", "Berlin" };
         List<Company> companies = new ArrayList<>(n);
         for (int i = 0; i < n; i++) {
             Company co = new Company();
@@ -175,12 +210,16 @@ public class BenchExample {
     // ========================================================================
 
     static String formatBytes(long b) {
-        if (b >= 1048576) return String.format("%.1f MB", b / 1048576.0);
-        if (b >= 1024) return String.format("%.1f KB", b / 1024.0);
+        if (b >= 1048576)
+            return String.format("%.1f MB", b / 1048576.0);
+        if (b >= 1024)
+            return String.format("%.1f KB", b / 1024.0);
         return b + " B";
     }
 
-    static final Gson GSON = new Gson();
+    // FastJSON2 doesn't need a static instance for basic usage, but we can use JSON
+    // class directly.
+    // Or we can define a JSONWriter.Feature if needed.
 
     // ========================================================================
     // Benchmark runners
@@ -192,34 +231,38 @@ public class BenchExample {
         // JSON serialize
         long start = System.nanoTime();
         String jsonStr = "";
-        for (int i = 0; i < iterations; i++) jsonStr = GSON.toJson(users);
+        for (int i = 0; i < iterations; i++)
+            jsonStr = JSON.toJSONString(users);
         double jsonSerMs = (System.nanoTime() - start) / 1e6;
 
         // ASON serialize
         start = System.nanoTime();
         String asonStr = "";
-        for (int i = 0; i < iterations; i++) asonStr = Ason.encode(new ArrayList<>(users));
+        for (int i = 0; i < iterations; i++)
+            asonStr = Ason.encode(users);
         double asonSerMs = (System.nanoTime() - start) / 1e6;
 
         // JSON deserialize
-        var userListType = new TypeToken<List<User>>() {}.getType();
         start = System.nanoTime();
         for (int i = 0; i < iterations; i++) {
-            List<User> r = GSON.fromJson(jsonStr, userListType);
+            List<User> r = JSON.parseObject(jsonStr, new TypeReference<List<User>>() {
+            });
         }
         double jsonDeMs = (System.nanoTime() - start) / 1e6;
 
-        // ASON deserialize
+        // ASON deserialize (byte[] API avoids String→byte[] per iteration)
+        byte[] asonBytes = asonStr.getBytes(java.nio.charset.StandardCharsets.UTF_8);
         start = System.nanoTime();
         for (int i = 0; i < iterations; i++) {
-            List<User> r = Ason.decodeList(asonStr, User.class);
+            List<User> r = Ason.decodeList(asonBytes, User.class);
         }
         double asonDeMs = (System.nanoTime() - start) / 1e6;
 
         // Binary
         start = System.nanoTime();
         byte[] binBuf = new byte[0];
-        for (int i = 0; i < iterations; i++) binBuf = Ason.encodeBinary(new ArrayList<>(users));
+        for (int i = 0; i < iterations; i++)
+            binBuf = Ason.encodeBinary(users);
         double binSerMs = (System.nanoTime() - start) / 1e6;
 
         start = System.nanoTime();
@@ -229,18 +272,18 @@ public class BenchExample {
         double binDeMs = (System.nanoTime() - start) / 1e6;
 
         double serRatio = jsonSerMs / asonSerMs;
-        double deRatio  = jsonDeMs / asonDeMs;
+        double deRatio = jsonDeMs / asonDeMs;
         double saving = (1.0 - (double) asonStr.length() / jsonStr.length()) * 100;
         double binSaving = (1.0 - (double) binBuf.length / jsonStr.length()) * 100;
 
         System.out.printf("  Flat struct × %d (%d fields)%n", count, 8);
         System.out.printf("    Serialize:   JSON %8.2fms | ASON %8.2fms | ratio %.2fx %s%n",
-            jsonSerMs, asonSerMs, serRatio, serRatio >= 1 ? "✓ ASON faster" : "");
+                jsonSerMs, asonSerMs, serRatio, serRatio >= 1 ? "✓ ASON faster" : "");
         System.out.printf("    Deserialize: JSON %8.2fms | ASON %8.2fms | ratio %.2fx %s%n",
-            jsonDeMs, asonDeMs, deRatio, deRatio >= 1 ? "✓ ASON faster" : "");
+                jsonDeMs, asonDeMs, deRatio, deRatio >= 1 ? "✓ ASON faster" : "");
         System.out.printf("    BIN ser: %8.2fms | BIN de: %8.2fms%n", binSerMs, binDeMs);
         System.out.printf("    Size: JSON %8d B | ASON %8d B (%.0f%% smaller) | BIN %8d B (%.0f%% smaller)%n",
-            jsonStr.length(), asonStr.length(), saving, binBuf.length, binSaving);
+                jsonStr.length(), asonStr.length(), saving, binBuf.length, binSaving);
         System.out.println();
     }
 
@@ -249,30 +292,34 @@ public class BenchExample {
 
         long start = System.nanoTime();
         String jsonStr = "";
-        for (int i = 0; i < iterations; i++) jsonStr = GSON.toJson(companies);
+        for (int i = 0; i < iterations; i++)
+            jsonStr = JSON.toJSONString(companies);
         double jsonSerMs = (System.nanoTime() - start) / 1e6;
 
         start = System.nanoTime();
         String asonStr = "";
-        for (int i = 0; i < iterations; i++) asonStr = Ason.encode(new ArrayList<>(companies));
+        for (int i = 0; i < iterations; i++)
+            asonStr = Ason.encode(companies);
         double asonSerMs = (System.nanoTime() - start) / 1e6;
 
-        var companyListType = new TypeToken<List<Company>>() {}.getType();
         start = System.nanoTime();
         for (int i = 0; i < iterations; i++) {
-            List<Company> r = GSON.fromJson(jsonStr, companyListType);
+            List<Company> r = JSON.parseObject(jsonStr, new TypeReference<List<Company>>() {
+            });
         }
         double jsonDeMs = (System.nanoTime() - start) / 1e6;
 
+        byte[] asonBytes = asonStr.getBytes(java.nio.charset.StandardCharsets.UTF_8);
         start = System.nanoTime();
         for (int i = 0; i < iterations; i++) {
-            List<Company> r = Ason.decodeList(asonStr, Company.class);
+            List<Company> r = Ason.decodeList(asonBytes, Company.class);
         }
         double asonDeMs = (System.nanoTime() - start) / 1e6;
 
         start = System.nanoTime();
         byte[] binBuf = new byte[0];
-        for (int i = 0; i < iterations; i++) binBuf = Ason.encodeBinary(new ArrayList<>(companies));
+        for (int i = 0; i < iterations; i++)
+            binBuf = Ason.encodeBinary(companies);
         double binSerMs = (System.nanoTime() - start) / 1e6;
 
         start = System.nanoTime();
@@ -288,56 +335,61 @@ public class BenchExample {
 
         System.out.printf("  Deep struct × %d (5-level nested, ~48 nodes each)%n", count);
         System.out.printf("    Serialize:   JSON %8.2fms | ASON %8.2fms | ratio %.2fx %s%n",
-            jsonSerMs, asonSerMs, serRatio, serRatio >= 1 ? "✓ ASON faster" : "");
+                jsonSerMs, asonSerMs, serRatio, serRatio >= 1 ? "✓ ASON faster" : "");
         System.out.printf("    Deserialize: JSON %8.2fms | ASON %8.2fms | ratio %.2fx %s%n",
-            jsonDeMs, asonDeMs, deRatio, deRatio >= 1 ? "✓ ASON faster" : "");
+                jsonDeMs, asonDeMs, deRatio, deRatio >= 1 ? "✓ ASON faster" : "");
         System.out.printf("    BIN ser: %8.2fms | BIN de: %8.2fms%n", binSerMs, binDeMs);
         System.out.printf("    Size: JSON %8d B | ASON %8d B (%.0f%% smaller) | BIN %8d B (%.0f%% smaller)%n",
-            jsonStr.length(), asonStr.length(), saving, binBuf.length, binSaving);
+                jsonStr.length(), asonStr.length(), saving, binBuf.length, binSaving);
         System.out.println();
     }
 
     static void benchSingleRoundtrip(int iterations) {
         User user = new User();
-        user.id = 1; user.name = "Alice"; user.email = "alice@example.com";
-        user.age = 30; user.score = 95.5; user.active = true;
-        user.role = "engineer"; user.city = "NYC";
+        user.id = 1;
+        user.name = "Alice";
+        user.email = "alice@example.com";
+        user.age = 30;
+        user.score = 95.5;
+        user.active = true;
+        user.role = "engineer";
+        user.city = "NYC";
 
         long start = System.nanoTime();
         for (int i = 0; i < iterations; i++) {
             String s = Ason.encode(user);
-            Ason.decode(s, User.class);
+            Ason.decode(s.getBytes(java.nio.charset.StandardCharsets.UTF_8), User.class);
         }
         double asonMs = (System.nanoTime() - start) / 1e6;
 
         start = System.nanoTime();
         for (int i = 0; i < iterations; i++) {
-            String s = GSON.toJson(user);
-            GSON.fromJson(s, User.class);
+            String s = JSON.toJSONString(user);
+            JSON.parseObject(s, User.class);
         }
         double jsonMs = (System.nanoTime() - start) / 1e6;
 
         System.out.printf("  Flat:  ASON %6.2fms | JSON %6.2fms | ratio %.2fx%n",
-            asonMs, jsonMs, jsonMs / asonMs);
+                asonMs, jsonMs, jsonMs / asonMs);
 
         // Deep single
         Company company = generateCompanies(1).getFirst();
         start = System.nanoTime();
         for (int i = 0; i < iterations; i++) {
             String s = Ason.encode(company);
-            Ason.decode(s, Company.class);
+            Ason.decode(s.getBytes(java.nio.charset.StandardCharsets.UTF_8), Company.class);
         }
         asonMs = (System.nanoTime() - start) / 1e6;
 
         start = System.nanoTime();
         for (int i = 0; i < iterations; i++) {
-            String s = GSON.toJson(company);
-            GSON.fromJson(s, Company.class);
+            String s = JSON.toJSONString(company);
+            JSON.parseObject(s, Company.class);
         }
         jsonMs = (System.nanoTime() - start) / 1e6;
 
         System.out.printf("  Deep:  ASON %6.2fms | JSON %6.2fms | ratio %.2fx%n",
-            asonMs, jsonMs, jsonMs / asonMs);
+                asonMs, jsonMs, jsonMs / asonMs);
     }
 
     // ========================================================================
@@ -346,12 +398,12 @@ public class BenchExample {
 
     public static void main(String[] args) {
         System.out.println("╔══════════════════════════════════════════════════════════════╗");
-        System.out.println("║          ASON vs JSON (Gson) Benchmark — Java               ║");
+        System.out.println("║          ASON vs JSON (FastJSON2) Benchmark — Java            ║");
         System.out.println("╚══════════════════════════════════════════════════════════════╝");
 
         System.out.printf("%nSystem: %s %s | JDK %s%n",
-            System.getProperty("os.name"), System.getProperty("os.arch"),
-            System.getProperty("java.version"));
+                System.getProperty("os.name"), System.getProperty("os.arch"),
+                System.getProperty("java.version"));
 
         Runtime rt = Runtime.getRuntime();
         long memBefore = rt.totalMemory() - rt.freeMemory();
@@ -360,11 +412,34 @@ public class BenchExample {
         int iterations = 100;
         System.out.println("Iterations per test: " + iterations);
 
+        // Warmup: trigger JIT compilation for both ASON and FastJSON2
+        System.out.println("Warming up JIT...");
+        List<User> warmUsers = generateUsers(100);
+        byte[] warmAsonFlatBytes = Ason.encode(warmUsers).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        for (int i = 0; i < 1000; i++) {
+            JSON.toJSONString(warmUsers);
+            Ason.encode(warmUsers);
+            JSON.parseObject(JSON.toJSONString(warmUsers), new TypeReference<List<User>>() {});
+            Ason.decodeList(warmAsonFlatBytes, User.class);
+        }
+        // Warmup deep struct encode+decode paths
+        List<Company> warmCos = generateCompanies(10);
+        String warmAsonDeep = Ason.encode(warmCos);
+        byte[] warmAsonDeepBytes = warmAsonDeep.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        String warmJsonDeep = JSON.toJSONString(warmCos);
+        for (int i = 0; i < 500; i++) {
+            JSON.toJSONString(warmCos);
+            Ason.encode(warmCos);
+            JSON.parseArray(warmJsonDeep, Company.class);
+            Ason.decodeList(warmAsonDeepBytes, Company.class);
+        }
+        System.out.println("Warmup complete.\n");
+
         // Section 1: Flat struct
         System.out.println("\n┌─────────────────────────────────────────────┐");
         System.out.println("│  Section 1: Flat Struct (schema-driven vec) │");
         System.out.println("└─────────────────────────────────────────────┘");
-        for (int count : new int[]{100, 500, 1000, 5000}) {
+        for (int count : new int[] { 100, 500, 1000, 5000 }) {
             benchFlat(count, iterations);
         }
 
@@ -372,7 +447,7 @@ public class BenchExample {
         System.out.println("┌──────────────────────────────────────────────────────────┐");
         System.out.println("│  Section 2: 5-Level Deep Nesting (Company hierarchy)     │");
         System.out.println("└──────────────────────────────────────────────────────────┘");
-        for (int count : new int[]{10, 50, 100}) {
+        for (int count : new int[] { 10, 50, 100 }) {
             benchDeep(count, iterations);
         }
 
@@ -387,39 +462,45 @@ public class BenchExample {
         System.out.println("│  Section 4: Throughput Summary               │");
         System.out.println("└──────────────────────────────────────────────┘");
         List<User> users1k = generateUsers(1000);
-        String jsonStr1k = GSON.toJson(users1k);
-        String asonStr1k = Ason.encode(new ArrayList<>(users1k));
+        String jsonStr1k = JSON.toJSONString(users1k);
+        String asonStr1k = Ason.encode(users1k);
         int iters = 100;
-        var userListType = new TypeToken<List<User>>() {}.getType();
 
         long start = System.nanoTime();
-        for (int i = 0; i < iters; i++) GSON.toJson(users1k);
+        for (int i = 0; i < iters; i++)
+            JSON.toJSONString(users1k);
         double jsonSerDur = (System.nanoTime() - start) / 1e9;
 
         start = System.nanoTime();
-        for (int i = 0; i < iters; i++) Ason.encode(new ArrayList<>(users1k));
+        for (int i = 0; i < iters; i++)
+            Ason.encode(users1k);
         double asonSerDur = (System.nanoTime() - start) / 1e9;
 
         start = System.nanoTime();
-        for (int i = 0; i < iters; i++) { List<User> r = GSON.fromJson(jsonStr1k, userListType); }
+        for (int i = 0; i < iters; i++) {
+            List<User> r = JSON.parseObject(jsonStr1k, new TypeReference<List<User>>() {
+            });
+        }
         double jsonDeDur = (System.nanoTime() - start) / 1e9;
 
+        byte[] asonBytes1k = asonStr1k.getBytes(java.nio.charset.StandardCharsets.UTF_8);
         start = System.nanoTime();
-        for (int i = 0; i < iters; i++) Ason.decodeList(asonStr1k, User.class);
+        for (int i = 0; i < iters; i++)
+            Ason.decodeList(asonBytes1k, User.class);
         double asonDeDur = (System.nanoTime() - start) / 1e9;
 
         double totalRecords = 1000.0 * iters;
         System.out.printf("  Serialize throughput (1000 records × %d iters):%n", iters);
         System.out.printf("    JSON: %.0f records/s  (%.1f MB/s)%n",
-            totalRecords / jsonSerDur, jsonStr1k.length() * (double) iters / jsonSerDur / 1048576);
+                totalRecords / jsonSerDur, jsonStr1k.length() * (double) iters / jsonSerDur / 1048576);
         System.out.printf("    ASON: %.0f records/s  (%.1f MB/s)%n",
-            totalRecords / asonSerDur, asonStr1k.length() * (double) iters / asonSerDur / 1048576);
+                totalRecords / asonSerDur, asonStr1k.length() * (double) iters / asonSerDur / 1048576);
         System.out.printf("    Speed: %.2fx%n", (totalRecords / asonSerDur) / (totalRecords / jsonSerDur));
         System.out.printf("  Deserialize throughput:%n");
         System.out.printf("    JSON: %.0f records/s  (%.1f MB/s)%n",
-            totalRecords / jsonDeDur, jsonStr1k.length() * (double) iters / jsonDeDur / 1048576);
+                totalRecords / jsonDeDur, jsonStr1k.length() * (double) iters / jsonDeDur / 1048576);
         System.out.printf("    ASON: %.0f records/s  (%.1f MB/s)%n",
-            totalRecords / asonDeDur, asonStr1k.length() * (double) iters / asonDeDur / 1048576);
+                totalRecords / asonDeDur, asonStr1k.length() * (double) iters / asonDeDur / 1048576);
         System.out.printf("    Speed: %.2fx%n", (totalRecords / asonDeDur) / (totalRecords / jsonDeDur));
 
         // Memory

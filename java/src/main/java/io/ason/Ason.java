@@ -1,121 +1,120 @@
 package io.ason;
 
+import io.ason.ClassMeta.FieldMeta;
 import java.lang.reflect.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
  * ASON (Array-Schema Object Notation) — Java implementation.
- * <p>
- * High-performance, reflection-based serialization with SIMD acceleration.
- * <p>
- * Public API:
- * <ul>
- *   <li>{@link #encode(Object)} — ASON text (untyped schema)</li>
- *   <li>{@link #encodeTyped(Object)} — ASON text (with type annotations)</li>
- *   <li>{@link #decode(String, Class)} — single struct from ASON text</li>
- *   <li>{@link #decodeList(String, Class)} — list of structs from ASON text</li>
- *   <li>{@link #encodeBinary(Object)} — ASON binary</li>
- *   <li>{@link #decodeBinary(byte[], Class)} — single struct from ASON binary</li>
- *   <li>{@link #decodeBinaryList(byte[], Class)} — list of structs from ASON binary</li>
- * </ul>
+ * High-performance encoder with ClassMeta pre-computed metadata,
+ * MethodHandle invokeExact, and single-pass fused string writing.
  */
 public final class Ason {
 
     private Ason() {}
+
+    private static final byte[] TRUE_BYTES  = {'t','r','u','e'};
+    private static final byte[] FALSE_BYTES = {'f','a','l','s','e'};
+    private static final byte[] EMPTY_SCHEMA = {'[','{','}',']',':'};
+    private static final byte[] HEX = "0123456789abcdef".getBytes(StandardCharsets.US_ASCII);
+
+    // Character classification table for writeString fast path (0-127)
+    // 0 = normal (pass-through), 1 = needs quoting (special ASON delimiters)
+    private static final byte[] CHAR_CLASS = new byte[128];
+    static {
+        // Control chars
+        for (int i = 0; i < 0x20; i++) CHAR_CLASS[i] = 1;
+        // ASON delimiters
+        CHAR_CLASS[','] = 1; CHAR_CLASS['('] = 1; CHAR_CLASS[')'] = 1;
+        CHAR_CLASS['['] = 1; CHAR_CLASS[']'] = 1;
+        CHAR_CLASS['"'] = 1; CHAR_CLASS['\\'] = 1;
+    }
 
     // ========================================================================
     // Text Encode
     // ========================================================================
 
     public static String encode(Object value) {
-        if (value instanceof List<?> list) {
-            return encodeList(list, false);
-        }
+        if (value instanceof List<?> list) return encodeList(list, false);
         return encodeSingle(value, false);
     }
 
     public static String encodeTyped(Object value) {
-        if (value instanceof List<?> list) {
-            return encodeList(list, true);
-        }
+        if (value instanceof List<?> list) return encodeList(list, true);
         return encodeSingle(value, true);
     }
 
     private static String encodeSingle(Object value, boolean typed) {
-        ByteBuffer buf = new ByteBuffer(256);
-        Class<?> clazz = value.getClass();
-        Field[] fields = getFields(clazz);
-        buf.append('{');
-        writeSchemaFields(buf, fields, typed, value);
-        buf.appendStr("}:");
-        writeTuple(buf, value, fields);
-        return buf.toStringUtf8();
+        ByteBuffer buf = new ByteBuffer();
+        ClassMeta meta = ClassMeta.of(value.getClass());
+        if (typed) {
+            buf.append('{');
+            writeSchemaFieldsTyped(buf, meta.fields, value);
+            buf.append('}');
+        } else {
+            buf.appendBytes(meta.schemaBytes, 0, meta.schemaBytes.length);
+        }
+        buf.append(':');
+        writeTuple(buf, value, meta);
+        return buf.toStringUtf8AndClose();
     }
 
     private static String encodeList(List<?> list, boolean typed) {
-        ByteBuffer buf = new ByteBuffer(256);
+        ByteBuffer buf = new ByteBuffer();
         if (list.isEmpty()) {
-            buf.appendStr("[{}]:");
-            return buf.toStringUtf8();
+            buf.appendBytes(EMPTY_SCHEMA, 0, 5);
+            return buf.toStringUtf8AndClose();
         }
         Object first = list.getFirst();
-        Class<?> clazz = first.getClass();
-        Field[] fields = getFields(clazz);
-        buf.appendStr("[{");
-        writeSchemaFields(buf, fields, typed, first);
-        buf.appendStr("}]:");
+        ClassMeta meta = ClassMeta.of(first.getClass());
+        if (typed) {
+            buf.append('['); buf.append('{');
+            writeSchemaFieldsTyped(buf, meta.fields, first);
+            buf.append('}'); buf.append(']');
+        } else {
+            buf.appendBytes(meta.schemaBytesVec, 0, meta.schemaBytesVec.length);
+        }
+        buf.append(':');
         for (int i = 0; i < list.size(); i++) {
             if (i > 0) buf.append(',');
-            writeTuple(buf, list.get(i), fields);
+            writeTuple(buf, list.get(i), meta);
         }
-        return buf.toStringUtf8();
+        return buf.toStringUtf8AndClose();
     }
 
-    private static void writeSchemaFields(ByteBuffer buf, Field[] fields, boolean typed, Object sampleValue) {
+    private static void writeSchemaFieldsTyped(ByteBuffer buf, FieldMeta[] fields, Object sample) {
         for (int i = 0; i < fields.length; i++) {
             if (i > 0) buf.append(',');
-            buf.appendStr(fields[i].getName());
-            if (typed) {
-                String hint = typeHint(fields[i], sampleValue);
-                if (hint != null) {
-                    buf.append(':');
-                    buf.appendStr(hint);
-                }
-            }
+            FieldMeta fm = fields[i];
+            buf.appendBytes(fm.nameBytes, 0, fm.nameBytes.length);
+            String hint = typeHintField(fm, sample);
+            if (hint != null) { buf.append(':'); buf.appendAscii(hint); }
         }
     }
 
-    private static String typeHint(Field f, Object sample) {
-        Class<?> type = f.getType();
-        if (type == boolean.class || type == Boolean.class) return "bool";
-        if (type == int.class || type == Integer.class || type == long.class || type == Long.class
-            || type == short.class || type == Short.class || type == byte.class || type == Byte.class) return "int";
-        if (type == float.class || type == Float.class || type == double.class || type == Double.class) return "float";
-        if (type == String.class || type == char.class || type == Character.class) return "str";
-        if (type == Optional.class) {
-            // Check if it has a value for type hint
-            try {
-                f.setAccessible(true);
-                Object val = f.get(sample);
-                if (val instanceof Optional<?> opt && opt.isPresent()) {
-                    Object inner = opt.get();
-                    return typeHintForValue(inner);
-                }
-            } catch (Exception e) { /* ignore */ }
-            return null;
-        }
-        if (List.class.isAssignableFrom(type)) {
-            Type genType = f.getGenericType();
-            if (genType instanceof ParameterizedType pt) {
-                Type arg = pt.getActualTypeArguments()[0];
-                String inner = typeHintForType(arg);
-                if (inner != null) return "[" + inner + "]";
+    private static String typeHintField(FieldMeta fm, Object sample) {
+        return switch (fm.typeTag) {
+            case FieldMeta.T_BOOLEAN -> "bool";
+            case FieldMeta.T_INT, FieldMeta.T_LONG, FieldMeta.T_SHORT, FieldMeta.T_BYTE -> "int";
+            case FieldMeta.T_FLOAT, FieldMeta.T_DOUBLE -> "float";
+            case FieldMeta.T_STRING, FieldMeta.T_CHAR -> "str";
+            case FieldMeta.T_OPTIONAL -> {
+                try {
+                    Object val = fm.get(sample);
+                    if (val instanceof Optional<?> opt && opt.isPresent()) yield typeHintForValue(opt.get());
+                } catch (Exception e) { /* ignore */ }
+                yield null;
             }
-            return null;
-        }
-        // Nested struct — no simple type hint
-        return null;
+            case FieldMeta.T_LIST -> {
+                if (fm.elemType != null) {
+                    String inner = typeHintForType(fm.elemType);
+                    if (inner != null) yield "[" + inner + "]";
+                }
+                yield null;
+            }
+            default -> null;
+        };
     }
 
     private static String typeHintForValue(Object val) {
@@ -144,102 +143,148 @@ public final class Ason {
         return null;
     }
 
-    private static void writeTuple(ByteBuffer buf, Object value, Field[] fields) {
+    // ========================================================================
+    // Tuple writing — type-tag dispatched, no boxing for primitives
+    // ========================================================================
+
+    @SuppressWarnings("unchecked")
+    private static void writeTuple(ByteBuffer buf, Object obj, ClassMeta meta) {
         buf.append('(');
+        FieldMeta[] fields = meta.fields;
         for (int i = 0; i < fields.length; i++) {
             if (i > 0) buf.append(',');
-            try {
-                fields[i].setAccessible(true);
-                Object fv = fields[i].get(value);
-                writeFieldValue(buf, fv, fields[i].getType(), fields[i].getGenericType());
-            } catch (Exception e) {
-                throw new AsonException("Failed to read field: " + fields[i].getName(), e);
+            FieldMeta fm = fields[i];
+            switch (fm.typeTag) {
+                case FieldMeta.T_BOOLEAN -> {
+                    if (fm.isPrimitive) {
+                        boolean v = fm.getBoolean(obj);
+                        buf.appendBytes(v ? TRUE_BYTES : FALSE_BYTES, 0, v ? 4 : 5);
+                    } else {
+                        Object v = fm.get(obj);
+                        if (v != null) { boolean bv = (Boolean) v; buf.appendBytes(bv ? TRUE_BYTES : FALSE_BYTES, 0, bv ? 4 : 5); }
+                    }
+                }
+                case FieldMeta.T_INT -> {
+                    if (fm.isPrimitive) writeInt(buf, fm.getInt(obj));
+                    else { Object v = fm.get(obj); if (v != null) writeInt(buf, (Integer) v); }
+                }
+                case FieldMeta.T_LONG -> {
+                    if (fm.isPrimitive) writeLong(buf, fm.getLong(obj));
+                    else { Object v = fm.get(obj); if (v != null) writeLong(buf, (Long) v); }
+                }
+                case FieldMeta.T_SHORT -> {
+                    if (fm.isPrimitive) writeInt(buf, fm.getShort(obj));
+                    else { Object v = fm.get(obj); if (v != null) writeInt(buf, (Short) v); }
+                }
+                case FieldMeta.T_BYTE -> {
+                    if (fm.isPrimitive) writeInt(buf, fm.getByte(obj));
+                    else { Object v = fm.get(obj); if (v != null) writeInt(buf, (Byte) v); }
+                }
+                case FieldMeta.T_FLOAT -> {
+                    if (fm.isPrimitive) writeFloat(buf, fm.getFloat(obj));
+                    else { Object v = fm.get(obj); if (v != null) writeFloat(buf, (Float) v); }
+                }
+                case FieldMeta.T_DOUBLE -> {
+                    if (fm.isPrimitive) writeDouble(buf, fm.getDouble(obj));
+                    else { Object v = fm.get(obj); if (v != null) writeDouble(buf, (Double) v); }
+                }
+                case FieldMeta.T_CHAR -> {
+                    if (fm.isPrimitive) writeString(buf, String.valueOf(fm.getChar(obj)));
+                    else { Object v = fm.get(obj); if (v != null) writeString(buf, String.valueOf(v)); }
+                }
+                case FieldMeta.T_STRING -> {
+                    String sv = (String) fm.get(obj);
+                    if (sv != null) writeString(buf, sv);
+                }
+                case FieldMeta.T_OPTIONAL -> {
+                    Optional<?> opt = (Optional<?>) fm.get(obj);
+                    if (opt != null && opt.isPresent()) {
+                        Object inner = opt.get();
+                        writeValue(buf, inner, inner.getClass(), inner.getClass());
+                    }
+                }
+                case FieldMeta.T_LIST -> {
+                    List<?> list = (List<?>) fm.get(obj);
+                    if (list != null) writeListValue(buf, list,
+                        fm.elemClass != null ? fm.elemClass : Object.class,
+                        fm.elemType != null ? fm.elemType : Object.class);
+                }
+                case FieldMeta.T_MAP -> {
+                    Map<?, ?> map = (Map<?, ?>) fm.get(obj);
+                    if (map != null) writeMapValue(buf, map,
+                        fm.elemClass != null ? fm.elemClass : String.class,
+                        fm.elemType != null ? fm.elemType : String.class,
+                        fm.valClass != null ? fm.valClass : Object.class,
+                        fm.valType != null ? fm.valType : Object.class);
+                }
+                default -> {
+                    Object nested = fm.get(obj);
+                    if (nested != null) writeTuple(buf, nested, ClassMeta.of(fm.type));
+                }
             }
         }
         buf.append(')');
     }
 
     @SuppressWarnings("unchecked")
-    private static void writeFieldValue(ByteBuffer buf, Object value, Class<?> type, Type genericType) {
-        if (value == null) {
-            // empty = null for Optional
-            return;
-        }
+    private static void writeValue(ByteBuffer buf, Object value, Class<?> type, Type genericType) {
+        if (value == null) return;
+        if (type == Object.class) type = value.getClass();
         if (value instanceof Optional<?> opt) {
-            if (opt.isPresent()) {
-                Object inner = opt.get();
-                writeFieldValue(buf, inner, inner.getClass(), inner.getClass());
-            }
+            if (opt.isPresent()) { Object inner = opt.get(); writeValue(buf, inner, inner.getClass(), inner.getClass()); }
             return;
         }
         if (type == boolean.class || type == Boolean.class) {
-            buf.appendStr((Boolean) value ? "true" : "false");
-        } else if (type == int.class || type == Integer.class) {
-            writeInt(buf, (Integer) value);
-        } else if (type == long.class || type == Long.class) {
-            writeLong(buf, (Long) value);
-        } else if (type == short.class || type == Short.class) {
-            writeInt(buf, (Short) value);
-        } else if (type == byte.class || type == Byte.class) {
-            writeInt(buf, (Byte) value);
-        } else if (type == float.class || type == Float.class) {
-            writeFloat(buf, (Float) value);
-        } else if (type == double.class || type == Double.class) {
-            writeDouble(buf, (Double) value);
-        } else if (type == char.class || type == Character.class) {
-            writeString(buf, String.valueOf(value));
-        } else if (type == String.class) {
-            writeString(buf, (String) value);
+            boolean v = (Boolean) value; buf.appendBytes(v ? TRUE_BYTES : FALSE_BYTES, 0, v ? 4 : 5);
+        } else if (type == int.class || type == Integer.class) { writeInt(buf, (Integer) value);
+        } else if (type == long.class || type == Long.class) { writeLong(buf, (Long) value);
+        } else if (type == short.class || type == Short.class) { writeInt(buf, (Short) value);
+        } else if (type == byte.class || type == Byte.class) { writeInt(buf, (Byte) value);
+        } else if (type == float.class || type == Float.class) { writeFloat(buf, (Float) value);
+        } else if (type == double.class || type == Double.class) { writeDouble(buf, (Double) value);
+        } else if (type == char.class || type == Character.class) { writeString(buf, String.valueOf(value));
+        } else if (type == String.class) { writeString(buf, (String) value);
         } else if (List.class.isAssignableFrom(type)) {
             List<?> list = (List<?>) value;
-            Type elemType = Object.class;
-            if (genericType instanceof ParameterizedType pt) {
-                elemType = pt.getActualTypeArguments()[0];
-            }
-            buf.append('[');
-            Class<?> elemClass;
-            if (elemType instanceof Class<?> c) {
-                elemClass = c;
-            } else if (elemType instanceof ParameterizedType pt2) {
-                elemClass = (Class<?>) pt2.getRawType();
-            } else {
-                elemClass = Object.class;
-            }
-            for (int i = 0; i < list.size(); i++) {
-                if (i > 0) buf.append(',');
-                Object item = list.get(i);
-                if (item != null) {
-                    writeFieldValue(buf, item, elemClass, elemType);
-                }
-            }
-            buf.append(']');
+            Type elemType = Object.class; Class<?> elemClass = Object.class;
+            if (genericType instanceof ParameterizedType pt) { elemType = pt.getActualTypeArguments()[0]; elemClass = FieldMeta.resolveClass(elemType); }
+            writeListValue(buf, list, elemClass, elemType);
         } else if (Map.class.isAssignableFrom(type)) {
             Map<?, ?> map = (Map<?, ?>) value;
-            Type keyType = String.class, valType = Object.class;
+            Type keyType = String.class, valType = Object.class; Class<?> keyClass = String.class, valClass = Object.class;
             if (genericType instanceof ParameterizedType pt) {
                 Type[] args = pt.getActualTypeArguments();
-                keyType = args[0];
-                valType = args[1];
+                keyType = args[0]; keyClass = FieldMeta.resolveClass(keyType);
+                valType = args[1]; valClass = FieldMeta.resolveClass(valType);
             }
-            Class<?> keyClass = (keyType instanceof Class<?> c) ? c : String.class;
-            Class<?> valClass = (valType instanceof Class<?> c) ? c : Object.class;
-            buf.append('[');
-            boolean first = true;
-            for (var entry : map.entrySet()) {
-                if (!first) buf.append(',');
-                first = false;
-                buf.append('(');
-                writeFieldValue(buf, entry.getKey(), keyClass, keyType);
-                buf.append(',');
-                writeFieldValue(buf, entry.getValue(), valClass, valType);
-                buf.append(')');
-            }
-            buf.append(']');
-        } else {
-            // Nested struct
-            Field[] fields = getFields(type);
-            writeTuple(buf, value, fields);
+            writeMapValue(buf, map, keyClass, keyType, valClass, valType);
+        } else { writeTuple(buf, value, ClassMeta.of(type)); }
+    }
+
+    private static void writeListValue(ByteBuffer buf, List<?> list, Class<?> elemClass, Type elemType) {
+        buf.append('[');
+        for (int i = 0; i < list.size(); i++) {
+            if (i > 0) buf.append(',');
+            Object item = list.get(i);
+            if (item != null) writeValue(buf, item, elemClass, elemType);
         }
+        buf.append(']');
+    }
+
+    private static void writeMapValue(ByteBuffer buf, Map<?, ?> map,
+            Class<?> keyClass, Type keyType, Class<?> valClass, Type valType) {
+        buf.append('[');
+        boolean first = true;
+        for (var entry : map.entrySet()) {
+            if (!first) buf.append(',');
+            first = false;
+            buf.append('(');
+            writeValue(buf, entry.getKey(), keyClass, keyType);
+            buf.append(',');
+            writeValue(buf, entry.getValue(), valClass, valType);
+            buf.append(')');
+        }
+        buf.append(']');
     }
 
     // ========================================================================
@@ -248,16 +293,11 @@ public final class Ason {
 
     private static final byte[] DEC_DIGITS = "00010203040506070809101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263646566676869707172737475767778798081828384858687888990919293949596979899".getBytes(StandardCharsets.US_ASCII);
 
-    static void writeInt(ByteBuffer buf, int v) {
-        writeLong(buf, v);
-    }
+    static void writeInt(ByteBuffer buf, int v) { writeLong(buf, v); }
 
     static void writeLong(ByteBuffer buf, long v) {
         if (v < 0) {
-            if (v == Long.MIN_VALUE) {
-                buf.appendStr("-9223372036854775808");
-                return;
-            }
+            if (v == Long.MIN_VALUE) { buf.appendAscii("-9223372036854775808"); return; }
             buf.append('-');
             v = -v;
         }
@@ -265,126 +305,219 @@ public final class Ason {
     }
 
     static void writeULong(ByteBuffer buf, long v) {
-        if (v < 10) {
-            buf.append((byte) ('0' + v));
-            return;
-        }
+        if (v < 10) { buf.append((byte) ('0' + v)); return; }
         if (v < 100) {
             int idx = (int) (v * 2);
-            buf.append(DEC_DIGITS[idx]);
-            buf.append(DEC_DIGITS[idx + 1]);
+            buf.ensureCapacity(2);
+            buf.data[buf.len++] = DEC_DIGITS[idx];
+            buf.data[buf.len++] = DEC_DIGITS[idx + 1];
             return;
         }
-        // Stack-based: write digits right-to-left
-        byte[] tmp = new byte[20];
-        int pos = 20;
+        int digits = digitCount(v);
+        buf.ensureCapacity(digits);
+        int pos = buf.len + digits;
+        buf.len = pos;
         while (v >= 100) {
             int rem = (int) (v % 100);
             v /= 100;
             pos -= 2;
-            tmp[pos] = DEC_DIGITS[rem * 2];
-            tmp[pos + 1] = DEC_DIGITS[rem * 2 + 1];
+            buf.data[pos] = DEC_DIGITS[rem * 2];
+            buf.data[pos + 1] = DEC_DIGITS[rem * 2 + 1];
         }
         if (v >= 10) {
             int idx = (int) (v * 2);
             pos -= 2;
-            tmp[pos] = DEC_DIGITS[idx];
-            tmp[pos + 1] = DEC_DIGITS[idx + 1];
+            buf.data[pos] = DEC_DIGITS[idx];
+            buf.data[pos + 1] = DEC_DIGITS[idx + 1];
         } else {
-            pos--;
-            tmp[pos] = (byte) ('0' + v);
+            buf.data[pos - 1] = (byte) ('0' + v);
         }
-        buf.appendBytes(tmp, pos, 20 - pos);
+    }
+
+    private static int digitCount(long v) {
+        if (v < 10L) return 1;       if (v < 100L) return 2;
+        if (v < 1000L) return 3;     if (v < 10000L) return 4;
+        if (v < 100000L) return 5;   if (v < 1000000L) return 6;
+        if (v < 10000000L) return 7; if (v < 100000000L) return 8;
+        if (v < 1000000000L) return 9; if (v < 10000000000L) return 10;
+        if (v < 100000000000L) return 11; if (v < 1000000000000L) return 12;
+        if (v < 10000000000000L) return 13; if (v < 100000000000000L) return 14;
+        if (v < 1000000000000000L) return 15; if (v < 10000000000000000L) return 16;
+        if (v < 100000000000000000L) return 17; if (v < 1000000000000000000L) return 18;
+        return 19;
     }
 
     static void writeDouble(ByteBuffer buf, double v) {
         if (Double.isFinite(v) && v == Math.floor(v) && Math.abs(v) < (double) Long.MAX_VALUE) {
             writeLong(buf, (long) v);
-            buf.appendStr(".0");
+            buf.ensureCapacity(2); buf.data[buf.len++] = '.'; buf.data[buf.len++] = '0';
             return;
         }
         if (Double.isFinite(v)) {
             double v10 = v * 10.0;
             if (v10 == Math.floor(v10) && Math.abs(v10) < 1e18) {
                 long vi = (long) v10;
-                if (vi < 0) {
-                    buf.append('-');
-                    vi = -vi;
-                }
+                if (vi < 0) { buf.append('-'); vi = -vi; }
                 writeULong(buf, vi / 10);
-                buf.append('.');
-                buf.append((byte) ('0' + (vi % 10)));
+                buf.ensureCapacity(2); buf.data[buf.len++] = '.'; buf.data[buf.len++] = (byte) ('0' + (vi % 10));
                 return;
             }
         }
-        buf.appendStr(Double.toString(v));
+        buf.appendAscii(Double.toString(v));
     }
 
-    static void writeFloat(ByteBuffer buf, float v) {
-        writeDouble(buf, v);
-    }
+    static void writeFloat(ByteBuffer buf, float v) { writeDouble(buf, v); }
 
     // ========================================================================
-    // String quoting
+    // String writing — single-pass fused scan+write, no double getBytes
     // ========================================================================
 
     static void writeString(ByteBuffer buf, String s) {
-        if (needsQuoting(s)) {
-            writeEscaped(buf, s);
-        } else {
-            buf.appendStr(s);
+        int slen = s.length();
+        if (slen == 0) {
+            buf.ensureCapacity(2); buf.data[buf.len++] = '"'; buf.data[buf.len++] = '"';
+            return;
         }
+
+        char first = s.charAt(0);
+        char last = s.charAt(slen - 1);
+
+        // Leading/trailing space
+        if (first == ' ' || last == ' ') { writeQuoted(buf, s, slen); return; }
+
+        // "true" / "false"
+        if (slen == 4 && first == 't' && s.charAt(1) == 'r' && s.charAt(2) == 'u' && s.charAt(3) == 'e') {
+            writeQuoted(buf, s, slen); return;
+        }
+        if (slen == 5 && first == 'f' && s.charAt(1) == 'a' && s.charAt(2) == 'l' && s.charAt(3) == 's' && s.charAt(4) == 'e') {
+            writeQuoted(buf, s, slen); return;
+        }
+
+        // Combined scan + write in a single pass
+        buf.ensureCapacity(slen);
+        int startLen = buf.len;
+        boolean couldBeNumber = true;
+        int numStart = first == '-' ? 1 : 0;
+
+        for (int i = 0; i < slen; i++) {
+            char c = s.charAt(i);
+            if (c >= 128) {
+                // Non-ASCII: rollback, handle with getBytes
+                buf.len = startLen;
+                writeStringNonAscii(buf, s, slen);
+                return;
+            }
+            if (CHAR_CLASS[c] != 0) {
+                // Special char: rollback, write quoted
+                buf.len = startLen;
+                writeQuoted(buf, s, slen);
+                return;
+            }
+            if (couldBeNumber && i >= numStart) {
+                if ((c < '0' || c > '9') && c != '.') couldBeNumber = false;
+            }
+            buf.data[buf.len++] = (byte) c;
+        }
+
+        // Number check: rollback + quote
+        if (couldBeNumber && numStart < slen) {
+            // Already wrote slen bytes; insert quotes around them
+            buf.ensureCapacity(2);
+            System.arraycopy(buf.data, startLen, buf.data, startLen + 1, slen);
+            buf.data[startLen] = '"';
+            buf.len = startLen + 1 + slen;
+            buf.data[buf.len++] = '"';
+        }
+        // else: success, bytes already written
     }
 
-    static boolean needsQuoting(String s) {
-        if (s.isEmpty()) return true;
-        byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
-        if (bytes[0] == ' ' || bytes[bytes.length - 1] == ' ') return true;
-        if (s.equals("true") || s.equals("false")) return true;
-        if (SimdUtils.hasSpecialChars(bytes, 0, bytes.length)) return true;
-        // Check if it looks like a number
-        int start = bytes[0] == '-' ? 1 : 0;
-        if (start < bytes.length) {
-            boolean couldBeNumber = true;
-            for (int i = start; i < bytes.length; i++) {
-                byte b = bytes[i];
-                if ((b < '0' || b > '9') && b != '.') {
-                    couldBeNumber = false;
-                    break;
+    private static void writeStringNonAscii(ByteBuffer buf, String s, int slen) {
+        buf.hasNonAscii = true; // reached here because scan found non-ASCII
+        boolean needsQuote = false;
+        boolean couldBeNumber = true;
+        int numStart = s.charAt(0) == '-' ? 1 : 0;
+        for (int i = 0; i < slen; i++) {
+            char c = s.charAt(i);
+            if (c < 128 && CHAR_CLASS[c] != 0) {
+                needsQuote = true; break;
+            }
+            if (couldBeNumber && i >= numStart && (c < '0' || c > '9') && c != '.') couldBeNumber = false;
+        }
+        if (!needsQuote && couldBeNumber && numStart < slen) needsQuote = true;
+        if (needsQuote) { writeQuoted(buf, s, slen); }
+        else { buf.appendStr(s); }
+    }
+
+    private static void writeQuoted(ByteBuffer buf, String s, int slen) {
+        buf.append('"');
+        boolean needsEscape = false;
+        boolean hasNonAscii = false;
+        for (int i = 0; i < slen; i++) {
+            char c = s.charAt(i);
+            if (c == '"' || c == '\\' || c < 0x20) { needsEscape = true; break; }
+            if (c >= 128) hasNonAscii = true;
+        }
+        if (!needsEscape) {
+            if (!hasNonAscii) buf.appendCharsAsBytes(s, slen);
+            else buf.appendStr(s);
+        } else if (!hasNonAscii) {
+            writeEscapedAscii(buf, s, slen);
+        } else {
+            writeEscapedBytes(buf, s);
+        }
+        buf.append('"');
+    }
+
+    private static void writeEscapedAscii(ByteBuffer buf, String s, int slen) {
+        buf.ensureCapacity(slen);
+        for (int i = 0; i < slen; i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"' -> { buf.ensureCapacity(2); buf.data[buf.len++] = '\\'; buf.data[buf.len++] = '"'; }
+                case '\\' -> { buf.ensureCapacity(2); buf.data[buf.len++] = '\\'; buf.data[buf.len++] = '\\'; }
+                case '\n' -> { buf.ensureCapacity(2); buf.data[buf.len++] = '\\'; buf.data[buf.len++] = 'n'; }
+                case '\t' -> { buf.ensureCapacity(2); buf.data[buf.len++] = '\\'; buf.data[buf.len++] = 't'; }
+                case '\r' -> { buf.ensureCapacity(2); buf.data[buf.len++] = '\\'; buf.data[buf.len++] = 'r'; }
+                default -> {
+                    if (c < 0x20) {
+                        buf.ensureCapacity(6);
+                        buf.data[buf.len++] = '\\'; buf.data[buf.len++] = 'u';
+                        buf.data[buf.len++] = '0'; buf.data[buf.len++] = '0';
+                        buf.data[buf.len++] = HEX[(c >> 4) & 0xf]; buf.data[buf.len++] = HEX[c & 0xf];
+                    } else {
+                        if (buf.len >= buf.data.length) buf.ensureCapacity(1);
+                        buf.data[buf.len++] = (byte) c;
+                    }
                 }
             }
-            if (couldBeNumber) return true;
         }
-        return false;
     }
 
-    static void writeEscaped(ByteBuffer buf, String s) {
+    private static void writeEscapedBytes(ByteBuffer buf, String s) {
+        buf.hasNonAscii = true; // we know the string has non-ASCII chars
         byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
-        buf.append('"');
         int start = 0;
         while (start < bytes.length) {
             int next = SimdUtils.findEscape(bytes, start, bytes.length - start);
-            if (next > 0) {
-                buf.appendBytes(bytes, start, next);
-            }
+            if (next > 0) buf.appendBytes(bytes, start, next);
             int idx = start + next;
             if (idx >= bytes.length) break;
             byte b = bytes[idx];
             switch (b) {
-                case '"' -> buf.appendStr("\\\"");
-                case '\\' -> buf.appendStr("\\\\");
-                case '\n' -> buf.appendStr("\\n");
-                case '\t' -> buf.appendStr("\\t");
-                case '\r' -> buf.appendStr("\\r");
+                case '"' -> { buf.ensureCapacity(2); buf.data[buf.len++] = '\\'; buf.data[buf.len++] = '"'; }
+                case '\\' -> { buf.ensureCapacity(2); buf.data[buf.len++] = '\\'; buf.data[buf.len++] = '\\'; }
+                case '\n' -> { buf.ensureCapacity(2); buf.data[buf.len++] = '\\'; buf.data[buf.len++] = 'n'; }
+                case '\t' -> { buf.ensureCapacity(2); buf.data[buf.len++] = '\\'; buf.data[buf.len++] = 't'; }
+                case '\r' -> { buf.ensureCapacity(2); buf.data[buf.len++] = '\\'; buf.data[buf.len++] = 'r'; }
                 default -> {
-                    buf.appendStr("\\u00");
-                    buf.append((byte) "0123456789abcdef".charAt((b >> 4) & 0xf));
-                    buf.append((byte) "0123456789abcdef".charAt(b & 0xf));
+                    buf.ensureCapacity(6);
+                    buf.data[buf.len++] = '\\'; buf.data[buf.len++] = 'u';
+                    buf.data[buf.len++] = '0'; buf.data[buf.len++] = '0';
+                    buf.data[buf.len++] = HEX[(b >> 4) & 0xf]; buf.data[buf.len++] = HEX[b & 0xf];
                 }
             }
             start = idx + 1;
         }
-        buf.append('"');
     }
 
     // ========================================================================
@@ -395,43 +528,23 @@ public final class Ason {
         return new AsonDecoder(input.getBytes(StandardCharsets.UTF_8)).decodeSingle(clazz);
     }
 
+    public static <T> T decode(byte[] input, Class<T> clazz) {
+        return new AsonDecoder(input).decodeSingle(clazz);
+    }
+
     public static <T> List<T> decodeList(String input, Class<T> clazz) {
         return new AsonDecoder(input.getBytes(StandardCharsets.UTF_8)).decodeList(clazz);
+    }
+
+    public static <T> List<T> decodeList(byte[] input, Class<T> clazz) {
+        return new AsonDecoder(input).decodeList(clazz);
     }
 
     // ========================================================================
     // Binary Encode/Decode
     // ========================================================================
 
-    public static byte[] encodeBinary(Object value) {
-        return AsonBinary.encode(value);
-    }
-
-    public static <T> T decodeBinary(byte[] data, Class<T> clazz) {
-        return AsonBinary.decode(data, clazz);
-    }
-
-    public static <T> List<T> decodeBinaryList(byte[] data, Class<T> clazz) {
-        return AsonBinary.decodeList(data, clazz);
-    }
-
-    // ========================================================================
-    // Reflection cache
-    // ========================================================================
-
-    private static final Map<Class<?>, Field[]> FIELD_CACHE = new WeakHashMap<>();
-
-    static Field[] getFields(Class<?> clazz) {
-        return FIELD_CACHE.computeIfAbsent(clazz, c -> {
-            Field[] all = c.getDeclaredFields();
-            List<Field> result = new ArrayList<>();
-            for (Field f : all) {
-                if (Modifier.isStatic(f.getModifiers()) || Modifier.isTransient(f.getModifiers())) continue;
-                if (f.isSynthetic()) continue;
-                f.setAccessible(true);
-                result.add(f);
-            }
-            return result.toArray(new Field[0]);
-        });
-    }
+    public static byte[] encodeBinary(Object value) { return AsonBinary.encode(value); }
+    public static <T> T decodeBinary(byte[] data, Class<T> clazz) { return AsonBinary.decode(data, clazz); }
+    public static <T> List<T> decodeBinaryList(byte[] data, Class<T> clazz) { return AsonBinary.decodeList(data, clazz); }
 }
