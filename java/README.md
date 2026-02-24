@@ -1,7 +1,7 @@
 # ASON Java — High-Performance Array-Schema Object Notation
 
 A zero-copy, SIMD-accelerated ASON serialization library for Java 25+.
-Benchmarked against **FastJSON2** (Alibaba), the fastest JSON library in the JVM ecosystem.
+Benchmarked against **Gson** (Google), the most widely-used JSON library in the JVM ecosystem.
 
 ## Features
 
@@ -64,60 +64,62 @@ Nested struct:
 {id,dept}:(1,(Engineering))
 ```
 
-## Performance vs FastJSON2
+## Performance vs Gson
 
-Benchmarked on JDK 25 (aarch64) against FastJSON2 2.0.53 — the fastest JSON library in Java.
+Benchmarked on JDK 25 (aarch64) against Gson 2.12.1 — the most widely-used JSON library in Java.
 Ratio > 1.0 means ASON is faster.
 
-### Serialization (ASON wins at all scales)
+### Serialization (ASON 4–5x faster)
 
-| Test               | JSON (FastJSON2) | ASON    | Ratio       |
-| ------------------ | ---------------- | ------- | ----------- |
-| Flat 100×          | 1.10ms           | 0.91ms  | **1.22x** ✓ |
-| Flat 500×          | 4.91ms           | 4.76ms  | **1.03x** ✓ |
-| Flat 1000×         | 18.35ms          | 8.69ms  | **2.11x** ✓ |
-| Flat 5000×         | 56.69ms          | 42.22ms | **1.34x** ✓ |
-| Deep 10×           | 4.26ms           | 3.64ms  | **1.17x** ✓ |
-| Deep 50×           | 17.65ms          | 15.49ms | **1.14x** ✓ |
-| Deep 100×          | 32.60ms          | 29.36ms | **1.11x** ✓ |
-| Single Flat 10000× | 9.53ms           | 4.50ms  | **2.12x** ✓ |
+| Test               | JSON (Gson) | ASON    | Ratio       |
+| ------------------ | ----------- | ------- | ----------- |
+| Flat 100×          | 6.81ms      | 1.52ms  | **4.48x** ✓ |
+| Flat 500×          | 38.52ms     | 8.08ms  | **4.77x** ✓ |
+| Flat 1000×         | 70.46ms     | 14.13ms | **4.99x** ✓ |
+| Flat 5000×         | 355.77ms    | 71.44ms | **4.98x** ✓ |
+| Deep 10×           | 27.52ms     | 4.93ms  | **5.58x** ✓ |
+| Deep 50×           | 134.50ms    | 24.82ms | **5.42x** ✓ |
+| Deep 100×          | 269.97ms    | 48.73ms | **5.54x** ✓ |
+| Single Flat 10000× | 18.20ms     | 10.98ms | **1.66x** ✓ |
 
-### Deserialization (near parity with FastJSON2)
+### Deserialization (ASON 1.7–2.1x faster)
 
-| Test       | JSON (FastJSON2) | ASON    | Ratio       |
-| ---------- | ---------------- | ------- | ----------- |
-| Flat 100×  | 1.31ms           | 1.25ms  | **1.05x** ✓ |
-| Flat 500×  | 6.42ms           | 6.73ms  | 0.95x       |
-| Flat 1000× | 9.59ms           | 10.51ms | 0.91x       |
-| Deep 50×   | 16.63ms          | 17.89ms | 0.93x       |
-| Deep 100×  | 34.15ms          | 33.89ms | **1.01x** ✓ |
+| Test       | JSON (Gson) | ASON     | Ratio       |
+| ---------- | ----------- | -------- | ----------- |
+| Flat 100×  | 5.70ms      | 2.95ms   | **1.93x** ✓ |
+| Flat 500×  | 29.20ms     | 13.83ms  | **2.11x** ✓ |
+| Flat 1000× | 60.38ms     | 32.11ms  | **1.88x** ✓ |
+| Flat 5000× | 286.69ms    | 143.87ms | **1.99x** ✓ |
+| Deep 10×   | 25.00ms     | 14.92ms  | **1.68x** ✓ |
+| Deep 50×   | 138.94ms    | 77.25ms  | **1.80x** ✓ |
+| Deep 100×  | 246.83ms    | 138.38ms | **1.78x** ✓ |
 
 ### Throughput (1000 records × 100 iterations)
 
-| Direction   | JSON (FastJSON2) | ASON            | Ratio                             |
-| ----------- | ---------------- | --------------- | --------------------------------- |
-| Serialize   | ~13M records/s   | ~9M records/s   | 0.7x (ASON output is 53% smaller) |
-| Deserialize | ~9.3M records/s  | ~9.6M records/s | **1.03x** ✓                       |
+| Direction   | JSON (Gson)      | ASON            | Ratio       |
+| ----------- | ---------------- | --------------- | ----------- |
+| Serialize   | ~1.4M records/s  | ~7.1M records/s | **4.90x** ✓ |
+| Deserialize | ~1.8M records/s  | ~3.7M records/s | **2.08x** ✓ |
 
 ### Size Reduction
 
 | Data      | JSON   | ASON Text | Saving  | ASON Binary | Saving  |
 | --------- | ------ | --------- | ------- | ----------- | ------- |
-| Flat 1000 | 121 KB | 55 KB     | **53%** | 72 KB       | **39%** |
-| Deep 100  | 427 KB | 166 KB    | **61%** | 220 KB      | **49%** |
+| Flat 1000 | 122 KB | 57 KB     | **53%** | 74 KB       | **39%** |
+| Deep 100  | 438 KB | 170 KB    | **61%** | 225 KB      | **49%** |
 
-## Why ASON Beats FastJSON2
+## Why ASON Beats Gson
 
-FastJSON2 uses `sun.misc.Unsafe` for zero-copy String construction and ASM-generated serializers. ASON achieves competitive/superior performance through format advantages and JIT-friendly design:
+Gson uses Java reflection for field access and tree-based intermediate representations. ASON achieves 2–5x better performance through format advantages and JIT-friendly design:
 
 1. **No Key Repetition**: JSON repeats every key for every object. ASON writes the schema once, then only values — 53% smaller output means less memory bandwidth.
 2. **No Quoting Overhead**: ASON only quotes strings that contain special characters — most strings are emitted raw, saving `"` delimiter overhead.
-3. **MethodHandle invokeExact**: Pre-adapted handles match JIT-optimized direct field access. No boxing for primitives, no type adaptation at call site.
+3. **MethodHandle invokeExact**: Pre-adapted handles match JIT-optimized direct field access. No boxing for primitives, no type adaptation at call site — vs Gson's reflection-based `Field.get()`/`Field.set()`.
 4. **SIMD Scanning**: Character classification uses 256-bit vector operations, processing 32 bytes per cycle.
 5. **ThreadLocal Buffer Pool**: Reuses up to 1MB byte buffers, eliminating allocation pressure in the encode hot path.
 6. **ISO-8859-1 String Fast Path**: ASCII-only strings (the common case) use `ISO_8859_1` charset for direct byte-copy construction — 2-3x faster than UTF-8 validation.
 7. **Direct Double Parsing**: POW10 lookup table parses `intPart + fracVal / 10^n` without String allocation — avoids `Double.parseDouble()` for simple decimals.
-8. **CHAR_CLASS Lookup Table**: Single array lookup replaces 6+ character comparisons per byte in the encode scan loop.
+8. **No Intermediate Tree**: Gson builds `JsonElement` trees during parsing. ASON decodes directly into target objects with zero intermediate allocations.
 
 ## Supported Types
 
@@ -157,5 +159,5 @@ src/main/java/io/ason/
 └── examples/
     ├── BasicExample.java    — 12 basic examples
     ├── ComplexExample.java  — 14 complex examples
-    └── BenchExample.java    — Full benchmark suite (vs FastJSON2)
+    └── BenchExample.java    — Full benchmark suite (vs Gson)
 ```

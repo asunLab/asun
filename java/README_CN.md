@@ -1,7 +1,7 @@
 # ASON Java — 高性能数组模式对象表示法 (High-Performance Array-Schema Object Notation)
 
 零拷贝、SIMD 加速的 ASON 序列化库，适用于 Java 25+。
-基准测试对比对象为 **FastJSON2** (Alibaba)，它是 JVM 生态中最快的 JSON 库。
+基准测试对比对象为 **Gson** (Google)，它是 JVM 生态中使用最广泛的 JSON 库。
 
 ## 特性
 
@@ -106,18 +106,18 @@ List<T> list = Ason.decodeBinaryList(bin, MyClass.class);
 | 平面 1000 | 121 KB | 55 KB     | **53%** | 72 KB       | **39%** |
 | 深层 100  | 427 KB | 166 KB    | **61%** | 220 KB      | **49%** |
 
-## 为什么 ASON 比 FastJSON2 更快
+## 为什么 ASON 比 Gson 更快
 
-FastJSON2 使用 `sun.misc.Unsafe` 实现零拷贝字符串构建和 ASM 生成的序列化器。ASON 通过格式优势和 JIT 友好设计实现了竞争性甚至更优的性能：
+Gson 使用 Java 反射进行字段访问并构建基于树的中间表示。ASON 通过格式优势和 JIT 友好设计实现了 2–5 倍的性能提升：
 
-1. **无键名重复**: JSON 为每个对象重复写入键名。ASON 只写一次模式，之后仅有值 —— 输出缩小 53% 意味着更低的内存带宽占用。
-2. **无引号开销**: ASON 仅对包含特殊字符的字符串加引号 —— 大多数字符串直接输出，节省了 `"` 分隔符开销。
-3. **MethodHandle invokeExact**: 预适配的句柄匹配 JIT 优化的直接字段访问。原始类型无装箱，调用点无需类型适配。
+1. **无键名重复**: JSON 为每个对象重复写入键名。ASON 只写一次模式，之后仅有值 — 输出缩小 53% 意味着更低的内存带宽占用。
+2. **无引号开销**: ASON 仅对包含特殊字符的字符串加引号 — 大多数字符串直接输出，节省了 `"` 分隔符开销。
+3. **MethodHandle invokeExact**: 预适配的句柄匹配 JIT 优化的直接字段访问。原始类型无装箱，调用点无需类型适配 — 对比 Gson 基于反射的 `Field.get()`/`Field.set()`。
 4. **SIMD 扫描**: 字符分类使用 256 位向量操作，每周期处理 32 字节。
 5. **ThreadLocal 缓冲池**: 复用高达 1MB 的字节缓冲，消除编码热点路径的分配压力。
-6. **ISO-8859-1 字符串快径**: 仅含 ASCII 的字符串（常见情况）使用 `ISO_8859_1` 字符集直接进行字节拷贝构建 —— 比 UTF-8 校验快 2-3 倍。
-7. **直接浮点解析**: POW10 查找表通过 `整数部分 + 小数部分 / 10^n` 进行解析，无需 String 分配 —— 避免了简单浮点数的 `Double.parseDouble()` 开销。
-8. **CHAR_CLASS 查找表**: 单次数组查找取代了编码扫描循环中每字节 6 次以上的字符比较。
+6. **ISO-8859-1 字符串快径**: 仅含 ASCII 的字符串（常见情况）使用 `ISO_8859_1` 字符集直接进行字节拷贝构建 — 比 UTF-8 校验快 2-3 倍。
+7. **直接浮点解析**: POW10 查找表通过 `整数部分 + 小数部分 / 10^n` 进行解析，无需 String 分配 — 避免了简单浮点数的 `Double.parseDouble()` 开销。
+8. **无中间树**: Gson 在解析时构建 `JsonElement` 树。ASON 直接解码到目标对象，零中间分配。
 
 ## 支持类型
 
@@ -157,5 +157,5 @@ src/main/java/io/ason/
 └── examples/
     ├── BasicExample.java    — 12 个基础示例
     ├── ComplexExample.java  — 14 个复杂示例
-    └── BenchExample.java    — 完整基准测试套件 (对比 FastJSON2)
+    └── BenchExample.java    — 完整基准测试套件 (对比 Gson)
 ```

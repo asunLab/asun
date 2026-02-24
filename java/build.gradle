@@ -21,7 +21,7 @@ repositories {
 dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter:5.12.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    implementation 'com.alibaba.fastjson2:fastjson2:2.0.53'
+    implementation 'com.google.code.gson:gson:2.12.1'
 }
 
 tasks.withType(JavaCompile).configureEach {
