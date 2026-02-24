@@ -10,6 +10,10 @@ pub struct Deserializer<'de> {
     schema_fields: Option<Vec<&'de str>>,
     /// Current field index within a tuple
     field_index: usize,
+    /// True when schema_fields holds the shared vec-header schema,
+    /// meaning the next struct should use those field names directly
+    /// (source schema) rather than replacing with target struct fields.
+    vec_schema_active: bool,
 }
 
 pub fn decode<'a, T: Deserialize<'a>>(s: &'a str) -> Result<T> {
@@ -18,6 +22,7 @@ pub fn decode<'a, T: Deserialize<'a>>(s: &'a str) -> Result<T> {
         pos: 0,
         schema_fields: None,
         field_index: 0,
+        vec_schema_active: false,
     };
     de.skip_whitespace_and_comments();
     let value = T::deserialize(&mut de)?;
@@ -542,7 +547,37 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.skip_whitespace_and_comments();
         match self.peek_value_type() {
             ValueType::Null => visitor.visit_none(),
-            ValueType::Bool => self.deserialize_bool(visitor),
+            ValueType::Bool => {
+                // peek_value_type heuristically classifies 't'/'f' prefixed
+                // values as Bool, but unquoted strings like "test" or "foo"
+                // also start with these chars. Verify it's actually a bool
+                // keyword before committing; otherwise treat as string.
+                let is_true = self.pos + 4 <= self.input.len()
+                    && &self.input[self.pos..self.pos + 4] == b"true"
+                    && (self.pos + 4 >= self.input.len()
+                        || matches!(
+                            self.input[self.pos + 4],
+                            b',' | b')' | b']' | b' ' | b'\t' | b'\n' | b'\r'
+                        ));
+                let is_false = !is_true
+                    && self.pos + 5 <= self.input.len()
+                    && &self.input[self.pos..self.pos + 5] == b"false"
+                    && (self.pos + 5 >= self.input.len()
+                        || matches!(
+                            self.input[self.pos + 5],
+                            b',' | b')' | b']' | b' ' | b'\t' | b'\n' | b'\r'
+                        ));
+                if is_true || is_false {
+                    self.deserialize_bool(visitor)
+                } else {
+                    // Not a real bool — fall back to string
+                    let cow = self.parse_any_value_str()?;
+                    match cow {
+                        CowStr::Borrowed(s) => visitor.visit_borrowed_str(s),
+                        CowStr::Owned(s) => visitor.visit_string(s),
+                    }
+                }
+            }
             ValueType::Number => {
                 // Parse integer directly; only fall back to float if we hit '.'
                 let negative = self.pos < self.input.len() && self.input[self.pos] == b'-';
@@ -787,10 +822,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 return Err(Error::ExpectedColon);
             }
             self.schema_fields = Some(fields);
+            self.vec_schema_active = true;
             let value = visitor.visit_seq(AsonVecAccess {
                 de: self,
                 first: true,
             })?;
+            self.vec_schema_active = false;
             self.schema_fields = None;
             Ok(value)
         } else {
@@ -920,11 +957,20 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 self.pos += 1;
                 self.field_index = 0;
                 let parent_schema = self.schema_fields.take();
-                let nested_fields: Vec<&'de str> = fields
-                    .iter()
-                    .map(|&f| unsafe { core::mem::transmute::<&str, &'de str>(f) })
-                    .collect();
-                self.schema_fields = Some(nested_fields);
+                if self.vec_schema_active {
+                    // Vec row: schema_fields holds the source field names from
+                    // the vec header — keep them so serde can match by name.
+                    self.schema_fields = parent_schema.clone();
+                    self.vec_schema_active = false;
+                } else {
+                    // Nested struct: schema_fields was the parent struct's
+                    // schema — replace with target struct's declared fields.
+                    let nested_fields: Vec<&'de str> = fields
+                        .iter()
+                        .map(|&f| unsafe { core::mem::transmute::<&str, &'de str>(f) })
+                        .collect();
+                    self.schema_fields = Some(nested_fields);
+                }
 
                 let value = visitor.visit_map(AsonStructAccess {
                     de: self,
@@ -1094,6 +1140,7 @@ impl<'a, 'de> SeqAccess<'de> for AsonVecAccess<'a, 'de> {
             return Ok(None);
         }
         self.de.field_index = 0;
+        self.de.vec_schema_active = true;
         seed.deserialize(&mut *self.de).map(Some)
     }
 }

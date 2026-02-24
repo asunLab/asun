@@ -47,4 +47,17 @@ pub fn build(b: *std.Build) void {
     const run_tests = b.addRunArtifact(lib_tests);
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_tests.step);
+
+    // Cross-compat tests
+    const cross_mod = b.createModule(.{
+        .root_source_file = b.path("tests/cross_compat_test.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    cross_mod.addImport("ason", ason_mod);
+    const cross_tests = b.addTest(.{
+        .root_module = cross_mod,
+    });
+    const run_cross = b.addRunArtifact(cross_tests);
+    test_step.dependOn(&run_cross.step);
 }

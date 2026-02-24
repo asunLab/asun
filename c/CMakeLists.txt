@@ -32,5 +32,9 @@ target_link_libraries(cross_compat ason m)
 add_executable(ason_test tests/ason_test.c)
 target_link_libraries(ason_test ason m)
 
+add_executable(cross_compat_test tests/cross_compat_test.c)
+target_link_libraries(cross_compat_test ason m)
+
 enable_testing()
 add_test(NAME ason_test COMMAND ason_test)
+add_test(NAME cross_compat_test COMMAND cross_compat_test)

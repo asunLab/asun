@@ -34,3 +34,7 @@ enable_testing()
 add_executable(ason_test tests/ason_test.cpp)
 target_link_libraries(ason_test PRIVATE ason)
 add_test(NAME ason_test COMMAND ason_test)
+
+add_executable(cross_compat_test tests/cross_compat_test.cpp)
+target_link_libraries(cross_compat_test PRIVATE ason)
+add_test(NAME cross_compat_test COMMAND cross_compat_test)

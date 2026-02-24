@@ -612,6 +612,13 @@ fn unwrapOptional(comptime T: type) type {
 // Text Deserializer (decode)
 // ============================================================================
 
+// Schema-aware decoding types
+const MAX_SCHEMA = 64;
+const SchemaField = struct {
+    name: []const u8,
+    sub_schema: ?[]const u8 = null,
+};
+
 pub fn decode(comptime T: type, input: []const u8, allocator: Allocator) !T {
     var parser = Parser{ .input = input, .pos = 0, .allocator = allocator };
     parser.skipWhitespaceAndComments();
@@ -622,8 +629,14 @@ pub fn decode(comptime T: type, input: []const u8, allocator: Allocator) !T {
             parser.pos += 1;
             parser.skipWhitespaceAndComments();
         }
+
+        var schema_buf: [MAX_SCHEMA]SchemaField = undefined;
+        var schema_count: usize = 0;
+        var has_schema = false;
+
         if (parser.pos < parser.input.len and parser.input[parser.pos] == '{') {
-            try parser.skipSchema();
+            schema_count = try parser.parseSchemaIntoFields(&schema_buf);
+            has_schema = true;
             parser.skipWhitespaceAndComments();
         }
         if (parser.pos < parser.input.len and parser.input[parser.pos] == ']') {
@@ -643,7 +656,10 @@ pub fn decode(comptime T: type, input: []const u8, allocator: Allocator) !T {
             if (parser.pos >= parser.input.len) break;
             if (parser.input[parser.pos] != '(') break;
 
-            const val = try parser.parseStruct(E);
+            const val = if (has_schema)
+                try parser.parseStructWithSchema(E, schema_buf[0..schema_count])
+            else
+                try parser.parseStruct(E);
             try results.append(allocator, val);
 
             parser.skipWhitespaceAndComments();
@@ -655,15 +671,23 @@ pub fn decode(comptime T: type, input: []const u8, allocator: Allocator) !T {
 
         return results.toOwnedSlice(allocator);
     } else {
+        var schema_buf: [MAX_SCHEMA]SchemaField = undefined;
+        var schema_count: usize = 0;
+        var has_schema = false;
+
         if (parser.pos < parser.input.len and parser.input[parser.pos] == '{') {
-            try parser.skipSchema();
+            schema_count = try parser.parseSchemaIntoFields(&schema_buf);
+            has_schema = true;
             parser.skipWhitespaceAndComments();
             if (parser.pos < parser.input.len and parser.input[parser.pos] == ':') {
                 parser.pos += 1;
             }
             parser.skipWhitespaceAndComments();
         }
-        return parser.parseStruct(T);
+        if (has_schema)
+            return parser.parseStructWithSchema(T, schema_buf[0..schema_count])
+        else
+            return parser.parseStruct(T);
     }
 }
 
@@ -992,6 +1016,281 @@ const Parser = struct {
                 break;
             }
             if (self.input[self.pos] == ',') {
+                self.pos += 1;
+            }
+        }
+
+        return result.toOwnedSlice(self.allocator);
+    }
+
+    // ========================================================================
+    // Schema-aware parsing methods
+    // ========================================================================
+
+    fn parseSchemaIntoFields(self: *Parser, buf: *[MAX_SCHEMA]SchemaField) !usize {
+        if (self.pos >= self.input.len or self.input[self.pos] != '{') return error.ExpectedOpenBrace;
+        self.pos += 1;
+        var count: usize = 0;
+
+        while (self.pos < self.input.len) {
+            self.skipWhitespaceAndComments();
+            if (self.pos >= self.input.len) return error.Eof;
+            if (self.input[self.pos] == '}') {
+                self.pos += 1;
+                return count;
+            }
+            if (count > 0) {
+                if (self.pos < self.input.len and self.input[self.pos] == ',') {
+                    self.pos += 1;
+                    self.skipWhitespaceAndComments();
+                }
+            }
+
+            // Read field name until : , or }
+            const name_start = self.pos;
+            while (self.pos < self.input.len) {
+                const c = self.input[self.pos];
+                if (c == ':' or c == ',' or c == '}') break;
+                self.pos += 1;
+            }
+            const name = self.input[name_start..self.pos];
+            var sub: ?[]const u8 = null;
+
+            if (self.pos < self.input.len and self.input[self.pos] == ':') {
+                self.pos += 1; // skip ':'
+                self.skipWhitespaceAndComments();
+
+                if (self.pos < self.input.len and self.input[self.pos] == '{') {
+                    // Nested struct schema: {sub1,sub2,...}
+                    const sub_start = self.pos;
+                    var depth: usize = 0;
+                    while (self.pos < self.input.len) {
+                        if (self.input[self.pos] == '{') {
+                            depth += 1;
+                        } else if (self.input[self.pos] == '}') {
+                            depth -= 1;
+                            if (depth == 0) {
+                                self.pos += 1;
+                                break;
+                            }
+                        }
+                        self.pos += 1;
+                    }
+                    sub = self.input[sub_start..self.pos];
+                } else if (self.pos < self.input.len and self.input[self.pos] == '[') {
+                    // Array type: [int], [{sub_schema}], etc
+                    self.pos += 1;
+                    self.skipWhitespaceAndComments();
+                    if (self.pos < self.input.len and self.input[self.pos] == '{') {
+                        // [{sub_schema}]
+                        const sub_start = self.pos;
+                        var depth: usize = 0;
+                        while (self.pos < self.input.len) {
+                            if (self.input[self.pos] == '{') {
+                                depth += 1;
+                            } else if (self.input[self.pos] == '}') {
+                                depth -= 1;
+                                if (depth == 0) {
+                                    self.pos += 1;
+                                    break;
+                                }
+                            }
+                            self.pos += 1;
+                        }
+                        sub = self.input[sub_start..self.pos];
+                        // skip to ']'
+                        while (self.pos < self.input.len and self.input[self.pos] != ']') self.pos += 1;
+                        if (self.pos < self.input.len) self.pos += 1;
+                    } else {
+                        // [type] - skip to closing ']'
+                        var depth: usize = 1;
+                        while (self.pos < self.input.len) {
+                            if (self.input[self.pos] == '[') {
+                                depth += 1;
+                            } else if (self.input[self.pos] == ']') {
+                                depth -= 1;
+                                if (depth == 0) {
+                                    self.pos += 1;
+                                    break;
+                                }
+                            }
+                            self.pos += 1;
+                        }
+                    }
+                } else {
+                    // Simple type annotation - skip until , or }
+                    while (self.pos < self.input.len) {
+                        const c = self.input[self.pos];
+                        if (c == ',' or c == '}') break;
+                        self.pos += 1;
+                    }
+                }
+            }
+
+            buf[count] = .{ .name = name, .sub_schema = sub };
+            count += 1;
+            if (count >= MAX_SCHEMA) break;
+        }
+        return error.Eof;
+    }
+
+    fn parseStructWithSchema(self: *Parser, comptime T: type, schema: []const SchemaField) !T {
+        const info = @typeInfo(T).@"struct";
+        self.skipWhitespaceAndComments();
+        if ((try self.peekByte()) != '(') return error.ExpectedOpenParen;
+        self.pos += 1;
+
+        var result: T = undefined;
+
+        // Initialize all fields with safe defaults
+        inline for (info.fields) |field| {
+            if (field.default_value_ptr) |ptr| {
+                const default_ptr: *const field.type = @ptrCast(@alignCast(ptr));
+                @field(result, field.name) = default_ptr.*;
+            } else if (comptime @typeInfo(field.type) == .optional) {
+                @field(result, field.name) = null;
+            } else if (comptime @typeInfo(field.type) == .bool) {
+                @field(result, field.name) = false;
+            } else if (comptime @typeInfo(field.type) == .int) {
+                @field(result, field.name) = 0;
+            } else if (comptime @typeInfo(field.type) == .float) {
+                @field(result, field.name) = 0;
+            } else if (comptime field.type == []const u8 or field.type == []u8) {
+                @field(result, field.name) = "";
+            } else if (comptime @typeInfo(field.type) == .pointer and @typeInfo(field.type).pointer.size == .slice) {
+                @field(result, field.name) = &[_]@typeInfo(field.type).pointer.child{};
+            } else if (comptime @typeInfo(field.type) == .@"struct") {
+                @field(result, field.name) = std.mem.zeroes(field.type);
+            } else {
+                @field(result, field.name) = undefined;
+            }
+        }
+
+        // Read values positionally according to schema, match by name
+        for (schema, 0..) |sf, si| {
+            if (si > 0) {
+                self.skipWhitespaceAndComments();
+                if (self.pos < self.input.len and self.input[self.pos] == ',')
+                    self.pos += 1;
+            }
+            self.skipWhitespaceAndComments();
+
+            var matched = false;
+            inline for (info.fields) |field| {
+                if (!matched and mem.eql(u8, sf.name, field.name)) {
+                    @field(result, field.name) = try self.parseFieldWithSubSchema(field.type, sf.sub_schema);
+                    matched = true;
+                }
+            }
+            if (!matched) {
+                try self.skipValue();
+            }
+        }
+
+        try self.skipRemainingTupleValues();
+        self.skipWhitespaceAndComments();
+        if ((try self.peekByte()) != ')') return error.ExpectedCloseParen;
+        self.pos += 1;
+        return result;
+    }
+
+    fn parseFieldWithSubSchema(self: *Parser, comptime T: type, sub_schema: ?[]const u8) !T {
+        const info = @typeInfo(T);
+        switch (info) {
+            .@"struct" => {
+                if (sub_schema) |ss| {
+                    var sub_buf: [MAX_SCHEMA]SchemaField = undefined;
+                    var sub_parser = Parser{ .input = ss, .pos = 0, .allocator = self.allocator };
+                    const cnt = try sub_parser.parseSchemaIntoFields(&sub_buf);
+                    return self.parseStructWithSchema(T, sub_buf[0..cnt]);
+                }
+                return self.parseStruct(T);
+            },
+            .pointer => |ptr| {
+                if (ptr.size == .slice and ptr.child == u8) {
+                    return self.parseString();
+                } else if (ptr.size == .slice and @typeInfo(ptr.child) == .@"struct") {
+                    return self.parseArrayOfStructWithSubSchema(ptr.child, sub_schema);
+                } else if (ptr.size == .slice) {
+                    return self.parseArray(ptr.child);
+                }
+                return error.UnsupportedType;
+            },
+            .optional => |opt| {
+                self.skipWhitespaceAndComments();
+                const b = try self.peekByte();
+                if (b == ',' or b == ')') return null;
+                return try self.parseFieldWithSubSchema(opt.child, sub_schema);
+            },
+            else => return self.parseField(T),
+        }
+    }
+
+    fn parseArrayOfStructWithSubSchema(self: *Parser, comptime E: type, sub_schema: ?[]const u8) ![]E {
+        self.skipWhitespaceAndComments();
+        if ((try self.peekByte()) != '[') return error.InvalidFormat;
+        self.pos += 1;
+
+        var result: std.ArrayList(E) = .{};
+        errdefer result.deinit(self.allocator);
+
+        self.skipWhitespaceAndComments();
+        if (self.pos < self.input.len and self.input[self.pos] == ']') {
+            self.pos += 1;
+            return result.toOwnedSlice(self.allocator);
+        }
+
+        // Check for inline schema [{schema}]:
+        var schema_buf: [MAX_SCHEMA]SchemaField = undefined;
+        var schema_count: usize = 0;
+        var has_inline_schema = false;
+
+        if (self.pos < self.input.len and self.input[self.pos] == '{') {
+            schema_count = try self.parseSchemaIntoFields(&schema_buf);
+            has_inline_schema = true;
+            self.skipWhitespaceAndComments();
+            if (self.pos < self.input.len and self.input[self.pos] == ']') {
+                self.pos += 1;
+                self.skipWhitespaceAndComments();
+            }
+            if (self.pos < self.input.len and self.input[self.pos] == ':') {
+                self.pos += 1;
+                self.skipWhitespaceAndComments();
+            }
+        }
+
+        // Determine effective schema
+        var sub_parsed_buf: [MAX_SCHEMA]SchemaField = undefined;
+        var effective_count: usize = 0;
+        var has_effective = false;
+
+        if (has_inline_schema) {
+            has_effective = true;
+            effective_count = schema_count;
+        } else if (sub_schema) |ss| {
+            var sub_parser = Parser{ .input = ss, .pos = 0, .allocator = self.allocator };
+            effective_count = try sub_parser.parseSchemaIntoFields(&sub_parsed_buf);
+            has_effective = true;
+        }
+
+        while (self.pos < self.input.len) {
+            self.skipWhitespaceAndComments();
+            if (self.pos >= self.input.len) break;
+            if (self.input[self.pos] == ']') {
+                self.pos += 1;
+                break;
+            }
+            if (self.input[self.pos] != '(') break;
+
+            const val = if (has_effective) blk: {
+                const sch = if (has_inline_schema) schema_buf[0..effective_count] else sub_parsed_buf[0..effective_count];
+                break :blk try self.parseStructWithSchema(E, sch);
+            } else try self.parseStruct(E);
+
+            try result.append(self.allocator, val);
+
+            self.skipWhitespaceAndComments();
+            if (self.pos < self.input.len and self.input[self.pos] == ',') {
                 self.pos += 1;
             }
         }

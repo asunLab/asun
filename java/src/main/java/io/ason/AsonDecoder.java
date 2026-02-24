@@ -8,6 +8,7 @@ import java.util.*;
 /**
  * ASON text decoder — MethodHandle-based, zero-copy where possible.
  * Uses ClassMeta for fast field access via invokeExact.
+ * Schema-aware: parses schema field names for name-based matching.
  */
 final class AsonDecoder {
     private final byte[] input;
@@ -18,6 +19,9 @@ final class AsonDecoder {
         1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9,
         1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18
     };
+
+    // Schema field: name + optional sub-schema for nested structs/vec-of-struct
+    record SchemaField(String name, String subSchema) {}
 
     AsonDecoder(byte[] input) {
         this.input = input;
@@ -37,11 +41,15 @@ final class AsonDecoder {
         }
 
         ClassMeta meta = ClassMeta.of(clazz);
+        SchemaField[] schema = null;
         if (pos < input.length && input[pos] == '{') {
-            skipSchema();
+            schema = parseSchema();
             skipWhitespaceAndComments();
             expect(':');
             skipWhitespaceAndComments();
+        }
+        if (schema != null) {
+            return parseTupleWithSchema(clazz, meta, schema);
         }
         return parseTuple(clazz, meta);
     }
@@ -56,7 +64,7 @@ final class AsonDecoder {
         ClassMeta meta = ClassMeta.of(clazz);
         if (pos < input.length && input[pos] == '[') {
             pos++;
-            skipSchema();
+            SchemaField[] schema = parseSchema();
             skipWs();
             expect(']');
             skipWs();
@@ -69,7 +77,7 @@ final class AsonDecoder {
             while (pos < input.length) {
                 if (pos < input.length && input[pos] <= ' ') skipWs();
                 if (pos >= input.length || input[pos] != '(') break;
-                result.add(parseTuple(clazz, meta));
+                result.add(parseTupleWithSchema(clazz, meta, schema));
                 if (pos < input.length && input[pos] == ',') pos++;
             }
             return result;
@@ -77,14 +85,70 @@ final class AsonDecoder {
         throw new AsonException("Expected '[' for list format");
     }
 
-    private void skipSchema() {
+    // ========================================================================
+    // Schema parsing — extract field names and sub-schemas
+    // ========================================================================
+
+    private SchemaField[] parseSchema() {
         expect('{');
+        List<SchemaField> fields = new ArrayList<>();
+        while (pos < input.length && input[pos] != '}') {
+            skipWs();
+            if (pos < input.length && input[pos] == '}') break;
+            if (!fields.isEmpty()) {
+                if (pos < input.length && input[pos] == ',') pos++;
+                skipWs();
+            }
+            if (pos < input.length && input[pos] == '}') break;
+            // Parse field name
+            int nameStart = pos;
+            while (pos < input.length && input[pos] != ',' && input[pos] != ':' && input[pos] != '}') pos++;
+            String name = new String(input, nameStart, pos - nameStart, java.nio.charset.StandardCharsets.UTF_8).trim();
+            String subSchema = null;
+            if (pos < input.length && input[pos] == ':') {
+                pos++; // skip ':'
+                skipWs();
+                if (pos < input.length && input[pos] == '{') {
+                    // Nested struct sub-schema: {field1,field2}
+                    subSchema = extractBraced();
+                } else if (pos < input.length && input[pos] == '[') {
+                    // Vec-of-struct sub-schema: [{field1,field2}]
+                    subSchema = extractBracketed();
+                } else {
+                    // Type annotation like :int, :str, :bool, :float — skip it
+                    while (pos < input.length && input[pos] != ',' && input[pos] != '}') pos++;
+                }
+            }
+            if (!name.isEmpty()) fields.add(new SchemaField(name, subSchema));
+        }
+        if (pos < input.length && input[pos] == '}') pos++;
+        return fields.toArray(new SchemaField[0]);
+    }
+
+    /** Extract {...} including braces as a string, handling nesting */
+    private String extractBraced() {
+        int start = pos;
+        pos++; // skip '{'
         int depth = 1;
         while (pos < input.length && depth > 0) {
             byte b = input[pos++];
             if (b == '{') depth++;
             else if (b == '}') depth--;
         }
+        return new String(input, start, pos - start, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    /** Extract [{...}] including brackets as a string */
+    private String extractBracketed() {
+        int start = pos;
+        pos++; // skip '['
+        int depth = 1;
+        while (pos < input.length && depth > 0) {
+            byte b = input[pos++];
+            if (b == '[') depth++;
+            else if (b == ']') depth--;
+        }
+        return new String(input, start, pos - start, java.nio.charset.StandardCharsets.UTF_8);
     }
 
     // ========================================================================
@@ -120,75 +184,251 @@ final class AsonDecoder {
             byte b = inp[pos];
             if (b == ',' || b == ')' || b == ']') continue;
 
-            switch (fm.typeTag) {
-                case FieldMeta.T_BOOLEAN -> {
-                    boolean v = parseBool();
-                    if (fm.isPrimitive) fm.setBoolean(obj, v);
-                    else fm.set(obj, v);
-                }
-                case FieldMeta.T_INT -> {
-                    int v = (int) parseLong();
-                    if (fm.isPrimitive) fm.setInt(obj, v);
-                    else fm.set(obj, v);
-                }
-                case FieldMeta.T_LONG -> {
-                    long v = parseLong();
-                    if (fm.isPrimitive) fm.setLong(obj, v);
-                    else fm.set(obj, v);
-                }
-                case FieldMeta.T_SHORT -> {
-                    short v = (short) parseLong();
-                    if (fm.isPrimitive) fm.setShort(obj, v);
-                    else fm.set(obj, v);
-                }
-                case FieldMeta.T_BYTE -> {
-                    byte v = (byte) parseLong();
-                    if (fm.isPrimitive) fm.setByte(obj, v);
-                    else fm.set(obj, v);
-                }
-                case FieldMeta.T_FLOAT -> {
-                    float v = (float) parseDoubleDirect();
-                    if (fm.isPrimitive) fm.setFloat(obj, v);
-                    else fm.set(obj, v);
-                }
-                case FieldMeta.T_DOUBLE -> {
-                    double v = parseDoubleDirect();
-                    if (fm.isPrimitive) fm.setDouble(obj, v);
-                    else fm.set(obj, v);
-                }
-                case FieldMeta.T_CHAR -> {
-                    String s = parseStringValue();
-                    char v = s.isEmpty() ? '\0' : s.charAt(0);
-                    if (fm.isPrimitive) fm.setChar(obj, v);
-                    else fm.set(obj, v);
-                }
-                case FieldMeta.T_STRING -> fm.set(obj, parseStringValue());
-                case FieldMeta.T_OPTIONAL -> {
-                    if (atValueEnd()) {
-                        fm.set(obj, Optional.empty());
-                    } else {
-                        Type innerType = fm.elemType != null ? fm.elemType : Object.class;
-                        Class<?> innerClass = fm.elemClass != null ? fm.elemClass : Object.class;
-                        Object inner = parseFieldValue(innerClass, innerType);
-                        fm.set(obj, Optional.ofNullable(inner));
-                    }
-                }
-                case FieldMeta.T_LIST -> fm.set(obj, parseListField(fm));
-                case FieldMeta.T_MAP -> fm.set(obj, parseMap(fm.genericType));
-                default -> {
-                    // T_STRUCT
-                    if (inp[pos] == '(') {
-                        ClassMeta nested = fm.nestedMeta != null ? fm.nestedMeta : ClassMeta.of(fm.type);
-                        fm.set(obj, parseTuple(fm.type, nested));
-                    } else {
-                        fm.set(obj, parseFieldValue(fm.type, fm.genericType));
-                    }
-                }
-            }
+            parseFieldInto(obj, fm, null);
         }
         skipWs();
         if (pos < inp.length && inp[pos] == ')') pos++;
         return (T) obj;
+    }
+
+    // ========================================================================
+    // Schema-aware tuple parsing — name-based field matching
+    // ========================================================================
+
+    @SuppressWarnings("unchecked")
+    private <T> T parseTupleWithSchema(Class<T> clazz, ClassMeta meta, SchemaField[] schema) {
+        expect('(');
+        Object obj = meta.newInstance();
+        FieldMeta[] fields = meta.fields;
+        final byte[] inp = this.input;
+
+        // Build name->FieldMeta map for the target class
+        Map<String, FieldMeta> fieldMap = new HashMap<>();
+        for (FieldMeta fm : fields) fieldMap.put(fm.name, fm);
+
+        for (int si = 0; si < schema.length; si++) {
+            if (si > 0) {
+                if (pos < inp.length && inp[pos] == ',') {
+                    pos++;
+                } else {
+                    skipWs();
+                    if (pos < inp.length && inp[pos] == ',') pos++;
+                    else if (pos < inp.length && inp[pos] == ')') break;
+                    else break;
+                }
+            }
+            if (pos < inp.length && inp[pos] <= ' ') skipWs();
+
+            SchemaField sf = schema[si];
+            FieldMeta fm = fieldMap.get(sf.name);
+
+            if (fm == null) {
+                // No matching target field — skip this value
+                skipValue();
+            } else {
+                if (pos >= inp.length) continue;
+                byte b = inp[pos];
+                if (b == ',' || b == ')' || b == ']') continue;
+                parseFieldInto(obj, fm, sf.subSchema);
+            }
+        }
+        // Skip any remaining values in the tuple
+        skipRemainingTupleValues();
+        skipWs();
+        if (pos < inp.length && inp[pos] == ')') pos++;
+        return (T) obj;
+    }
+
+    /** Parse a single field value into the object based on the field's type tag */
+    private void parseFieldInto(Object obj, FieldMeta fm, String subSchema) {
+        final byte[] inp = this.input;
+        switch (fm.typeTag) {
+            case FieldMeta.T_BOOLEAN -> {
+                boolean v = parseBool();
+                if (fm.isPrimitive) fm.setBoolean(obj, v);
+                else fm.set(obj, v);
+            }
+            case FieldMeta.T_INT -> {
+                int v = (int) parseLong();
+                if (fm.isPrimitive) fm.setInt(obj, v);
+                else fm.set(obj, v);
+            }
+            case FieldMeta.T_LONG -> {
+                long v = parseLong();
+                if (fm.isPrimitive) fm.setLong(obj, v);
+                else fm.set(obj, v);
+            }
+            case FieldMeta.T_SHORT -> {
+                short v = (short) parseLong();
+                if (fm.isPrimitive) fm.setShort(obj, v);
+                else fm.set(obj, v);
+            }
+            case FieldMeta.T_BYTE -> {
+                byte v = (byte) parseLong();
+                if (fm.isPrimitive) fm.setByte(obj, v);
+                else fm.set(obj, v);
+            }
+            case FieldMeta.T_FLOAT -> {
+                float v = (float) parseDoubleDirect();
+                if (fm.isPrimitive) fm.setFloat(obj, v);
+                else fm.set(obj, v);
+            }
+            case FieldMeta.T_DOUBLE -> {
+                double v = parseDoubleDirect();
+                if (fm.isPrimitive) fm.setDouble(obj, v);
+                else fm.set(obj, v);
+            }
+            case FieldMeta.T_CHAR -> {
+                String s = parseStringValue();
+                char v = s.isEmpty() ? '\0' : s.charAt(0);
+                if (fm.isPrimitive) fm.setChar(obj, v);
+                else fm.set(obj, v);
+            }
+            case FieldMeta.T_STRING -> fm.set(obj, parseStringValue());
+            case FieldMeta.T_OPTIONAL -> {
+                if (atValueEnd()) {
+                    fm.set(obj, Optional.empty());
+                } else {
+                    Type innerType = fm.elemType != null ? fm.elemType : Object.class;
+                    Class<?> innerClass = fm.elemClass != null ? fm.elemClass : Object.class;
+                    Object inner = parseFieldValue(innerClass, innerType);
+                    fm.set(obj, Optional.ofNullable(inner));
+                }
+            }
+            case FieldMeta.T_LIST -> {
+                if (subSchema != null && fm.listElemMeta != null) {
+                    fm.set(obj, parseListFieldWithSubSchema(fm, subSchema));
+                } else {
+                    fm.set(obj, parseListField(fm));
+                }
+            }
+            case FieldMeta.T_MAP -> fm.set(obj, parseMap(fm.genericType));
+            default -> {
+                // T_STRUCT
+                if (pos < inp.length && inp[pos] == '(') {
+                    if (subSchema != null && fm.nestedMeta != null) {
+                        // Decode nested struct using sub-schema for name-based matching
+                        SchemaField[] nestedSchema = parseSubSchemaFields(subSchema);
+                        ClassMeta nested = fm.nestedMeta != null ? fm.nestedMeta : ClassMeta.of(fm.type);
+                        fm.set(obj, parseTupleWithSchema(fm.type, nested, nestedSchema));
+                    } else {
+                        ClassMeta nested = fm.nestedMeta != null ? fm.nestedMeta : ClassMeta.of(fm.type);
+                        fm.set(obj, parseTuple(fm.type, nested));
+                    }
+                } else {
+                    fm.set(obj, parseFieldValue(fm.type, fm.genericType));
+                }
+            }
+        }
+    }
+
+    /** Parse a sub-schema string like "{name,age}" into SchemaField[] */
+    private SchemaField[] parseSubSchemaFields(String sub) {
+        AsonDecoder subDecoder = new AsonDecoder(sub.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return subDecoder.parseSchema();
+    }
+
+    /** Parse a vec-of-struct field using sub-schema for name-based matching on each element */
+    @SuppressWarnings("unchecked")
+    private List<?> parseListFieldWithSubSchema(FieldMeta fm, String subSchemaStr) {
+        expect('[');
+        Class<?> elemClass = fm.elemClass != null ? fm.elemClass : Object.class;
+        ClassMeta nestedMeta = fm.listElemMeta;
+
+        // Parse the sub-schema: could be "[{field1,field2}]" or "{field1,field2}"
+        SchemaField[] elemSchema;
+        String inner = subSchemaStr.trim();
+        if (inner.startsWith("[") && inner.endsWith("]")) {
+            inner = inner.substring(1, inner.length() - 1);
+        }
+        elemSchema = parseSubSchemaFields(inner);
+
+        List<Object> result = new ArrayList<>();
+        boolean first = true;
+        while (pos < input.length) {
+            skipWs();
+            if (pos < input.length && input[pos] == ']') { pos++; return result; }
+            if (!first) {
+                if (pos < input.length && input[pos] == ',') {
+                    pos++;
+                    skipWs();
+                    if (pos < input.length && input[pos] == ']') { pos++; return result; }
+                }
+            }
+            first = false;
+            skipWs();
+            if (nestedMeta != null && input[pos] == '(') {
+                result.add(parseTupleWithSchema(elemClass, nestedMeta, elemSchema));
+            } else {
+                result.add(parseFieldValue(elemClass, fm.elemType != null ? fm.elemType : Object.class));
+            }
+        }
+        return result;
+    }
+
+    // ========================================================================
+    // Skip logic — for unmatched fields and remaining tuple values
+    // ========================================================================
+
+    /** Skip a single ASON value: number, bool, string, tuple, array, map */
+    private void skipValue() {
+        skipWs();
+        if (pos >= input.length) return;
+        byte b = input[pos];
+        if (b == ',' || b == ')' || b == ']') return; // empty value
+        if (b == '(') {
+            // Skip tuple
+            pos++;
+            int depth = 1;
+            while (pos < input.length && depth > 0) {
+                byte c = input[pos++];
+                if (c == '(') depth++;
+                else if (c == ')') depth--;
+                else if (c == '"') skipQuotedStringBody();
+            }
+        } else if (b == '[') {
+            // Skip array/map
+            pos++;
+            int depth = 1;
+            while (pos < input.length && depth > 0) {
+                byte c = input[pos++];
+                if (c == '[') depth++;
+                else if (c == ']') depth--;
+                else if (c == '"') skipQuotedStringBody();
+            }
+        } else if (b == '"') {
+            // Skip quoted string
+            pos++;
+            skipQuotedStringBody();
+        } else {
+            // Skip plain value (number, bool, unquoted string)
+            while (pos < input.length) {
+                byte c = input[pos];
+                if (c == ',' || c == ')' || c == ']') break;
+                pos++;
+            }
+        }
+    }
+
+    /** Skip the body of a quoted string (pos is after opening quote) */
+    private void skipQuotedStringBody() {
+        while (pos < input.length) {
+            byte c = input[pos++];
+            if (c == '"') return;
+            if (c == '\\') pos++; // skip escaped char
+        }
+    }
+
+    /** Skip remaining comma-separated values until ')' */
+    private void skipRemainingTupleValues() {
+        skipWs();
+        while (pos < input.length && input[pos] != ')') {
+            if (input[pos] == ',') pos++;
+            skipWs();
+            if (pos < input.length && input[pos] == ')') break;
+            skipValue();
+            skipWs();
+        }
     }
 
     // ========================================================================
