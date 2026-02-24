@@ -720,6 +720,65 @@ const Parser = struct {
         return error.Eof;
     }
 
+    /// Skip any single ASON value (string, number, bool, tuple, array, etc.)
+    fn skipValue(self: *Parser) !void {
+        self.skipWhitespaceAndComments();
+        if (self.pos >= self.input.len) return error.Eof;
+        const b = self.input[self.pos];
+        if (b == '(' or b == '[' or b == '{') {
+            const open = b;
+            const close: u8 = if (b == '(') ')' else if (b == '[') ']' else '}';
+            var depth: usize = 0;
+            while (self.pos < self.input.len) {
+                const c = self.input[self.pos];
+                self.pos += 1;
+                if (c == open) {
+                    depth += 1;
+                } else if (c == close) {
+                    depth -= 1;
+                    if (depth == 0) return;
+                }
+            }
+            return error.Eof;
+        }
+        if (b == '"') {
+            self.pos += 1;
+            while (self.pos < self.input.len) {
+                if (self.input[self.pos] == '\\') {
+                    self.pos += 1;
+                } else if (self.input[self.pos] == '"') {
+                    self.pos += 1;
+                    return;
+                }
+                self.pos += 1;
+            }
+            return error.Eof;
+        }
+        // Bare value: skip until delimiter
+        while (self.pos < self.input.len) {
+            const c = self.input[self.pos];
+            if (c == ',' or c == ')' or c == ']') return;
+            self.pos += 1;
+        }
+    }
+
+    /// Skip remaining comma-separated values in a tuple until ')' is found.
+    /// Used when the target struct has fewer fields than the source data.
+    fn skipRemainingTupleValues(self: *Parser) !void {
+        while (true) {
+            self.skipWhitespaceAndComments();
+            if (self.pos >= self.input.len) return;
+            if (self.input[self.pos] == ')') return;
+            if (self.input[self.pos] == ',') {
+                self.pos += 1;
+                self.skipWhitespaceAndComments();
+                if (self.pos >= self.input.len) return;
+                if (self.input[self.pos] == ')') return;
+            } else return;
+            try self.skipValue();
+        }
+    }
+
     fn parseStruct(self: *Parser, comptime T: type) !T {
         const info = @typeInfo(T);
         switch (info) {
@@ -738,6 +797,7 @@ const Parser = struct {
                     self.skipWhitespaceAndComments();
                     @field(result, field.name) = try self.parseField(field.type);
                 }
+                try self.skipRemainingTupleValues();
                 self.skipWhitespaceAndComments();
                 if ((try self.peekByte()) != ')') return error.ExpectedCloseParen;
                 self.pos += 1;

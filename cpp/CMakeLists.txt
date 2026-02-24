@@ -26,6 +26,9 @@ target_link_libraries(complex_example PRIVATE ason)
 add_executable(bench examples/bench.cpp)
 target_link_libraries(bench PRIVATE ason)
 
+add_executable(cross_compat examples/cross_compat.cpp)
+target_link_libraries(cross_compat PRIVATE ason)
+
 # Tests
 enable_testing()
 add_executable(ason_test tests/ason_test.cpp)

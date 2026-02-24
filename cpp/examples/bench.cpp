@@ -936,7 +936,7 @@ std::pair<double, double> bench_deep_single_roundtrip(int iterations) {
 
 int main() {
     std::cout << "╔══════════════════════════════════════════════════════════════╗\n";
-    std::cout << "║         ASON vs JSON Comprehensive Benchmark (C++)         ║\n";
+    std::cout << "║         ASON vs JSON Comprehensive Benchmark (C++)           ║\n";
     std::cout << "╚══════════════════════════════════════════════════════════════╝\n";
 
 #if defined(__aarch64__) || defined(_M_ARM64)
@@ -974,7 +974,7 @@ int main() {
 
     // Section 3: Deep nesting
     std::cout << "┌──────────────────────────────────────────────────────────┐\n";
-    std::cout << "│  Section 3: 5-Level Deep Nesting (Company hierarchy)    │\n";
+    std::cout << "│  Section 3: 5-Level Deep Nesting (Company hierarchy)     │\n";
     std::cout << "└──────────────────────────────────────────────────────────┘\n";
 
     for (size_t count : {10, 50, 100}) {
@@ -1048,7 +1048,7 @@ int main() {
 
     // Section 7: Annotated vs Unannotated Serialization
     std::cout << "\n┌──────────────────────────────────────────────────────────────┐\n";
-    std::cout << "│  Section 7: Annotated vs Unannotated Schema (serialize)     │\n";
+    std::cout << "│  Section 7: Annotated vs Unannotated Schema (serialize)      │\n";
     std::cout << "└──────────────────────────────────────────────────────────────┘\n";
     {
         auto users_1k = generate_users(1000);
@@ -1136,7 +1136,7 @@ int main() {
     }
 
     std::cout << "\n╔══════════════════════════════════════════════════════════════╗\n";
-    std::cout << "║                    Benchmark Complete                       ║\n";
+    std::cout << "║                    Benchmark Complete                        ║\n";
     std::cout << "╚══════════════════════════════════════════════════════════════╝\n";
 
     return 0;

@@ -793,6 +793,18 @@ inline void skip_value(const char*& pos, const char* end) {
     }
 }
 
+// Skip remaining comma-separated values in a tuple until ')' is found.
+// Used when the target struct has fewer fields than the source data.
+inline void skip_remaining_tuple_values(const char*& pos, const char* end) {
+    for (;;) {
+        skip_whitespace_and_comments(pos, end);
+        if (pos >= end || *pos == ')') return;
+        if (*pos == ',') { pos++; skip_whitespace_and_comments(pos, end); if (pos >= end || *pos == ')') return; }
+        else return;
+        skip_value(pos, end);
+    }
+}
+
 } // namespace detail
 
 // ============================================================================
@@ -983,6 +995,7 @@ load_value(const char*& pos, const char* end, T& out) {
                 detail::skip_value(pos, end);
             }
         }
+        detail::skip_remaining_tuple_values(pos, end);
         detail::skip_whitespace_and_comments(pos, end);
         if (pos < end && *pos == ')') pos++;
         return;
@@ -1002,6 +1015,7 @@ load_value(const char*& pos, const char* end, T& out) {
             }
             AsonFields<T>::load_field(pos, end, out, i);
         }
+        detail::skip_remaining_tuple_values(pos, end);
         detail::skip_whitespace_and_comments(pos, end);
         if (pos < end && *pos == ')') pos++;
         return;
@@ -1323,6 +1337,7 @@ T decode(std::string_view input) {
                     detail::skip_value(pos, end);
                 }
             }
+            detail::skip_remaining_tuple_values(pos, end);
             detail::skip_whitespace_and_comments(pos, end);
             if (pos < end && *pos == ')') pos++;
             result.push_back(std::move(elem));
@@ -1366,6 +1381,7 @@ T decode(std::string_view input) {
                 detail::skip_value(pos, end);
             }
         }
+        detail::skip_remaining_tuple_values(pos, end);
         detail::skip_whitespace_and_comments(pos, end);
         if (pos < end && *pos == ')') pos++;
         return result;

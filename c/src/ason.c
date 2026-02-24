@@ -750,6 +750,7 @@ ason_err_t ason_decode_struct(const char** pos, const char* end, void* obj, cons
                 ason_skip_value(pos, end);
             }
         }
+        ason_skip_remaining_tuple_values(pos, end);
         ason_skip_ws(pos, end);
         if (*pos < end && **pos == ')') (*pos)++;
         return ASON_OK;
@@ -780,6 +781,7 @@ ason_err_t ason_decode_struct(const char** pos, const char* end, void* obj, cons
             }
             if (err != ASON_OK) return err;
         }
+        ason_skip_remaining_tuple_values(pos, end);
         ason_skip_ws(pos, end);
         if (*pos < end && **pos == ')') (*pos)++;
         return ASON_OK;

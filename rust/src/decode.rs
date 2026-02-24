@@ -170,6 +170,61 @@ impl<'de> Deserializer<'de> {
         }
     }
 
+    /// Skip a single ASON value (string, number, bool, tuple, array, etc.)
+    fn skip_value(&mut self) -> Result<()> {
+        self.skip_whitespace_and_comments();
+        if self.pos >= self.input.len() {
+            return Ok(());
+        }
+        match self.input[self.pos] {
+            b'(' => self.skip_balanced(b'(', b')'),
+            b'[' => self.skip_balanced(b'[', b']'),
+            b'"' => {
+                self.pos += 1;
+                while self.pos < self.input.len() {
+                    match self.input[self.pos] {
+                        b'\\' => self.pos += 2,
+                        b'"' => {
+                            self.pos += 1;
+                            return Ok(());
+                        }
+                        _ => self.pos += 1,
+                    }
+                }
+                Err(Error::Eof)
+            }
+            _ => {
+                while self.pos < self.input.len() {
+                    match self.input[self.pos] {
+                        b',' | b')' | b']' | b'}' => break,
+                        _ => self.pos += 1,
+                    }
+                }
+                Ok(())
+            }
+        }
+    }
+
+    /// Skip remaining comma-separated values until ')'.
+    /// Used when the source tuple has more fields than the target struct.
+    fn skip_remaining_tuple_values(&mut self) -> Result<()> {
+        self.skip_whitespace_and_comments();
+        while self.pos < self.input.len() && self.input[self.pos] != b')' {
+            if self.input[self.pos] == b',' {
+                self.pos += 1;
+                self.skip_whitespace_and_comments();
+                if self.pos < self.input.len() && self.input[self.pos] == b')' {
+                    break;
+                }
+            }
+            if self.pos < self.input.len() && self.input[self.pos] != b')' {
+                self.skip_value()?;
+                self.skip_whitespace_and_comments();
+            }
+        }
+        Ok(())
+    }
+
     /// Parse a plain (unquoted) string value, stopping at delimiters.
     /// Scalar loop — plain values are typically short (< 16 bytes),
     /// so SIMD overhead is not beneficial here.
@@ -806,6 +861,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 de: self,
                 field_index: 0,
             })?;
+            self.skip_remaining_tuple_values()?;
             self.skip_whitespace_and_comments();
             if self.pos < self.input.len() && self.input[self.pos] == b')' {
                 self.pos += 1;
@@ -838,6 +894,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 de: self,
                 field_index: 0,
             })?;
+            self.skip_remaining_tuple_values()?;
             self.skip_whitespace_and_comments();
             if self.pos < self.input.len() && self.input[self.pos] == b')' {
                 self.pos += 1;
@@ -873,6 +930,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     de: self,
                     field_index: 0,
                 })?;
+                self.skip_remaining_tuple_values()?;
                 self.skip_whitespace_and_comments();
                 if self.pos < self.input.len() && self.input[self.pos] == b')' {
                     self.pos += 1;
@@ -910,6 +968,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     de: self,
                     field_index: 0,
                 })?;
+                self.skip_remaining_tuple_values()?;
                 self.skip_whitespace_and_comments();
                 if self.pos < self.input.len() && self.input[self.pos] == b')' {
                     self.pos += 1;
@@ -928,6 +987,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     de: self,
                     field_index: 0,
                 })?;
+                self.skip_remaining_tuple_values()?;
                 self.skip_whitespace_and_comments();
                 if self.pos < self.input.len() && self.input[self.pos] == b')' {
                     self.pos += 1;

@@ -400,7 +400,7 @@ func benchDeepSingleRoundtrip(iterations int) (asonMs, jsonMs float64) {
 
 func main() {
 	fmt.Println("╔══════════════════════════════════════════════════════════════╗")
-	fmt.Println("║            ASON vs JSON Comprehensive Benchmark            ║")
+	fmt.Println("║            ASON vs JSON Comprehensive Benchmark              ║")
 	fmt.Println("╚══════════════════════════════════════════════════════════════╝")
 	fmt.Printf("\nSystem: %s %s\n", runtime.GOOS, runtime.GOARCH)
 	var memBefore runtime.MemStats
@@ -431,7 +431,7 @@ func main() {
 
 	// Section 3: 5-level deep nested struct
 	fmt.Println("┌──────────────────────────────────────────────────────────┐")
-	fmt.Println("│  Section 3: 5-Level Deep Nesting (Company hierarchy)    │")
+	fmt.Println("│  Section 3: 5-Level Deep Nesting (Company hierarchy)     │")
 	fmt.Println("└──────────────────────────────────────────────────────────┘")
 	for _, count := range []int{10, 50, 100} {
 		r := benchDeep(count, iterations)
@@ -458,7 +458,7 @@ func main() {
 
 	// Section 6: Annotated vs Unannotated (deserialize)
 	fmt.Println("\n┌──────────────────────────────────────────────────────────────┐")
-	fmt.Println("│  Section 6: Annotated vs Unannotated Schema (deserialize)   │")
+	fmt.Println("│  Section 6: Annotated vs Unannotated Schema (deserialize)    │")
 	fmt.Println("└──────────────────────────────────────────────────────────────┘")
 	{
 		users1k := generateUsers(1000)
@@ -515,7 +515,7 @@ func main() {
 
 	// Section 7: Annotated vs Unannotated (serialize)
 	fmt.Println("\n┌──────────────────────────────────────────────────────────────┐")
-	fmt.Println("│  Section 7: Annotated vs Unannotated Schema (serialize)     │")
+	fmt.Println("│  Section 7: Annotated vs Unannotated Schema (serialize)      │")
 	fmt.Println("└──────────────────────────────────────────────────────────────┘")
 	{
 		users1k := generateUsers(1000)
@@ -621,7 +621,7 @@ func main() {
 
 	// Section 9: Binary Format (ASON-BIN) benchmarks
 	fmt.Println("\n┌──────────────────────────────────────────────────────────────┐")
-	fmt.Println("│  Section 9: Binary Format (ASON-BIN) vs ASON text vs JSON   │")
+	fmt.Println("│  Section 9: Binary Format (ASON-BIN) vs ASON text vs JSON    │")
 	fmt.Println("└──────────────────────────────────────────────────────────────┘")
 	{
 		// -- Flat struct benchmark --
@@ -838,6 +838,6 @@ func main() {
 	}
 
 	fmt.Println("\n╔══════════════════════════════════════════════════════════════╗")
-	fmt.Println("║                    Benchmark Complete                       ║")
+	fmt.Println("║                    Benchmark Complete                        ║")
 	fmt.Println("╚══════════════════════════════════════════════════════════════╝")
 }

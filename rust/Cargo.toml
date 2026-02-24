@@ -33,3 +33,7 @@ path = "examples/complex.rs"
 [[example]]
 name = "bench"
 path = "examples/bench.rs"
+
+[[example]]
+name = "cross_compat"
+path = "examples/cross_compat.rs"

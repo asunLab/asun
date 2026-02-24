@@ -47,7 +47,7 @@ application {
 }
 
 // Example tasks
-['BasicExample', 'ComplexExample', 'BenchExample'].each { name ->
+['BasicExample', 'ComplexExample', 'BenchExample', 'CrossCompatExample'].each { name ->
     tasks.register("run${name}", JavaExec) {
         group = 'application'
         description = "Run ${name}"

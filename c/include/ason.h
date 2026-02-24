@@ -714,6 +714,18 @@ ason_inline void ason_skip_value(const char** pos, const char* end) {
     while (*pos < end && **pos != ',' && **pos != ')' && **pos != ']') (*pos)++;
 }
 
+/* Skip remaining comma-separated values in a tuple until ')' is found.
+ * Used when the target struct has fewer fields than the source data. */
+ason_inline void ason_skip_remaining_tuple_values(const char** pos, const char* end) {
+    for (;;) {
+        ason_skip_ws(pos, end);
+        if (*pos >= end || **pos == ')') return;
+        if (**pos == ',') { (*pos)++; ason_skip_ws(pos, end); if (*pos >= end || **pos == ')') return; }
+        else return;
+        ason_skip_value(pos, end);
+    }
+}
+
 /* Parse the schema: {field1,field2,...} or {field1:type1,...} */
 /* Returns field names (just pointers + lengths into the input). */
 typedef struct { const char* name; size_t len; } ason_schema_field_t;
@@ -1143,6 +1155,7 @@ void ason_write_schema_typed(ason_buf_t* buf, const ason_desc_t* desc);
                     ason_skip_value(&pos, end); \
                 } \
             } \
+            ason_skip_remaining_tuple_values(&pos, end); \
             ason_skip_ws(&pos, end); \
             if (pos < end && *pos == ')') pos++; \
             cnt++; \
