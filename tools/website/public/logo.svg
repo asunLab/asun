@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <!-- Background circle -->
+  <circle cx="60" cy="60" r="56" fill="#646cff" opacity="0.12"/>
+  <!-- Schema brackets { } -->
+  <text x="8" y="80" font-family="monospace" font-size="72" font-weight="700" fill="#646cff">{</text>
+  <text x="82" y="80" font-family="monospace" font-size="72" font-weight="700" fill="#9b87f5">}</text>
+  <!-- Data brackets ( ) in center smaller -->
+  <text x="38" y="70" font-family="monospace" font-size="36" font-weight="700" fill="#ffffff" opacity="0.9">()</text>
+</svg>

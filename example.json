@@ -1,0 +1,363 @@
+{
+    "identifier": "8a74b2ed-86bf-4c3b-8179-c06f21277783",
+    "organisation": "ADC Telecommunications, Inc.",
+    "organisationGroup": "ADC Telecommunications, Inc.",
+    "productId": "1636326000",
+    "productType": "NGA",
+    "tag": "Assurance User",
+    "status": "RAISE_FAULT",
+    "initiator": "Assurance Portal",
+    "recommendedNextStep": "RAISE_FAULT",
+    "diagnosticSummary": "DIAGNOSTICS_UNAVAILABLE",
+    "createdDate": "2021-07-15T08:54:23.740157+12:00",
+    "updatedDate": "2021-07-15T08:56:17.781654+12:00",
+    "product": {
+        "entity": {
+            "name": "ADC Telecommunications, Inc.",
+            "entityType": "RSP",
+            "entityGroup": "ADC Telecommunications, Inc."
+        },
+        "events": {
+            "all": [
+            ],
+            "future": [
+            ],
+            "recent": [
+            ],
+            "current": [
+            ],
+            "historic": [
+            ]
+        },
+        "address": {
+            "links": [
+                {
+                    "rel": "self",
+                    "href": "https://api.test.com/addresslookup/v1/addresses/tlc:100302842",
+                    "method": "GET"
+                }
+            ],
+            "related": [
+            ],
+            "location": {
+                "nzmgX": 2154546.41450832,
+                "nzmgY": 5411867.10041861,
+                "nztmX": 1244790.145,
+                "nztmY": 4849875.887,
+                "wgs84Lat": -46.4111960673455,
+                "wgs84Lon": 168.378040755418
+            },
+            "references": {
+                "aid": "A1001066438",
+                "tlc": 100302842,
+                "tui": 1001066438,
+                "dpid": null,
+                "plsam": 523210
+            },
+            "formattedAddress": {
+                "line1": "26 LOCKERBIE STREET",
+                "line2": null,
+                "line3": "Turnbull Thomson Park",
+                "line4": "INVERCARGILL 9810"
+            },
+            "structuredAddress": {
+                "town": "INVERCARGILL",
+                "unit": null,
+                "region": "Invercargill City",
+                "suburb": "Turnbull Thomson Park",
+                "suffix": null,
+                "boxType": null,
+                "country": "New Zealand",
+                "roadAbv": "ST",
+                "boxLobby": null,
+                "postcode": "9810",
+                "roadType": "STREET",
+                "unitType": null,
+                "boxNumber": null,
+                "isPrimary": "true",
+                "levelType": null,
+                "roadSuffix": null,
+                "streetName": "LOCKERBIE",
+                "levelNumber": null,
+                "streetNumber": 26,
+                "ruralDelivery": null,
+                "situationNumber": 26
+            }
+        },
+        "product": {
+            "id": "1636326000",
+            "olt": {
+                "ont": "9",
+                "pon": "2",
+                "card": "3",
+                "rack": "1",
+                "device": "INE-POLT02",
+                "ltCard": "FGLT-A",
+                "subrack": "1",
+                "gponPort": "INE002032",
+                "installedOptics": "GPON"
+            },
+            "ont": {
+                "id": "INE-POLT02:1-1-3-2-9",
+                "pra": "RFS_6844382",
+                "tlc": "100302842",
+                "mode": "Standard",
+                "slid": "6927007",
+                "type": "Type 200",
+                "model": "G-240G-P",
+                "plsam": null,
+                "ports": "4",
+                "ataPorts": "2",
+                "xgsPorts": "0",
+                "wifiPorts": "0",
+                "gponPathId": "PTH006927006",
+                "technology": "GPON",
+                "ontSerialNumber": null
+            },
+            "rsp": {
+                "id": "2977826097594368",
+                "name": "ADC Telecommunications, Inc.",
+                "subscriber": "2977826097594368",
+                "voiceOnBoarding": "False"
+            },
+            "type": "NGA",
+            "address": {
+                "id": 100302842,
+                "townName": "INVERCARGILL",
+                "addressName": "26 LOCKERBIE STREET",
+                "localityName": "TURNBULL THOMSON PARK",
+                "postCodeZone": "9810",
+                "roadNameConcat": "LOCKERBIE STREET",
+                "streetNumConcat": "26"
+            },
+            "service": {
+                "id": "CFS006927004",
+                "type": "Bitstream 2",
+                "status": "No Pending Changes",
+                "customerPlan": "vf Private 100-20-2.5-2.5",
+                "lastProvisioningChange": "2017-03-03T02:48:58.000Z"
+            },
+            "ataOffOnt": false,
+            "dataServices": [
+                {
+                    "id": "1636326000B01",
+                    "plan": {
+                        "lowPriorityCIR": {
+                            "upstream": "2500",
+                            "downstream": "2500"
+                        },
+                        "highPriorityCIR": {
+                            "upstream": "2500",
+                            "downstream": "2500"
+                        },
+                        "lowPriorityEIR+CIR": {
+                            "upstream": "22000",
+                            "downstream": "110000"
+                        }
+                    },
+                    "port": "1",
+                    "type": "1G",
+                    "cvlan": "34",
+                    "svlan": "3999",
+                    "taggingMode": "Tagged",
+                    "allocatedPorts": [
+                        {
+                            "type": "1G",
+                            "number": "1"
+                        }
+                    ],
+                    "circuitInsertion": "On",
+                    "handoverLinkedId": "IDA100609432"
+                }
+            ],
+            "voiceServices": [
+            ]
+        },
+        "configuration": {
+            "problemReport": {
+                "product": {
+                    "name": "Next Generation Access Evolve BS2",
+                    "type": "NGA Bitstream 2",
+                    "status": "In use",
+                    "typeId": "NGABS2",
+                    "isBusiness": false,
+                    "isValidated": true,
+                    "workDivisionId": "UP",
+                    "productCategory": "NGA",
+                    "allowsByBookings": false,
+                    "allowsASAPBookings": true,
+                    "allowBetweenBookings": true,
+                    "timeToRestorationTarget": 24,
+                    "allowsSelfServiceTruckRoll": true
+                },
+                "questions": [
+                    {
+                        "id": "Q0014",
+                        "text": "Has an isolation test been carried out on the line?",
+                        "answerType": "boolean",
+                        "questionType": "STANDARD"
+                    },
+                    {
+                        "id": "Q0063",
+                        "text": "What specific condition or circumstances may have been involved in the fault?",
+                        "answers": [
+                            "None",
+                            "Rain",
+                            "Storm",
+                            "Strong winds",
+                            "tech working on street",
+                            "Other"
+                        ],
+                        "answerType": "listOfValues",
+                        "questionType": "NONSTANDARD"
+                    },
+                    {
+                        "id": "Q0064",
+                        "text": "Do you accept responsibility for the fee if no fault is found?",
+                        "answers": [
+                            "Yes"
+                        ],
+                        "answerType": "listOfValues",
+                        "questionType": "NONSTANDARD"
+                    },
+                    {
+                        "id": "Q0077",
+                        "text": "Do you want repairs made if the technician has identified a fault in the premise, accepting any associated charges as defined in the Pricebook?",
+                        "answerType": "boolean",
+                        "questionType": "STANDARD"
+                    }
+                ],
+                "faultTypes": [
+                    {
+                        "group": "Fibre",
+                        "prefix": "NGA",
+                        "subGroup": "NGA",
+                        "testType": "ontStatus|opticalInfo",
+                        "faultTypeId": "NGA Layer 1 - No Optical Signal",
+                        "internalWiringCharge": "Yes|No",
+                        "testResultRestrictions": "Faulty",
+                        "allowsSelfServiceTruckRoll": true
+                    },
+                    {
+                        "group": "Fibre",
+                        "prefix": "NGA",
+                        "subGroup": "NGA",
+                        "testType": "statusOverTime",
+                        "faultTypeId": "NGA Layer 1 - Intermittent Service",
+                        "internalWiringCharge": "Yes|No",
+                        "testResultRestrictions": "Faulty",
+                        "allowsSelfServiceTruckRoll": false
+                    }
+                ],
+                "workDivisions": [
+                    {
+                        "description": "UC / NGA Core Network",
+                        "workDivisionId": "UC"
+                    },
+                    {
+                        "description": "NGA FRE",
+                        "workDivisionId": "UF"
+                    }
+                ]
+            },
+            "supportedTestTypes": [
+                "ontStatus",
+                "opticalInfo",
+                "rgwBandwidth",
+                "statusOverTime"
+            ]
+        },
+        "problemReports": {
+            "allProblemReports": [
+            ],
+            "activeProblemReports": [
+            ]
+        },
+        "summaryDetails": {
+            "fields": [
+                {
+                    "fieldName": "Address",
+                    "fieldValue": {
+                        "line1": "26 LOCKERBIE STREET",
+                        "line2": null,
+                        "line3": "Turnbull Thomson Park",
+                        "line4": "INVERCARGILL 9810"
+                    }
+                },
+                {
+                    "fieldName": "Product Type",
+                    "fieldValue": "NGA Bitstream 2"
+                },
+                {
+                    "fieldName": "Customer Plan",
+                    "fieldValue": "vf Private 100-20-2.5-2.5"
+                }
+            ],
+            "productId": "1636326000",
+            "exchangeId": "INE",
+            "productCategoryType": "NGA"
+        }
+    },
+    "questions": [
+                {
+            "id": "Q0064",
+            "text": "Do you accept responsibility for the fee if no fault is found?",
+            "answers": [
+                "Yes"
+            ],
+            "answerType": "listOfValues",
+            "questionType": "NONSTANDARD"
+        },
+        {
+            "id": "Q0077",
+            "text": "Do you want repairs made if the technician has identified a fault in the premise, accepting any associated charges as defined in the Pricebook?",
+            "answers": [
+                "Yes",
+                "No"
+            ],
+            "answerType": "boolean",
+            "questionType": "STANDARD"
+        }
+    ],
+    "restrictedFaultTypes": [
+        {
+            "group": "Fibre",
+            "prefix": "NGA",
+            "subGroup": "NGA",
+            "testType": "ontStatus|opticalInfo",
+            "faultTypeId": "NGA Layer 1 - No Optical Signal",
+            "internalWiringCharge": "Yes|No",
+            "testResultRestrictions": "Faulty",
+            "allowsSelfServiceTruckRoll": true
+        },
+        {
+            "group": "Fibre",
+            "prefix": "NGA",
+            "subGroup": "NGA",
+            "testType": "statusOverTime",
+            "faultTypeId": "NGA Layer 1 - Intermittent Service",
+            "internalWiringCharge": "Yes|No",
+            "testResultRestrictions": "Faulty",
+            "allowsSelfServiceTruckRoll": false
+        }
+    ],
+    "faultTypes": [
+        "NGA RGW - WAN"
+    ],
+    "options": {
+        "activeNetworkEvent": false,
+        "canLinkToNetworkEvent": false
+    },
+    "diagnostics": [
+        {
+            "identifier": "d5741d5a-99e4-46f7-8196-b1f488c91703",
+            "initiator": "Assurance Portal",
+            "initiatorReference": "Assurance User",
+            "inputDiagnosticType": "opticalInfo",
+            "status": "FAILED",
+            "expiryDate": "2021-07-15T08:56:17.259+12:00",
+            "createdDate": "2021-07-15T08:56:17.261377+12:00",
+            "updatedDate": "2021-07-15T08:56:17.538654+12:00"
+        }
+    ]
+}

@@ -1,0 +1,67 @@
+name: Deploy ASON Website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/website/**"
+      - ".github/workflows/deploy-website.yml"
+  workflow_dispatch:
+
+# 让 GitHub Actions 有权写入 GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同时只允许一个部署，跳过排队中的，但不取消进行中的
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 获取完整历史，用于 lastUpdated
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: tools/website/package-lock.json
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Install dependencies
+        working-directory: tools/website
+        run: npm ci
+
+      - name: Build
+        working-directory: tools/website
+        run: npm run build
+        env:
+          # 项目页部署到 https://<user>.github.io/<repo>/
+          # 若使用自定义域名，将此值改为 /  或直接删掉这行
+          VITE_BASE: /${{ github.event.repository.name }}/
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: tools/website/.vitepress/dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
