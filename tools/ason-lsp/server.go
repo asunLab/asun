@@ -46,6 +46,8 @@ type ServerCapabilities struct {
 	DocumentFormattingProvider bool                   `json:"documentFormattingProvider"`
 	DiagnosticProvider         *DiagnosticOptions     `json:"diagnosticProvider,omitempty"`
 	SemanticTokensProvider     *SemanticTokensOptions `json:"semanticTokensProvider,omitempty"`
+	InlayHintProvider          bool                   `json:"inlayHintProvider,omitempty"`
+	ExecuteCommandProvider     *ExecuteCommandOptions `json:"executeCommandProvider,omitempty"`
 }
 
 type CompletionOptions struct {
@@ -170,6 +172,28 @@ type SemanticTokensParams struct {
 
 type SemanticTokensResult struct {
 	Data []int `json:"data"`
+}
+
+type ExecuteCommandOptions struct {
+	Commands []string `json:"commands"`
+}
+
+type ExecuteCommandParams struct {
+	Command   string            `json:"command"`
+	Arguments []json.RawMessage `json:"arguments,omitempty"`
+}
+
+type InlayHintParams struct {
+	TextDocument TextDocumentIdentifier `json:"textDocument"`
+	Range        LSPRange               `json:"range"`
+}
+
+type LSPInlayHint struct {
+	Position     LSPPosition `json:"position"`
+	Label        string      `json:"label"`
+	Kind         int         `json:"kind"` // 1=Type, 2=Parameter
+	PaddingLeft  bool        `json:"paddingLeft,omitempty"`
+	PaddingRight bool        `json:"paddingRight,omitempty"`
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -325,6 +349,10 @@ func (s *Server) handleMessage(msg *jsonRPCMessage) {
 		s.handleFormatting(msg)
 	case "textDocument/semanticTokens/full":
 		s.handleSemanticTokens(msg)
+	case "textDocument/inlayHint":
+		s.handleInlayHint(msg)
+	case "workspace/executeCommand":
+		s.handleExecuteCommand(msg)
 
 	default:
 		if msg.ID != nil {
@@ -347,6 +375,7 @@ func (s *Server) handleInitialize(msg *jsonRPCMessage) {
 			},
 			HoverProvider:              true,
 			DocumentFormattingProvider: true,
+			InlayHintProvider:          true,
 			SemanticTokensProvider: &SemanticTokensOptions{
 				Full: true,
 				Legend: SemanticLegend{
@@ -540,6 +569,88 @@ func (s *Server) handleSemanticTokens(msg *jsonRPCMessage) {
 	}
 
 	s.sendResponse(msg.ID, SemanticTokensResult{Data: data})
+}
+
+func (s *Server) handleInlayHint(msg *jsonRPCMessage) {
+	var params InlayHintParams
+	json.Unmarshal(msg.Params, &params)
+	uri := params.TextDocument.URI
+	root := s.getTree(uri)
+	if root == nil {
+		s.sendResponse(msg.ID, []LSPInlayHint{})
+		return
+	}
+	hints := InlayHints(root)
+	var lspHints []LSPInlayHint
+	for _, h := range hints {
+		lspHints = append(lspHints, LSPInlayHint{
+			Position:     LSPPosition{Line: h.Line, Character: h.Col},
+			Label:        h.Label,
+			Kind:         2, // Parameter
+			PaddingRight: true,
+		})
+	}
+	if lspHints == nil {
+		lspHints = []LSPInlayHint{}
+	}
+	s.sendResponse(msg.ID, lspHints)
+}
+
+func (s *Server) handleExecuteCommand(msg *jsonRPCMessage) {
+	var params ExecuteCommandParams
+	json.Unmarshal(msg.Params, &params)
+
+	switch params.Command {
+	case "ason.compress":
+		if len(params.Arguments) > 0 {
+			var uri string
+			json.Unmarshal(params.Arguments[0], &uri)
+			src, ok := s.docs[uri]
+			if !ok {
+				s.sendResponse(msg.ID, nil)
+				return
+			}
+			compressed := Compress(src)
+			s.sendResponse(msg.ID, compressed)
+		} else {
+			s.sendResponse(msg.ID, nil)
+		}
+	case "ason.toJSON":
+		if len(params.Arguments) > 0 {
+			var uri string
+			json.Unmarshal(params.Arguments[0], &uri)
+			src, ok := s.docs[uri]
+			if !ok {
+				s.sendResponse(msg.ID, nil)
+				return
+			}
+			result, err := AsonToJSON(src)
+			if err != nil {
+				s.sendError(msg.ID, -32600, "conversion failed: "+err.Error())
+				return
+			}
+			s.sendResponse(msg.ID, result)
+		} else {
+			s.sendResponse(msg.ID, nil)
+		}
+
+	case "ason.fromJSON":
+		if len(params.Arguments) > 0 {
+			var jsonSrc string
+			json.Unmarshal(params.Arguments[0], &jsonSrc)
+			result, err := JSONToASON(jsonSrc)
+			if err != nil {
+				s.sendError(msg.ID, -32600, "conversion failed: "+err.Error())
+				return
+			}
+			s.sendResponse(msg.ID, result)
+		} else {
+			s.sendResponse(msg.ID, nil)
+		}
+
+	default:
+		s.sendError(msg.ID, -32601, "unknown command: "+params.Command)
+	}
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

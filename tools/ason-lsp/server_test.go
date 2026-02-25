@@ -108,6 +108,21 @@ func (c *lspClient) readAllResponses() []*jsonRPCMessage {
 
 func intPtr(v int) *int { return &v }
 
+// initAndOpen initializes the server and opens a document.
+func (c *lspClient) initAndOpen(uri, text string) {
+	c.send("initialize", intPtr(1), InitializeParams{ProcessID: 1})
+	msg, _ := c.srv.readMessage()
+	c.srv.handleMessage(msg)
+	c.out.Reset()
+
+	c.send("textDocument/didOpen", nil, DidOpenTextDocumentParams{
+		TextDocument: TextDocumentItem{URI: uri, Text: text},
+	})
+	msg, _ = c.srv.readMessage()
+	c.srv.handleMessage(msg)
+	c.out.Reset()
+}
+
 // ──────────── Initialize ────────────
 
 func TestLSPInitialize(t *testing.T) {
@@ -446,6 +461,140 @@ func TestLSPDidClose(t *testing.T) {
 	}
 }
 
+// ──────────── Inlay Hints ────────────
+
+func TestLSPInlayHint(t *testing.T) {
+	c := newTestClient()
+
+	c.send("textDocument/didOpen", nil, DidOpenTextDocumentParams{
+		TextDocument: TextDocumentItem{
+			URI:  "file:///test.ason",
+			Text: `{name:str,age:int}:(Alice,30)`,
+		},
+	})
+	msg, _ := c.srv.readMessage()
+	c.srv.handleMessage(msg)
+	c.out.Reset()
+
+	c.send("textDocument/inlayHint", intPtr(10), InlayHintParams{
+		TextDocument: TextDocumentIdentifier{URI: "file:///test.ason"},
+		Range: LSPRange{
+			Start: LSPPosition{Line: 0, Character: 0},
+			End:   LSPPosition{Line: 0, Character: 100},
+		},
+	})
+	msg, _ = c.srv.readMessage()
+	c.srv.handleMessage(msg)
+
+	resp := c.readResponse()
+	if resp == nil {
+		t.Fatal("no inlay hint response")
+	}
+	var hints []LSPInlayHint
+	json.Unmarshal(resp.Result, &hints)
+	if len(hints) != 2 {
+		t.Fatalf("expected 2 inlay hints, got %d", len(hints))
+	}
+	if hints[0].Label != "name:" {
+		t.Errorf("hint[0] = %q, want 'name:'", hints[0].Label)
+	}
+	if hints[1].Label != "age:" {
+		t.Errorf("hint[1] = %q, want 'age:'", hints[1].Label)
+	}
+}
+
+func TestLSPInlayHintObjectArray(t *testing.T) {
+	c := newTestClient()
+
+	c.send("textDocument/didOpen", nil, DidOpenTextDocumentParams{
+		TextDocument: TextDocumentItem{
+			URI:  "file:///test.ason",
+			Text: `[{id:int,name:str}]:(1,Alice),(2,Bob)`,
+		},
+	})
+	msg, _ := c.srv.readMessage()
+	c.srv.handleMessage(msg)
+	c.out.Reset()
+
+	c.send("textDocument/inlayHint", intPtr(11), InlayHintParams{
+		TextDocument: TextDocumentIdentifier{URI: "file:///test.ason"},
+		Range: LSPRange{
+			Start: LSPPosition{Line: 0, Character: 0},
+			End:   LSPPosition{Line: 0, Character: 200},
+		},
+	})
+	msg, _ = c.srv.readMessage()
+	c.srv.handleMessage(msg)
+
+	resp := c.readResponse()
+	if resp == nil {
+		t.Fatal("no inlay hint response")
+	}
+	var hints []LSPInlayHint
+	json.Unmarshal(resp.Result, &hints)
+	if len(hints) != 4 {
+		t.Fatalf("expected 4 inlay hints, got %d", len(hints))
+	}
+}
+
+// ──────────── Execute Command (Compress) ────────────
+
+func TestLSPExecuteCommandCompress(t *testing.T) {
+	c := newTestClient()
+
+	c.send("textDocument/didOpen", nil, DidOpenTextDocumentParams{
+		TextDocument: TextDocumentItem{
+			URI:  "file:///test.ason",
+			Text: "{name:str, age:int}:\n  (Alice, 30)",
+		},
+	})
+	msg, _ := c.srv.readMessage()
+	c.srv.handleMessage(msg)
+	c.out.Reset()
+
+	uriArg, _ := json.Marshal("file:///test.ason")
+	c.send("workspace/executeCommand", intPtr(20), ExecuteCommandParams{
+		Command:   "ason.compress",
+		Arguments: []json.RawMessage{json.RawMessage(uriArg)},
+	})
+	msg, _ = c.srv.readMessage()
+	c.srv.handleMessage(msg)
+
+	resp := c.readResponse()
+	if resp == nil {
+		t.Fatal("expected response for compress command")
+	}
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: %s", resp.Error.Message)
+	}
+	var compressed string
+	json.Unmarshal(resp.Result, &compressed)
+	expected := "{name:str,age:int}:(Alice,30)"
+	if compressed != expected {
+		t.Errorf("compress result = %q, want %q", compressed, expected)
+	}
+}
+
+// ──────────── Unknown Method: executeCommand errors ────────────
+
+func TestLSPExecuteCommandUnknown(t *testing.T) {
+	c := newTestClient()
+
+	c.send("workspace/executeCommand", intPtr(30), ExecuteCommandParams{
+		Command: "ason.unknownCommand",
+	})
+	msg, _ := c.srv.readMessage()
+	c.srv.handleMessage(msg)
+
+	resp := c.readResponse()
+	if resp == nil {
+		t.Fatal("expected response for unknown command")
+	}
+	if resp.Error == nil {
+		t.Error("expected error for unknown command")
+	}
+}
+
 // ──────────── Unknown Method ────────────
 
 func TestLSPUnknownMethod(t *testing.T) {
@@ -553,5 +702,58 @@ func TestLSPEndToEndFlow(t *testing.T) {
 
 	if !c.srv.shutdown {
 		t.Error("server should shut down")
+	}
+}
+
+// ──────────── ASON ↔ JSON commands ────────────
+
+func TestLSPToJSON(t *testing.T) {
+	c := newTestClient()
+	c.initAndOpen("file:///conv.ason", `{name:str,age:int}:(Alice,30)`)
+
+	c.send("workspace/executeCommand", intPtr(10), ExecuteCommandParams{
+		Command:   "ason.toJSON",
+		Arguments: []json.RawMessage{json.RawMessage(`"file:///conv.ason"`)},
+	})
+	msg, _ := c.srv.readMessage()
+	c.srv.handleMessage(msg)
+	resp := c.readResponse()
+	if resp == nil {
+		t.Fatal("no response for toJSON")
+	}
+	var result string
+	json.Unmarshal(resp.Result, &result)
+	if !strings.Contains(result, "Alice") || !strings.Contains(result, "30") {
+		t.Errorf("toJSON result = %q, missing expected values", result)
+	}
+	// Validate it's proper JSON
+	var obj map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &obj); err != nil {
+		t.Errorf("toJSON result is not valid JSON: %v", err)
+	}
+}
+
+func TestLSPFromJSON(t *testing.T) {
+	c := newTestClient()
+	c.initAndOpen("file:///dummy.ason", `{}:()`)
+
+	jsonSrc := `{"age": 30, "name": "Alice"}`
+	c.send("workspace/executeCommand", intPtr(11), ExecuteCommandParams{
+		Command:   "ason.fromJSON",
+		Arguments: []json.RawMessage{json.RawMessage(`"` + strings.ReplaceAll(jsonSrc, `"`, `\"`) + `"`)},
+	})
+	msg, _ := c.srv.readMessage()
+	c.srv.handleMessage(msg)
+	resp := c.readResponse()
+	if resp == nil {
+		t.Fatal("no response for fromJSON")
+	}
+	var result string
+	json.Unmarshal(resp.Result, &result)
+	if !strings.Contains(result, "age") || !strings.Contains(result, "name") {
+		t.Errorf("fromJSON result = %q, missing schema fields", result)
+	}
+	if !strings.Contains(result, "30") || !strings.Contains(result, "Alice") {
+		t.Errorf("fromJSON result = %q, missing data values", result)
 	}
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -868,6 +869,337 @@ func TestIsNumber(t *testing.T) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Inlay Hints Tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+func TestInlayHintsSingleObject(t *testing.T) {
+	src := `{name:str,age:int}:(Alice,30)`
+	root, _ := Parse(src)
+	hints := InlayHints(root)
+
+	if len(hints) != 2 {
+		t.Fatalf("expected 2 hints, got %d", len(hints))
+	}
+	if hints[0].Label != "name:" {
+		t.Errorf("hint[0] = %q, want 'name:'", hints[0].Label)
+	}
+	if hints[1].Label != "age:" {
+		t.Errorf("hint[1] = %q, want 'age:'", hints[1].Label)
+	}
+}
+
+func TestInlayHintsObjectArray(t *testing.T) {
+	src := `[{id:int,name:str}]:(1,Alice),(2,Bob)`
+	root, _ := Parse(src)
+	hints := InlayHints(root)
+
+	if len(hints) != 4 {
+		t.Fatalf("expected 4 hints (2 per tuple), got %d", len(hints))
+	}
+	if hints[0].Label != "id:" {
+		t.Errorf("hint[0] = %q, want 'id:'", hints[0].Label)
+	}
+	if hints[1].Label != "name:" {
+		t.Errorf("hint[1] = %q, want 'name:'", hints[1].Label)
+	}
+	if hints[2].Label != "id:" {
+		t.Errorf("hint[2] = %q, want 'id:'", hints[2].Label)
+	}
+	if hints[3].Label != "name:" {
+		t.Errorf("hint[3] = %q, want 'name:'", hints[3].Label)
+	}
+}
+
+func TestInlayHintsNested(t *testing.T) {
+	src := `{name:str,addr:{city:str,zip:int}}:(Alice,(NYC,10001))`
+	root, _ := Parse(src)
+	hints := InlayHints(root)
+
+	// Should get: name:, addr:, city:, zip:
+	if len(hints) != 4 {
+		t.Fatalf("expected 4 hints (including nested), got %d: %v", len(hints), hints)
+	}
+	labels := make([]string, len(hints))
+	for i, h := range hints {
+		labels[i] = h.Label
+	}
+	expected := []string{"name:", "addr:", "city:", "zip:"}
+	for i, exp := range expected {
+		if labels[i] != exp {
+			t.Errorf("hint[%d] = %q, want %q", i, labels[i], exp)
+		}
+	}
+}
+
+func TestInlayHintsPlainArray(t *testing.T) {
+	src := `[1,2,3]`
+	root, _ := Parse(src)
+	hints := InlayHints(root)
+
+	if len(hints) != 0 {
+		t.Errorf("plain arrays should have no inlay hints, got %d", len(hints))
+	}
+}
+
+func TestInlayHintsMultilineObjectArray(t *testing.T) {
+	src := "[{id:int,name:str}]:\n  (1,Alice),\n  (2,Bob)"
+	root, _ := Parse(src)
+	hints := InlayHints(root)
+
+	if len(hints) != 4 {
+		t.Fatalf("expected 4 hints, got %d", len(hints))
+	}
+	// Check line numbers are correct
+	if hints[0].Line != 1 || hints[2].Line != 2 {
+		t.Errorf("hints should be on lines 1 and 2, got %d and %d", hints[0].Line, hints[2].Line)
+	}
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Compress Tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+func TestCompressSingleObject(t *testing.T) {
+	src := `{name:str,  age:int}:(Alice,  30)`
+	result := Compress(src)
+	expected := `{name:str,age:int}:(Alice,30)`
+	if result != expected {
+		t.Errorf("compress = %q, want %q", result, expected)
+	}
+}
+
+func TestCompressObjectArray(t *testing.T) {
+	src := "[{id:int, name:str}]:\n  (1, Alice),\n  (2, Bob)"
+	result := Compress(src)
+	expected := `[{id:int,name:str}]:(1,Alice),(2,Bob)`
+	if result != expected {
+		t.Errorf("compress = %q, want %q", result, expected)
+	}
+}
+
+func TestCompressPlainArray(t *testing.T) {
+	src := `[ 1 , 2 , 3 ]`
+	result := Compress(src)
+	expected := `[1,2,3]`
+	if result != expected {
+		t.Errorf("compress = %q, want %q", result, expected)
+	}
+}
+
+func TestCompressNested(t *testing.T) {
+	src := "{name:str, addr:{city:str, zip:int}}:(Alice, (NYC, 10001))"
+	result := Compress(src)
+	expected := `{name:str,addr:{city:str,zip:int}}:(Alice,(NYC,10001))`
+	if result != expected {
+		t.Errorf("compress = %q, want %q", result, expected)
+	}
+}
+
+func TestCompressIdempotent(t *testing.T) {
+	src := `{a:int,b:str}:(1,hello)`
+	c1 := Compress(src)
+	c2 := Compress(c1)
+	if c1 != c2 {
+		t.Errorf("compress not idempotent: %q vs %q", c1, c2)
+	}
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ASON → JSON conversion tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+func TestAsonToJSON_SimpleObject(t *testing.T) {
+	src := `{name:str, age:int}:(Alice, 30)`
+	result, err := AsonToJSON(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var obj map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &obj); err != nil {
+		t.Fatal("invalid JSON:", err)
+	}
+	if obj["name"] != "Alice" {
+		t.Errorf("name = %v, want Alice", obj["name"])
+	}
+	if obj["age"] != float64(30) {
+		t.Errorf("age = %v, want 30", obj["age"])
+	}
+}
+
+func TestAsonToJSON_ObjectArray(t *testing.T) {
+	src := `[{name:str, score:int}]:
+  (Alice, 95),
+  (Bob, 87)`
+	result, err := AsonToJSON(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var arr []map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &arr); err != nil {
+		t.Fatal("invalid JSON array:", err)
+	}
+	if len(arr) != 2 {
+		t.Fatalf("len = %d, want 2", len(arr))
+	}
+	if arr[0]["name"] != "Alice" {
+		t.Errorf("arr[0].name = %v", arr[0]["name"])
+	}
+	if arr[1]["score"] != float64(87) {
+		t.Errorf("arr[1].score = %v", arr[1]["score"])
+	}
+}
+
+func TestAsonToJSON_NestedObject(t *testing.T) {
+	src := `{name:str, addr:{city:str, zip:int}}:(Alice, (NYC, 10001))`
+	result, err := AsonToJSON(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var obj map[string]interface{}
+	json.Unmarshal([]byte(result), &obj)
+	addr := obj["addr"].(map[string]interface{})
+	if addr["city"] != "NYC" {
+		t.Errorf("addr.city = %v", addr["city"])
+	}
+	if addr["zip"] != float64(10001) {
+		t.Errorf("addr.zip = %v", addr["zip"])
+	}
+}
+
+func TestAsonToJSON_BoolValues(t *testing.T) {
+	src := `{active:bool, name:str}:(true, Test)`
+	result, err := AsonToJSON(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var obj map[string]interface{}
+	json.Unmarshal([]byte(result), &obj)
+	if obj["active"] != true {
+		t.Errorf("active = %v, want true", obj["active"])
+	}
+}
+
+func TestAsonToJSON_FloatValues(t *testing.T) {
+	src := `{price:float, qty:int}:(9.99, 5)`
+	result, err := AsonToJSON(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var obj map[string]interface{}
+	json.Unmarshal([]byte(result), &obj)
+	if obj["price"] != 9.99 {
+		t.Errorf("price = %v, want 9.99", obj["price"])
+	}
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// JSON → ASON conversion tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+func TestJSONToASON_SimpleObject(t *testing.T) {
+	src := `{"age": 30, "name": "Alice"}`
+	result, err := JSONToASON(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Should contain schema and data
+	if !strings.Contains(result, "age:int") || !strings.Contains(result, "name:str") {
+		t.Errorf("result = %q, missing schema fields", result)
+	}
+	if !strings.Contains(result, "30") || !strings.Contains(result, "Alice") {
+		t.Errorf("result = %q, missing data values", result)
+	}
+}
+
+func TestJSONToASON_Array(t *testing.T) {
+	src := `[{"name": "Alice", "score": 95}, {"name": "Bob", "score": 87}]`
+	result, err := JSONToASON(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, "[{") {
+		t.Errorf("result = %q, want array schema", result)
+	}
+	if !strings.Contains(result, "Alice") || !strings.Contains(result, "Bob") {
+		t.Errorf("result = %q, missing values", result)
+	}
+}
+
+func TestJSONToASON_Nested(t *testing.T) {
+	src := `{"name": "Alice", "addr": {"city": "NYC", "zip": 10001}}`
+	result, err := JSONToASON(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, "addr:{") {
+		t.Errorf("result = %q, missing nested schema", result)
+	}
+	if !strings.Contains(result, "NYC") {
+		t.Errorf("result = %q, missing nested value", result)
+	}
+}
+
+func TestJSONToASON_BoolAndFloat(t *testing.T) {
+	src := `{"active": true, "price": 9.99}`
+	result, err := JSONToASON(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, "bool") {
+		t.Errorf("result = %q, missing bool type", result)
+	}
+	if !strings.Contains(result, "float") {
+		t.Errorf("result = %q, missing float type", result)
+	}
+}
+
+func TestRoundTrip_SimpleObject(t *testing.T) {
+	asonSrc := `{age:int,name:str}:(30,Alice)`
+	jsonStr, err := AsonToJSON(asonSrc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	asonBack, err := JSONToASON(jsonStr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Roundtrip back to JSON to verify semantic equivalence
+	jsonBack, err := AsonToJSON(asonBack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Compare JSON objects
+	var obj1, obj2 map[string]interface{}
+	json.Unmarshal([]byte(jsonStr), &obj1)
+	json.Unmarshal([]byte(jsonBack), &obj2)
+	if obj1["name"] != obj2["name"] || obj1["age"] != obj2["age"] {
+		t.Errorf("roundtrip mismatch:\n  orig JSON: %s\n  back JSON: %s", jsonStr, jsonBack)
+	}
+}
+
+func TestRoundTrip_ObjectArray(t *testing.T) {
+	asonSrc := `[{name:str,score:int}]:(Alice,95),(Bob,87)`
+	jsonStr, err := AsonToJSON(asonSrc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	asonBack, err := JSONToASON(jsonStr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jsonBack, err := AsonToJSON(asonBack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var arr1, arr2 []map[string]interface{}
+	json.Unmarshal([]byte(jsonStr), &arr1)
+	json.Unmarshal([]byte(jsonBack), &arr2)
+	if len(arr1) != len(arr2) {
+		t.Errorf("roundtrip array length mismatch: %d vs %d", len(arr1), len(arr2))
+	}
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -877,4 +1209,49 @@ func diagMessages(diags []Diagnostic) []string {
 		msgs = append(msgs, d.Message)
 	}
 	return msgs
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Format — smart formatting tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+func TestFormatSimpleArrayInline(t *testing.T) {
+	// Simple schema+tuples should stay compact
+	src := "[{name:str,age:int,active:bool}]:(Alice,30,true),(Bob,25,false)"
+	result := Format(src)
+	expected := "[{name:str, age:int, active:bool}]:\n  (Alice, 30, true),\n  (Bob, 25, false)\n"
+	if result != expected {
+		t.Errorf("format =\n%s\nwant:\n%s", result, expected)
+	}
+}
+
+func TestFormatSimpleSingleObject(t *testing.T) {
+	// Simple single object should keep schema and data inline
+	src := `{name:str,  age:int}:(Alice,  30)`
+	result := Format(src)
+	expected := `{name:str, age:int}:(Alice, 30)`
+	if result != expected {
+		t.Errorf("format = %q, want %q", result, expected)
+	}
+}
+
+func TestFormatNestedSchemaExpands(t *testing.T) {
+	// Nested schema should expand when complex
+	src := `[{employee:{department:{id:str,manager:{contact:{email:str,phone:str},id:str,name:str},name:str},id:str,name:str}}]:(((D006,((pat@ex.net,123),M1,Alice),HR),E001,Bob))`
+	result := Format(src)
+	// Schema should be multi-line since it's deeply nested
+	if !strings.Contains(result, "\n") {
+		t.Errorf("nested schema should be multi-line:\n%s", result)
+	}
+	// Data tuples with nested tuples should also expand
+	t.Logf("Formatted output:\n%s", result)
+}
+
+func TestFormatPlainArrayInline(t *testing.T) {
+	src := `[ 1 , 2 , 3 ]`
+	result := Format(src)
+	expected := `[1, 2, 3]`
+	if result != expected {
+		t.Errorf("format = %q, want %q", result, expected)
+	}
 }

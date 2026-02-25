@@ -1,0 +1,145 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "ASON",
+  "scopeName": "source.ason",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#schema" },
+    { "include": "#data" },
+    { "include": "#array" },
+    { "include": "#string" },
+    { "include": "#number" },
+    { "include": "#boolean" },
+    { "include": "#operators" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.block.ason",
+      "begin": "/\\*",
+      "end": "\\*/"
+    },
+    "schema": {
+      "patterns": [
+        {
+          "name": "meta.schema.ason",
+          "begin": "\\{",
+          "end": "\\}",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.schema.begin.ason" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.schema.end.ason" }
+          },
+          "patterns": [
+            { "include": "#comment" },
+            { "include": "#schema" },
+            { "include": "#type-hint" },
+            { "include": "#field-name" },
+            { "include": "#operators" },
+            { "include": "#map-keyword" }
+          ]
+        }
+      ]
+    },
+    "field-name": {
+      "name": "variable.other.field.ason",
+      "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b(?=\\s*[,:}])"
+    },
+    "type-hint": {
+      "name": "support.type.ason",
+      "match": "\\b(int|integer|float|double|str|string|bool|boolean)\\b"
+    },
+    "map-keyword": {
+      "name": "keyword.other.map.ason",
+      "match": "\\bmap\\b"
+    },
+    "data": {
+      "patterns": [
+        {
+          "name": "meta.tuple.ason",
+          "begin": "\\(",
+          "end": "\\)",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.tuple.begin.ason" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.tuple.end.ason" }
+          },
+          "patterns": [
+            { "include": "#comment" },
+            { "include": "#data" },
+            { "include": "#array" },
+            { "include": "#string" },
+            { "include": "#number" },
+            { "include": "#boolean" },
+            { "include": "#operators" },
+            { "include": "#plain-string" }
+          ]
+        }
+      ]
+    },
+    "array": {
+      "patterns": [
+        {
+          "name": "meta.array.ason",
+          "begin": "\\[",
+          "end": "\\]",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.array.begin.ason" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.array.end.ason" }
+          },
+          "patterns": [
+            { "include": "#comment" },
+            { "include": "#schema" },
+            { "include": "#data" },
+            { "include": "#array" },
+            { "include": "#string" },
+            { "include": "#number" },
+            { "include": "#boolean" },
+            { "include": "#operators" },
+            { "include": "#type-hint" },
+            { "include": "#field-name" },
+            { "include": "#plain-string" }
+          ]
+        }
+      ]
+    },
+    "string": {
+      "name": "string.quoted.double.ason",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.ason",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "number": {
+      "name": "constant.numeric.ason",
+      "match": "-?\\b[0-9]+(\\.[0-9]+)?\\b"
+    },
+    "boolean": {
+      "name": "constant.language.boolean.ason",
+      "match": "\\b(true|false)\\b"
+    },
+    "plain-string": {
+      "name": "string.unquoted.ason",
+      "match": "[a-zA-Z_][a-zA-Z0-9_.@#$%&*!?~+-]*"
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "punctuation.separator.colon.ason",
+          "match": ":"
+        },
+        {
+          "name": "punctuation.separator.comma.ason",
+          "match": ","
+        }
+      ]
+    }
+  }
+}

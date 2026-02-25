@@ -2,3 +2,6 @@
 build
 *.out
 tmp
+.DS_Store
+*.log
+*.vsix
