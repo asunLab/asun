@@ -841,6 +841,9 @@ ason_err_t ason_decode_struct(const char** pos, const char* end, void* obj, cons
 void ason_write_schema(ason_buf_t* buf, const ason_desc_t* desc);
 void ason_write_schema_typed(ason_buf_t* buf, const ason_desc_t* desc);
 
+/* Pretty-format: reformat compact ASON with smart indentation */
+ason_buf_t ason_pretty_format(const char* src, size_t len);
+
 /* ============================================================================
  * ASON_FIELD macro — build a field descriptor
  * ============================================================================ */
@@ -1083,6 +1086,27 @@ void ason_write_schema_typed(ason_buf_t* buf, const ason_desc_t* desc);
             ason_buf_push(&buf, ')'); \
         } \
         return buf; \
+    } \
+    /* encode_pretty: pretty-formatted single struct */ \
+    static inline ason_buf_t ason_encode_pretty_##StructType(const StructType* obj) { \
+        ason_buf_t compact = ason_encode_##StructType(obj); \
+        ason_buf_t pretty = ason_pretty_format(compact.data, compact.len); \
+        ason_buf_free(&compact); \
+        return pretty; \
+    } \
+    /* encode_pretty_typed: pretty-formatted single struct with types */ \
+    static inline ason_buf_t ason_encode_pretty_typed_##StructType(const StructType* obj) { \
+        ason_buf_t compact = ason_encode_typed_##StructType(obj); \
+        ason_buf_t pretty = ason_pretty_format(compact.data, compact.len); \
+        ason_buf_free(&compact); \
+        return pretty; \
+    } \
+    /* encode_pretty_vec: pretty-formatted array */ \
+    static inline ason_buf_t ason_encode_pretty_vec_##StructType(const StructType* arr, size_t count) { \
+        ason_buf_t compact = ason_encode_vec_##StructType(arr, count); \
+        ason_buf_t pretty = ason_pretty_format(compact.data, compact.len); \
+        ason_buf_free(&compact); \
+        return pretty; \
     } \
     /* decode_vec: [{schema}]:(row1),(row2),... */ \
     static inline ason_err_t ason_decode_vec_##StructType(const char* input, size_t len, \

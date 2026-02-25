@@ -2,12 +2,14 @@ pub mod binary;
 pub mod decode;
 pub mod encode;
 pub mod error;
+pub mod pretty;
 pub mod simd;
 
 pub use binary::{decode_binary, encode_binary};
 pub use decode::decode;
 pub use encode::{encode, encode_typed};
 pub use error::{Error, Result};
+pub use pretty::{encode_pretty, encode_pretty_typed, pretty_format};
 
 #[cfg(test)]
 mod tests {
@@ -576,5 +578,39 @@ mod tests {
 
         let typed = encode_typed(&users).unwrap();
         assert_eq!(typed, "[{id:int,name:str,active:bool}]:(1,Alice,true)");
+    }
+
+    #[test]
+    fn test_pretty_simple() {
+        let u = User { id: 1, name: "Alice".into(), active: true };
+        let p = encode_pretty(&u).unwrap();
+        assert_eq!(p, "{id, name, active}:(1, Alice, true)");
+    }
+
+    #[test]
+    fn test_pretty_typed() {
+        let u = User { id: 1, name: "Alice".into(), active: true };
+        let p = encode_pretty_typed(&u).unwrap();
+        assert_eq!(p, "{id:int, name:str, active:bool}:(1, Alice, true)");
+    }
+
+    #[test]
+    fn test_pretty_roundtrip() {
+        let u = User { id: 1, name: "Alice".into(), active: true };
+        let p = encode_pretty(&u).unwrap();
+        let decoded: User = decode(&p).unwrap();
+        assert_eq!(decoded, u);
+    }
+
+    #[test]
+    fn test_pretty_array() {
+        let users = vec![
+            User { id: 1, name: "Alice".into(), active: true },
+            User { id: 2, name: "Bob".into(), active: false },
+        ];
+        let p = encode_pretty(&users).unwrap();
+        assert!(p.contains('\n'), "expected multi-line output");
+        let decoded: Vec<User> = decode(&p).unwrap();
+        assert_eq!(decoded, users);
     }
 }

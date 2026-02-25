@@ -45,6 +45,14 @@ public final class Ason {
         return encodeSingle(value, true);
     }
 
+    public static String encodePretty(Object value) {
+        return prettyFormat(encode(value));
+    }
+
+    public static String encodePrettyTyped(Object value) {
+        return prettyFormat(encodeTyped(value));
+    }
+
     private static String encodeSingle(Object value, boolean typed) {
         ByteBuffer buf = new ByteBuffer();
         ClassMeta meta = ClassMeta.of(value.getClass());
@@ -599,4 +607,181 @@ public final class Ason {
     public static byte[] encodeBinary(Object value) { return AsonBinary.encode(value); }
     public static <T> T decodeBinary(byte[] data, Class<T> clazz) { return AsonBinary.decode(data, clazz); }
     public static <T> List<T> decodeBinaryList(byte[] data, Class<T> clazz) { return AsonBinary.decodeList(data, clazz); }
+
+    // ========================================================================
+    // Pretty Format
+    // ========================================================================
+
+    private static final int PRETTY_MAX_WIDTH = 100;
+
+    /**
+     * Reformat compact ASON string with smart indentation.
+     * Simple structures stay inline; complex ones expand with 2-space indentation.
+     */
+    public static String prettyFormat(String src) {
+        if (src == null || src.isEmpty()) return src;
+        byte[] b = src.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        int n = b.length;
+
+        // Build matching bracket table
+        int[] mat = new int[n];
+        java.util.Arrays.fill(mat, -1);
+        int[] stack = new int[256];
+        int sp = 0;
+        boolean inQuote = false;
+        for (int i = 0; i < n; i++) {
+            if (inQuote) {
+                if (b[i] == '\\' && i + 1 < n) { i++; continue; }
+                if (b[i] == '"') inQuote = false;
+                continue;
+            }
+            switch (b[i]) {
+                case '"': inQuote = true; break;
+                case '{': case '(': case '[': stack[sp++] = i; break;
+                case '}': case ')': case ']':
+                    if (sp > 0) { int j = stack[--sp]; mat[j] = i; mat[i] = j; }
+                    break;
+            }
+        }
+
+        int[] state = {0, 0}; // pos, depth
+        StringBuilder out = new StringBuilder(n * 2);
+        prettyWriteTop(b, n, mat, state, out);
+        return out.toString();
+    }
+
+    private static void prettyWriteTop(byte[] b, int n, int[] mat, int[] s, StringBuilder o) {
+        if (s[0] >= n) return;
+        if (b[s[0]] == '[' && s[0] + 1 < n && b[s[0] + 1] == '{')
+            prettyArrayTop(b, n, mat, s, o);
+        else if (b[s[0]] == '{')
+            prettyObjectTop(b, n, mat, s, o);
+        else
+            o.append(new String(b, s[0], n - s[0], java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    private static void prettyObjectTop(byte[] b, int n, int[] mat, int[] s, StringBuilder o) {
+        prettyGroup(b, n, mat, s, o);
+        if (s[0] < n && b[s[0]] == ':') {
+            o.append(':'); s[0]++;
+            if (s[0] < n) {
+                int cl = mat[s[0]];
+                if (cl >= 0 && cl - s[0] + 1 <= PRETTY_MAX_WIDTH) {
+                    prettyInline(b, mat, s[0], cl + 1, o); s[0] = cl + 1;
+                } else {
+                    o.append('\n'); s[1]++;
+                    prettyIndent(s[1], o); prettyGroup(b, n, mat, s, o); s[1]--;
+                }
+            }
+        }
+    }
+
+    private static void prettyArrayTop(byte[] b, int n, int[] mat, int[] s, StringBuilder o) {
+        o.append('['); s[0]++;
+        prettyGroup(b, n, mat, s, o);
+        if (s[0] < n && b[s[0]] == ']') { o.append(']'); s[0]++; }
+        if (s[0] < n && b[s[0]] == ':') { o.append(':').append('\n'); s[0]++; }
+        s[1]++;
+        boolean first = true;
+        while (s[0] < n) {
+            if (b[s[0]] == ',') s[0]++;
+            if (s[0] >= n) break;
+            if (!first) o.append(',').append('\n');
+            first = false;
+            prettyIndent(s[1], o); prettyGroup(b, n, mat, s, o);
+        }
+        o.append('\n'); s[1]--;
+    }
+
+    private static void prettyGroup(byte[] b, int n, int[] mat, int[] s, StringBuilder o) {
+        if (s[0] >= n) return;
+        byte ch = b[s[0]];
+        if (ch != '{' && ch != '(' && ch != '[') { prettyValue(b, n, s, o); return; }
+
+        // Special: [{...}]
+        if (ch == '[' && s[0] + 1 < n && b[s[0] + 1] == '{') {
+            int cb = mat[s[0] + 1], ck = mat[s[0]];
+            if (cb >= 0 && ck >= 0 && cb + 1 == ck) {
+                int w = ck - s[0] + 1;
+                if (w <= PRETTY_MAX_WIDTH) {
+                    prettyInline(b, mat, s[0], ck + 1, o); s[0] = ck + 1; return;
+                }
+                o.append('['); s[0]++;
+                prettyGroup(b, n, mat, s, o);
+                o.append(']'); s[0]++;
+                return;
+            }
+        }
+
+        int close = mat[s[0]];
+        if (close < 0) { o.append((char)ch); s[0]++; return; }
+        int w = close - s[0] + 1;
+        if (w <= PRETTY_MAX_WIDTH) { prettyInline(b, mat, s[0], close + 1, o); s[0] = close + 1; return; }
+
+        char closeCh = (char)b[close];
+        o.append((char)ch); s[0]++;
+        if (s[0] >= close) { o.append(closeCh); s[0] = close + 1; return; }
+
+        o.append('\n'); s[1]++;
+        boolean first = true;
+        while (s[0] < close) {
+            if (b[s[0]] == ',') s[0]++;
+            if (!first) o.append(',').append('\n');
+            first = false;
+            prettyIndent(s[1], o); prettyElement(b, n, mat, s, o, close);
+        }
+        o.append('\n'); s[1]--;
+        prettyIndent(s[1], o); o.append(closeCh); s[0] = close + 1;
+    }
+
+    private static void prettyElement(byte[] b, int n, int[] mat, int[] s, StringBuilder o, int boundary) {
+        while (s[0] < boundary && b[s[0]] != ',') {
+            byte ch = b[s[0]];
+            if (ch == '{' || ch == '(' || ch == '[') prettyGroup(b, n, mat, s, o);
+            else if (ch == '"') prettyQuoted(b, n, s, o);
+            else { o.append((char)ch); s[0]++; }
+        }
+    }
+
+    private static void prettyValue(byte[] b, int n, int[] s, StringBuilder o) {
+        while (s[0] < n) {
+            byte ch = b[s[0]];
+            if (ch == ',' || ch == ')' || ch == '}' || ch == ']') break;
+            if (ch == '"') prettyQuoted(b, n, s, o);
+            else { o.append((char)ch); s[0]++; }
+        }
+    }
+
+    private static void prettyQuoted(byte[] b, int n, int[] s, StringBuilder o) {
+        o.append('"'); s[0]++;
+        while (s[0] < n) {
+            char ch = (char)b[s[0]]; o.append(ch); s[0]++;
+            if (ch == '\\' && s[0] < n) { o.append((char)b[s[0]]); s[0]++; }
+            else if (ch == '"') break;
+        }
+    }
+
+    private static void prettyInline(byte[] b, int[] mat, int start, int end, StringBuilder o) {
+        int d = 0; boolean inq = false;
+        for (int i = start; i < end; i++) {
+            char ch = (char)b[i];
+            if (inq) {
+                o.append(ch);
+                if (ch == '\\' && i + 1 < end) { i++; o.append((char)b[i]); }
+                else if (ch == '"') inq = false;
+                continue;
+            }
+            switch (ch) {
+                case '"': inq = true; o.append(ch); break;
+                case '{': case '(': case '[': d++; o.append(ch); break;
+                case '}': case ')': case ']': d--; o.append(ch); break;
+                case ',': o.append(','); if (d == 1) o.append(' '); break;
+                default: o.append(ch); break;
+            }
+        }
+    }
+
+    private static void prettyIndent(int depth, StringBuilder o) {
+        for (int i = 0; i < depth; i++) o.append("  ");
+    }
 }
