@@ -614,11 +614,23 @@ func tupleHints(schema *Node, tuple *Node) []InlayHint {
 			Col:   child.Token.Col,
 			Label: label,
 		})
-		// Recurse into nested tuples with nested schemas
-		if child.Kind == NodeTuple && len(fields[i].Children) > 0 {
-			for _, fc := range fields[i].Children {
-				if fc.Kind == NodeSchema {
+		// Recurse into nested structures
+		if len(fields[i].Children) > 0 {
+			fc := fields[i].Children[0]
+			switch fc.Kind {
+			case NodeSchema:
+				// field:{nested_schema} — data is a tuple
+				if child.Kind == NodeTuple {
 					hints = append(hints, tupleHints(fc, child)...)
+				}
+			case NodeArraySchema:
+				// field:[{nested_schema}] — data is an array of tuples
+				if child.Kind == NodeArray {
+					for _, elem := range child.Children {
+						if elem.Kind == NodeTuple {
+							hints = append(hints, tupleHints(fc, elem)...)
+						}
+					}
 				}
 			}
 		}

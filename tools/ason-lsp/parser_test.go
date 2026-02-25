@@ -941,6 +941,59 @@ func TestInlayHintsPlainArray(t *testing.T) {
 	}
 }
 
+func TestInlayHintsNestedArraySchema(t *testing.T) {
+	// Schema has a field with an array of objects: projects:[{id:str,name:str}]
+	// Data has an array of tuples for that field
+	src := `{name:str,projects:[{id:str,title:str}]}:(Alice,[(P1,App),(P2,Web)])`
+	root, _ := Parse(src)
+	hints := InlayHints(root)
+
+	// Expected hints:
+	// name: (before Alice)
+	// projects: (before [...])
+	// id: (before P1), title: (before App)
+	// id: (before P2), title: (before Web)
+	labels := make([]string, len(hints))
+	for i, h := range hints {
+		labels[i] = h.Label
+	}
+	expected := []string{"name:", "projects:", "id:", "title:", "id:", "title:"}
+	if len(hints) != len(expected) {
+		t.Fatalf("expected %d hints, got %d: %v", len(expected), len(hints), labels)
+	}
+	for i, exp := range expected {
+		if labels[i] != exp {
+			t.Errorf("hint[%d] = %q, want %q", i, labels[i], exp)
+		}
+	}
+}
+
+func TestInlayHintsDeeplyNested(t *testing.T) {
+	// 3 levels: employee has department (object) and projects (array of objects with tasks array)
+	src := `{employee:{dept:{id:str,name:str},projects:[{pid:str,tasks:[{tid:str,status:str}]}]}}:` +
+		`(((D1,HR),[(P1,[( T1,Done),(T2,Pending)])]))`
+	root, _ := Parse(src)
+	hints := InlayHints(root)
+
+	labels := make([]string, len(hints))
+	for i, h := range hints {
+		labels[i] = h.Label
+	}
+	// employee:, dept:, id:, name:, projects:, pid:, tasks:, tid:, status:, tid:, status:
+	expected := []string{
+		"employee:", "dept:", "id:", "name:", "projects:",
+		"pid:", "tasks:", "tid:", "status:", "tid:", "status:",
+	}
+	if len(hints) != len(expected) {
+		t.Fatalf("expected %d hints, got %d: %v", len(expected), len(hints), labels)
+	}
+	for i, exp := range expected {
+		if labels[i] != exp {
+			t.Errorf("hint[%d] = %q, want %q", i, labels[i], exp)
+		}
+	}
+}
+
 func TestInlayHintsMultilineObjectArray(t *testing.T) {
 	src := "[{id:int,name:str}]:\n  (1,Alice),\n  (2,Bob)"
 	root, _ := Parse(src)
