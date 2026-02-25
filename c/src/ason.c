@@ -699,6 +699,189 @@ void ason_encode_struct(ason_buf_t* buf, const void* obj, const ason_desc_t* des
     ason_buf_push(buf, ')');
 }
 
+/* ---- Pretty-format: smart indentation for ASON output ---- */
+#define ASON_PRETTY_MAX_WIDTH 100
+
+static void pretty_build_match_table(const char* src, int n, int* mat) {
+    int stack[256]; int sp = 0;
+    int in_quote = 0;
+    for (int i = 0; i < n; i++) mat[i] = -1;
+    for (int i = 0; i < n; i++) {
+        if (in_quote) {
+            if (src[i] == '\\' && i + 1 < n) { i++; continue; }
+            if (src[i] == '"') in_quote = 0;
+            continue;
+        }
+        switch (src[i]) {
+            case '"': in_quote = 1; break;
+            case '{': case '(': case '[': stack[sp++] = i; break;
+            case '}': case ')': case ']':
+                if (sp > 0) { int j = stack[--sp]; mat[j] = i; mat[i] = j; }
+                break;
+        }
+    }
+}
+
+typedef struct {
+    const char* src;
+    int n;
+    int* mat;
+    ason_buf_t* out;
+    int pos;
+    int depth;
+} pretty_state_t;
+
+static void pretty_indent(pretty_state_t* s) {
+    for (int i = 0; i < s->depth; i++) { ason_buf_push(s->out, ' '); ason_buf_push(s->out, ' '); }
+}
+
+static void pretty_quoted(pretty_state_t* s) {
+    ason_buf_push(s->out, '"'); s->pos++;
+    while (s->pos < s->n) {
+        char ch = s->src[s->pos]; ason_buf_push(s->out, ch); s->pos++;
+        if (ch == '\\' && s->pos < s->n) { ason_buf_push(s->out, s->src[s->pos]); s->pos++; }
+        else if (ch == '"') break;
+    }
+}
+
+static void pretty_inline(pretty_state_t* s, int start, int end) {
+    int d = 0, inq = 0;
+    for (int i = start; i < end; i++) {
+        char ch = s->src[i];
+        if (inq) {
+            ason_buf_push(s->out, ch);
+            if (ch == '\\' && i + 1 < end) { i++; ason_buf_push(s->out, s->src[i]); }
+            else if (ch == '"') inq = 0;
+            continue;
+        }
+        switch (ch) {
+            case '"': inq = 1; ason_buf_push(s->out, ch); break;
+            case '{': case '(': case '[': d++; ason_buf_push(s->out, ch); break;
+            case '}': case ')': case ']': d--; ason_buf_push(s->out, ch); break;
+            case ',': ason_buf_push(s->out, ','); if (d == 1) ason_buf_push(s->out, ' '); break;
+            default: ason_buf_push(s->out, ch); break;
+        }
+    }
+}
+
+static void pretty_group(pretty_state_t* s);
+
+static void pretty_value(pretty_state_t* s) {
+    while (s->pos < s->n) {
+        char ch = s->src[s->pos];
+        if (ch == ',' || ch == ')' || ch == '}' || ch == ']') break;
+        if (ch == '"') pretty_quoted(s); else { ason_buf_push(s->out, ch); s->pos++; }
+    }
+}
+
+static void pretty_element(pretty_state_t* s, int boundary) {
+    while (s->pos < boundary && s->src[s->pos] != ',') {
+        char ch = s->src[s->pos];
+        if (ch == '{' || ch == '(' || ch == '[') pretty_group(s);
+        else if (ch == '"') pretty_quoted(s);
+        else { ason_buf_push(s->out, ch); s->pos++; }
+    }
+}
+
+static void pretty_group(pretty_state_t* s) {
+    if (s->pos >= s->n) return;
+    char ch = s->src[s->pos];
+    if (ch != '{' && ch != '(' && ch != '[') { pretty_value(s); return; }
+
+    /* Special case: [{...}] array schema */
+    if (ch == '[' && s->pos + 1 < s->n && s->src[s->pos + 1] == '{') {
+        int cb = s->mat[s->pos + 1], ck = s->mat[s->pos];
+        if (cb >= 0 && ck >= 0 && cb + 1 == ck) {
+            int width = ck - s->pos + 1;
+            if (width <= ASON_PRETTY_MAX_WIDTH) {
+                pretty_inline(s, s->pos, ck + 1); s->pos = ck + 1; return;
+            }
+            ason_buf_push(s->out, '['); s->pos++;
+            pretty_group(s);
+            ason_buf_push(s->out, ']'); s->pos++;
+            return;
+        }
+    }
+
+    int close = s->mat[s->pos];
+    if (close < 0) { ason_buf_push(s->out, ch); s->pos++; return; }
+    int width = close - s->pos + 1;
+    if (width <= ASON_PRETTY_MAX_WIDTH) {
+        pretty_inline(s, s->pos, close + 1); s->pos = close + 1; return;
+    }
+
+    char close_ch = s->src[close];
+    ason_buf_push(s->out, ch); s->pos++;
+    if (s->pos >= close) { ason_buf_push(s->out, close_ch); s->pos = close + 1; return; }
+
+    ason_buf_push(s->out, '\n'); s->depth++;
+    int first = 1;
+    while (s->pos < close) {
+        if (s->src[s->pos] == ',') s->pos++;
+        if (!first) { ason_buf_push(s->out, ','); ason_buf_push(s->out, '\n'); }
+        first = 0;
+        pretty_indent(s); pretty_element(s, close);
+    }
+    ason_buf_push(s->out, '\n'); s->depth--;
+    pretty_indent(s);
+    ason_buf_push(s->out, close_ch); s->pos = close + 1;
+}
+
+static void pretty_object_top(pretty_state_t* s) {
+    pretty_group(s);
+    if (s->pos < s->n && s->src[s->pos] == ':') {
+        ason_buf_push(s->out, ':'); s->pos++;
+        if (s->pos < s->n) {
+            int cl = s->mat[s->pos];
+            if (cl >= 0 && cl - s->pos + 1 <= ASON_PRETTY_MAX_WIDTH) {
+                pretty_inline(s, s->pos, cl + 1); s->pos = cl + 1;
+            } else {
+                ason_buf_push(s->out, '\n'); s->depth++;
+                pretty_indent(s); pretty_group(s); s->depth--;
+            }
+        }
+    }
+}
+
+static void pretty_array_top(pretty_state_t* s) {
+    ason_buf_push(s->out, '['); s->pos++;
+    pretty_group(s);
+    if (s->pos < s->n && s->src[s->pos] == ']') { ason_buf_push(s->out, ']'); s->pos++; }
+    if (s->pos < s->n && s->src[s->pos] == ':') {
+        ason_buf_push(s->out, ':'); ason_buf_push(s->out, '\n'); s->pos++;
+    }
+    s->depth++;
+    int first = 1;
+    while (s->pos < s->n) {
+        if (s->src[s->pos] == ',') s->pos++;
+        if (s->pos >= s->n) break;
+        if (!first) { ason_buf_push(s->out, ','); ason_buf_push(s->out, '\n'); }
+        first = 0;
+        pretty_indent(s); pretty_group(s);
+    }
+    ason_buf_push(s->out, '\n'); s->depth--;
+}
+
+ason_buf_t ason_pretty_format(const char* src, size_t len) {
+    ason_buf_t out = ason_buf_new(len * 2);
+    if (len == 0) return out;
+
+    int* mat = (int*)malloc(sizeof(int) * len);
+    if (!mat) return out;
+    pretty_build_match_table(src, (int)len, mat);
+
+    pretty_state_t s = { src, (int)len, mat, &out, 0, 0 };
+    if (src[0] == '[' && len > 1 && src[1] == '{')
+        pretty_array_top(&s);
+    else if (src[0] == '{')
+        pretty_object_top(&s);
+    else
+        ason_buf_append(&out, src, len);
+
+    free(mat);
+    return out;
+}
+
 ason_err_t ason_decode_struct(const char** pos, const char* end, void* obj, const ason_desc_t* desc) {
     ason_skip_ws(pos, end);
 

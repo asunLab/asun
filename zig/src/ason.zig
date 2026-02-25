@@ -318,6 +318,278 @@ pub fn encodeTyped(comptime T: type, value: T, allocator: Allocator) ![]const u8
     return w.toOwnedSlice();
 }
 
+/// Encode to pretty-formatted ASON with smart indentation.
+pub fn encodePretty(comptime T: type, value: T, allocator: Allocator) ![]const u8 {
+    const compact = try encode(T, value, allocator);
+    defer allocator.free(compact);
+    return prettyFormat(compact, allocator);
+}
+
+/// Encode to pretty-formatted ASON with type annotations.
+pub fn encodePrettyTyped(comptime T: type, value: T, allocator: Allocator) ![]const u8 {
+    const compact = try encodeTyped(T, value, allocator);
+    defer allocator.free(compact);
+    return prettyFormat(compact, allocator);
+}
+
+/// Reformat compact ASON with smart indentation (max 100 chars inline).
+pub fn prettyFormat(src: []const u8, allocator: Allocator) ![]const u8 {
+    const n = src.len;
+    if (n == 0) {
+        const empty = try allocator.alloc(u8, 0);
+        return empty;
+    }
+
+    // Build matching bracket table
+    const mat = try allocator.alloc(i32, n);
+    defer allocator.free(mat);
+    for (mat) |*m| m.* = -1;
+    var stack_buf: [256]usize = undefined;
+    var sp: usize = 0;
+    var in_quote = false;
+    var bi: usize = 0;
+    while (bi < n) : (bi += 1) {
+        if (in_quote) {
+            if (src[bi] == '\\' and bi + 1 < n) { bi += 1; continue; }
+            if (src[bi] == '"') in_quote = false;
+            continue;
+        }
+        switch (src[bi]) {
+            '"' => in_quote = true,
+            '{', '(', '[' => { stack_buf[sp] = bi; sp += 1; },
+            '}', ')', ']' => {
+                if (sp > 0) {
+                    sp -= 1;
+                    const j = stack_buf[sp];
+                    mat[j] = @intCast(bi);
+                    mat[bi] = @intCast(j);
+                }
+            },
+            else => {},
+        }
+    }
+
+    var out = Writer.init(allocator);
+    errdefer out.deinit();
+    try out.ensureUnusedCapacity(n * 2);
+
+    var state = PrettyState{ .src = src, .mat = mat, .out = &out, .pos = 0, .depth = 0 };
+    try state.writeTop();
+    return out.toOwnedSlice();
+}
+
+const PRETTY_MAX_WIDTH: usize = 100;
+
+const PrettyState = struct {
+    src: []const u8,
+    mat: []const i32,
+    out: *Writer,
+    pos: usize,
+    depth: usize,
+
+    fn writeTop(self: *PrettyState) Allocator.Error!void {
+        if (self.pos >= self.src.len) return;
+        if (self.src[self.pos] == '[' and self.pos + 1 < self.src.len and self.src[self.pos + 1] == '{') {
+            try self.writeArrayTop();
+        } else if (self.src[self.pos] == '{') {
+            try self.writeObjectTop();
+        } else {
+            try self.out.appendSlice(self.src[self.pos..]);
+        }
+    }
+
+    fn writeObjectTop(self: *PrettyState) Allocator.Error!void {
+        try self.writeGroup();
+        if (self.pos < self.src.len and self.src[self.pos] == ':') {
+            try self.out.append(':');
+            self.pos += 1;
+            if (self.pos < self.src.len) {
+                const cl = self.mat[self.pos];
+                if (cl >= 0 and @as(usize, @intCast(cl)) - self.pos + 1 <= PRETTY_MAX_WIDTH) {
+                    const end_pos = @as(usize, @intCast(cl)) + 1;
+                    try self.writeInline(self.pos, end_pos);
+                    self.pos = end_pos;
+                } else {
+                    try self.out.append('\n');
+                    self.depth += 1;
+                    try self.writeIndent();
+                    try self.writeGroup();
+                    self.depth -= 1;
+                }
+            }
+        }
+    }
+
+    fn writeArrayTop(self: *PrettyState) Allocator.Error!void {
+        try self.out.append('[');
+        self.pos += 1;
+        try self.writeGroup();
+        if (self.pos < self.src.len and self.src[self.pos] == ']') {
+            try self.out.append(']');
+            self.pos += 1;
+        }
+        if (self.pos < self.src.len and self.src[self.pos] == ':') {
+            try self.out.appendSlice(":\n");
+            self.pos += 1;
+        }
+        self.depth += 1;
+        var first = true;
+        while (self.pos < self.src.len) {
+            if (self.src[self.pos] == ',') self.pos += 1;
+            if (self.pos >= self.src.len) break;
+            if (!first) try self.out.appendSlice(",\n");
+            first = false;
+            try self.writeIndent();
+            try self.writeGroup();
+        }
+        try self.out.append('\n');
+        self.depth -= 1;
+    }
+
+    fn writeGroup(self: *PrettyState) Allocator.Error!void {
+        if (self.pos >= self.src.len) return;
+        const ch = self.src[self.pos];
+        if (ch != '{' and ch != '(' and ch != '[') {
+            try self.writeValue();
+            return;
+        }
+
+        // Special: [{...}] array schema
+        if (ch == '[' and self.pos + 1 < self.src.len and self.src[self.pos + 1] == '{') {
+            const cb = self.mat[self.pos + 1];
+            const ck = self.mat[self.pos];
+            if (cb >= 0 and ck >= 0 and cb + 1 == ck) {
+                const width = @as(usize, @intCast(ck)) - self.pos + 1;
+                if (width <= PRETTY_MAX_WIDTH) {
+                    const end_pos = @as(usize, @intCast(ck)) + 1;
+                    try self.writeInline(self.pos, end_pos);
+                    self.pos = end_pos;
+                    return;
+                }
+                try self.out.append('[');
+                self.pos += 1;
+                try self.writeGroup();
+                try self.out.append(']');
+                self.pos += 1;
+                return;
+            }
+        }
+
+        const close_i32 = self.mat[self.pos];
+        if (close_i32 < 0) {
+            try self.out.append(ch);
+            self.pos += 1;
+            return;
+        }
+        const close = @as(usize, @intCast(close_i32));
+        const width = close - self.pos + 1;
+        if (width <= PRETTY_MAX_WIDTH) {
+            try self.writeInline(self.pos, close + 1);
+            self.pos = close + 1;
+            return;
+        }
+
+        const close_ch = self.src[close];
+        try self.out.append(ch);
+        self.pos += 1;
+        if (self.pos >= close) {
+            try self.out.append(close_ch);
+            self.pos = close + 1;
+            return;
+        }
+
+        try self.out.append('\n');
+        self.depth += 1;
+        var first = true;
+        while (self.pos < close) {
+            if (self.src[self.pos] == ',') self.pos += 1;
+            if (!first) try self.out.appendSlice(",\n");
+            first = false;
+            try self.writeIndent();
+            try self.writeElement(close);
+        }
+        try self.out.append('\n');
+        self.depth -= 1;
+        try self.writeIndent();
+        try self.out.append(close_ch);
+        self.pos = close + 1;
+    }
+
+    fn writeElement(self: *PrettyState, boundary: usize) Allocator.Error!void {
+        while (self.pos < boundary and self.src[self.pos] != ',') {
+            const ch = self.src[self.pos];
+            if (ch == '{' or ch == '(' or ch == '[') {
+                try self.writeGroup();
+            } else if (ch == '"') {
+                try self.writeQuoted();
+            } else {
+                try self.out.append(ch);
+                self.pos += 1;
+            }
+        }
+    }
+
+    fn writeValue(self: *PrettyState) Allocator.Error!void {
+        while (self.pos < self.src.len) {
+            const ch = self.src[self.pos];
+            if (ch == ',' or ch == ')' or ch == '}' or ch == ']') break;
+            if (ch == '"') {
+                try self.writeQuoted();
+            } else {
+                try self.out.append(ch);
+                self.pos += 1;
+            }
+        }
+    }
+
+    fn writeQuoted(self: *PrettyState) Allocator.Error!void {
+        try self.out.append('"');
+        self.pos += 1;
+        while (self.pos < self.src.len) {
+            const ch = self.src[self.pos];
+            try self.out.append(ch);
+            self.pos += 1;
+            if (ch == '\\' and self.pos < self.src.len) {
+                try self.out.append(self.src[self.pos]);
+                self.pos += 1;
+            } else if (ch == '"') break;
+        }
+    }
+
+    fn writeInline(self: *PrettyState, start: usize, end: usize) Allocator.Error!void {
+        var d: i32 = 0;
+        var inq = false;
+        var i = start;
+        while (i < end) : (i += 1) {
+            const ch = self.src[i];
+            if (inq) {
+                try self.out.append(ch);
+                if (ch == '\\' and i + 1 < end) {
+                    i += 1;
+                    try self.out.append(self.src[i]);
+                } else if (ch == '"') inq = false;
+                continue;
+            }
+            switch (ch) {
+                '"' => { inq = true; try self.out.append(ch); },
+                '{', '(', '[' => { d += 1; try self.out.append(ch); },
+                '}', ')', ']' => { d -= 1; try self.out.append(ch); },
+                ',' => {
+                    try self.out.append(',');
+                    if (d == 1) try self.out.append(' ');
+                },
+                else => try self.out.append(ch),
+            }
+        }
+    }
+
+    fn writeIndent(self: *PrettyState) Allocator.Error!void {
+        for (0..self.depth) |_| {
+            try self.out.appendSlice("  ");
+        }
+    }
+};
+
 fn writeSchema(comptime T: type, w: *Writer, typed: bool) !void {
     const info = @typeInfo(T);
     switch (info) {
@@ -2020,4 +2292,44 @@ test "SIMD skip whitespace" {
     try std.testing.expectEqual(@as(usize, 3), simdSkipWhitespace("   hello", 0));
     try std.testing.expectEqual(@as(usize, 0), simdSkipWhitespace("hello", 0));
     try std.testing.expectEqual(@as(usize, 18), simdSkipWhitespace("                  hello", 0));
+}
+
+test "pretty format simple" {
+    const allocator = std.testing.allocator;
+    const result = try prettyFormat("{id,name,active}:(1,Alice,true)", allocator);
+    defer allocator.free(result);
+    try std.testing.expectEqualStrings("{id, name, active}:(1, Alice, true)", result);
+}
+
+test "pretty format array" {
+    const allocator = std.testing.allocator;
+    const result = try prettyFormat("[{id,name}]:(1,Alice),(2,Bob)", allocator);
+    defer allocator.free(result);
+    // Should contain the schema and both tuples
+    try std.testing.expect(std.mem.indexOf(u8, result, "[{id, name}]:") != null);
+    try std.testing.expect(std.mem.indexOf(u8, result, "(1, Alice)") != null);
+    try std.testing.expect(std.mem.indexOf(u8, result, "(2, Bob)") != null);
+}
+
+test "pretty encode roundtrip" {
+    const allocator = std.testing.allocator;
+    const T = struct { id: i64, name: []const u8, active: bool };
+    const val = T{ .id = 42, .name = "Test", .active = true };
+    const pretty = try encodePretty(T, val, allocator);
+    defer allocator.free(pretty);
+    const decoded = try decode(T, pretty, allocator);
+    defer allocator.free(decoded.name);
+    try std.testing.expectEqual(@as(i64, 42), decoded.id);
+    try std.testing.expectEqualStrings("Test", decoded.name);
+    try std.testing.expect(decoded.active);
+}
+
+test "pretty encode typed" {
+    const allocator = std.testing.allocator;
+    const T = struct { id: i64, name: []const u8 };
+    const val = T{ .id = 1, .name = "Alice" };
+    const pretty = try encodePrettyTyped(T, val, allocator);
+    defer allocator.free(pretty);
+    // Should contain type annotations
+    try std.testing.expect(std.mem.indexOf(u8, pretty, "int") != null or std.mem.indexOf(u8, pretty, "str") != null);
 }

@@ -434,4 +434,47 @@ public class AsonTest {
         Matrix3D m2 = Ason.decode(s, Matrix3D.class);
         assertEquals(m, m2);
     }
+
+    // ========================================================================
+    // Pretty encode tests
+    // ========================================================================
+
+    @Test void testPrettySimple() {
+        User u = new User(1, "Alice", true);
+        String pretty = Ason.encodePretty(u);
+        assertEquals("{id, name, active}:(1, Alice, true)", pretty);
+    }
+
+    @Test void testPrettyTyped() {
+        User u = new User(1, "Alice", true);
+        String pretty = Ason.encodePrettyTyped(u);
+        assertTrue(pretty.contains(":"));
+        // Should have type annotations like int, str, bool
+        assertTrue(pretty.contains("int") || pretty.contains("str") || pretty.contains("bool"));
+    }
+
+    @Test void testPrettyArray() {
+        List<User> users = List.of(
+            new User(1, "Alice", true),
+            new User(2, "Bob", false)
+        );
+        String pretty = Ason.encodePretty(users);
+        // Array format should have newlines for multiple tuples
+        assertTrue(pretty.contains("[{id, name, active}]:"));
+        assertTrue(pretty.contains("(1, Alice, true)"));
+        assertTrue(pretty.contains("(2, Bob, false)"));
+    }
+
+    @Test void testPrettyRoundtrip() {
+        User u = new User(42, "Test", true);
+        String pretty = Ason.encodePretty(u);
+        User decoded = Ason.decode(pretty, User.class);
+        assertEquals(u, decoded);
+    }
+
+    @Test void testPrettyFormat() {
+        String compact = "{id,name,active}:(1,Alice,true)";
+        String pretty = Ason.prettyFormat(compact);
+        assertEquals("{id, name, active}:(1, Alice, true)", pretty);
+    }
 }

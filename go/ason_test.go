@@ -595,3 +595,120 @@ func TestEncodeTypedVec(t *testing.T) {
 		t.Fatalf("mismatch")
 	}
 }
+
+func TestPrettyFormatSimple(t *testing.T) {
+	type User struct {
+		Name string `ason:"name"`
+		Age  int    `ason:"age"`
+	}
+	u := User{Name: "Alice", Age: 30}
+	p, err := EncodePretty(u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Short enough to stay inline
+	expected := "{name, age}:(Alice, 30)"
+	if string(p) != expected {
+		t.Fatalf("expected %q, got %q", expected, string(p))
+	}
+}
+
+func TestPrettyFormatComplex(t *testing.T) {
+	type Contact struct {
+		Email string `ason:"email"`
+		Phone string `ason:"phone"`
+	}
+	type Addr struct {
+		City    string `ason:"city"`
+		Zip     int    `ason:"zip"`
+		Country string `ason:"country"`
+	}
+	type User struct {
+		Id      int      `ason:"id"`
+		Name    string   `ason:"name"`
+		Active  bool     `ason:"active"`
+		Contact Contact  `ason:"contact"`
+		Addr    Addr     `ason:"addr"`
+		Tags    []string `ason:"tags"`
+	}
+
+	u := User{
+		Id: 1, Name: "John Smith", Active: true,
+		Contact: Contact{Email: "john@example.com", Phone: "555-1234"},
+		Addr:    Addr{City: "New York City", Zip: 10001, Country: "United States of America"},
+		Tags:    []string{"dev", "admin", "reviewer"},
+	}
+	p, err := EncodePretty(u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := string(p)
+	// Should contain newlines (expanded)
+	if !contains(result, "\n") {
+		t.Fatalf("expected multi-line output, got single line: %s", result)
+	}
+	// Should contain indentation
+	if !contains(result, "  ") {
+		t.Fatalf("expected indentation: %s", result)
+	}
+	// Should be decodable
+	var u2 User
+	if err := Decode(p, &u2); err != nil {
+		t.Fatalf("pretty output not decodable: %v\n%s", err, result)
+	}
+	if !reflect.DeepEqual(u, u2) {
+		t.Fatalf("roundtrip mismatch")
+	}
+}
+
+func TestPrettyFormatArray(t *testing.T) {
+	type Row struct {
+		Id   int    `ason:"id"`
+		Name string `ason:"name"`
+	}
+	rows := []Row{{Id: 1, Name: "Alice"}, {Id: 2, Name: "Bob"}}
+	p, err := EncodePretty(rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := string(p)
+	// Each row on its own line
+	if !contains(result, "\n") {
+		t.Fatalf("expected multi-line: %s", result)
+	}
+	var rows2 []Row
+	if err := Decode(p, &rows2); err != nil {
+		t.Fatalf("pretty array not decodable: %v\n%s", err, result)
+	}
+	if !reflect.DeepEqual(rows, rows2) {
+		t.Fatalf("roundtrip mismatch")
+	}
+}
+
+func TestPrettyFormatTyped(t *testing.T) {
+	type User struct {
+		Name string `ason:"name"`
+		Age  int    `ason:"age"`
+	}
+	u := User{Name: "Alice", Age: 30}
+	p, err := EncodePrettyTyped(u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := "{name:str, age:int}:(Alice, 30)"
+	if string(p) != expected {
+		t.Fatalf("expected %q, got %q", expected, string(p))
+	}
+}
+
+func contains(s, sub string) bool {
+	return len(s) >= len(sub) && (s == sub || len(sub) == 0 ||
+		func() bool {
+			for i := 0; i <= len(s)-len(sub); i++ {
+				if s[i:i+len(sub)] == sub {
+					return true
+				}
+			}
+			return false
+		}())
+}

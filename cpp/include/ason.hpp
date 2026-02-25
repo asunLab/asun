@@ -1292,6 +1292,208 @@ std::string encode_typed(const T& v) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Pretty-format: smart indentation for ASON output
+// ---------------------------------------------------------------------------
+//   Simple structures stay inline:   {name:str, age:int}:(Alice, 30)
+//   Complex structures expand with 2-space indentation.
+namespace detail {
+
+constexpr int PRETTY_MAX_WIDTH = 100;
+
+inline std::vector<int> build_match_table(const std::string& src) {
+    int n = static_cast<int>(src.size());
+    std::vector<int> mat(n, -1);
+    std::vector<int> stk;
+    bool in_quote = false;
+    for (int i = 0; i < n; i++) {
+        if (in_quote) {
+            if (src[i] == '\\' && i + 1 < n) { i++; continue; }
+            if (src[i] == '"') in_quote = false;
+            continue;
+        }
+        switch (src[i]) {
+            case '"': in_quote = true; break;
+            case '{': case '(': case '[': stk.push_back(i); break;
+            case '}': case ')': case ']':
+                if (!stk.empty()) {
+                    int j = stk.back(); stk.pop_back();
+                    mat[j] = i; mat[i] = j;
+                }
+                break;
+        }
+    }
+    return mat;
+}
+
+struct PrettyFmt {
+    const std::string& src;
+    const std::vector<int>& mat;
+    std::string out;
+    int pos = 0;
+    int depth = 0;
+
+    void write_indent() {
+        for (int i = 0; i < depth; i++) out.append("  ");
+    }
+
+    void write_quoted() {
+        out.push_back('"'); pos++;
+        while (pos < (int)src.size()) {
+            char ch = src[pos]; out.push_back(ch); pos++;
+            if (ch == '\\' && pos < (int)src.size()) { out.push_back(src[pos]); pos++; }
+            else if (ch == '"') break;
+        }
+    }
+
+    void write_inline(int start, int end) {
+        int d = 0; bool inq = false;
+        for (int i = start; i < end; i++) {
+            char ch = src[i];
+            if (inq) {
+                out.push_back(ch);
+                if (ch == '\\' && i + 1 < end) { i++; out.push_back(src[i]); }
+                else if (ch == '"') inq = false;
+                continue;
+            }
+            switch (ch) {
+                case '"': inq = true; out.push_back(ch); break;
+                case '{': case '(': case '[': d++; out.push_back(ch); break;
+                case '}': case ')': case ']': d--; out.push_back(ch); break;
+                case ',': out.push_back(','); if (d == 1) out.push_back(' '); break;
+                default: out.push_back(ch); break;
+            }
+        }
+    }
+
+    void write_value() {
+        while (pos < (int)src.size()) {
+            char ch = src[pos];
+            if (ch == ',' || ch == ')' || ch == '}' || ch == ']') break;
+            if (ch == '"') write_quoted(); else { out.push_back(ch); pos++; }
+        }
+    }
+
+    void write_element(int boundary) {
+        while (pos < boundary && src[pos] != ',') {
+            char ch = src[pos];
+            if (ch == '{' || ch == '(' || ch == '[') write_group();
+            else if (ch == '"') write_quoted();
+            else { out.push_back(ch); pos++; }
+        }
+    }
+
+    void write_group() {
+        if (pos >= (int)src.size()) return;
+        char ch = src[pos];
+        if (ch != '{' && ch != '(' && ch != '[') { write_value(); return; }
+
+        // Special case: [{...}] array schema — fuse brackets
+        if (ch == '[' && pos + 1 < (int)src.size() && src[pos + 1] == '{') {
+            int cb = mat[pos + 1], ck = mat[pos];
+            if (cb >= 0 && ck >= 0 && cb + 1 == ck) {
+                int width = ck - pos + 1;
+                if (width <= PRETTY_MAX_WIDTH) {
+                    write_inline(pos, ck + 1); pos = ck + 1; return;
+                }
+                out.push_back('['); pos++;
+                write_group();
+                out.push_back(']'); pos++;
+                return;
+            }
+        }
+
+        int close = mat[pos];
+        if (close < 0) { out.push_back(ch); pos++; return; }
+        int width = close - pos + 1;
+        if (width <= PRETTY_MAX_WIDTH) { write_inline(pos, close + 1); pos = close + 1; return; }
+
+        char close_ch = src[close];
+        out.push_back(ch); pos++;
+        if (pos >= close) { out.push_back(close_ch); pos = close + 1; return; }
+
+        out.push_back('\n'); depth++;
+        bool first = true;
+        while (pos < close) {
+            if (src[pos] == ',') pos++;
+            if (!first) { out.push_back(','); out.push_back('\n'); }
+            first = false;
+            write_indent();
+            write_element(close);
+        }
+        out.push_back('\n'); depth--;
+        write_indent();
+        out.push_back(close_ch); pos = close + 1;
+    }
+
+    void write_object_top() {
+        write_group();
+        if (pos < (int)src.size() && src[pos] == ':') {
+            out.push_back(':'); pos++;
+            if (pos < (int)src.size()) {
+                int cl = mat[pos];
+                if (cl >= 0 && cl - pos + 1 <= PRETTY_MAX_WIDTH) {
+                    write_inline(pos, cl + 1); pos = cl + 1;
+                } else {
+                    out.push_back('\n'); depth++;
+                    write_indent(); write_group(); depth--;
+                }
+            }
+        }
+    }
+
+    void write_array_top() {
+        out.push_back('['); pos++;
+        write_group();
+        if (pos < (int)src.size() && src[pos] == ']') { out.push_back(']'); pos++; }
+        if (pos < (int)src.size() && src[pos] == ':') { out.append(":\n"); pos++; }
+        depth++;
+        bool first = true;
+        while (pos < (int)src.size()) {
+            if (src[pos] == ',') pos++;
+            if (pos >= (int)src.size()) break;
+            if (!first) { out.push_back(','); out.push_back('\n'); }
+            first = false;
+            write_indent(); write_group();
+        }
+        out.push_back('\n'); depth--;
+    }
+
+    void write_top() {
+        if (pos >= (int)src.size()) return;
+        if (src[pos] == '[' && pos + 1 < (int)src.size() && src[pos + 1] == '{')
+            write_array_top();
+        else if (src[pos] == '{')
+            write_object_top();
+        else
+            out.append(src.substr(pos));
+    }
+};
+
+} // namespace detail
+
+// pretty_format: reformat compact ASON with smart indentation
+inline std::string pretty_format(const std::string& compact) {
+    if (compact.empty()) return compact;
+    auto mat = detail::build_match_table(compact);
+    detail::PrettyFmt f{compact, mat, {}, 0, 0};
+    f.out.reserve(compact.size() * 2);
+    f.write_top();
+    return std::move(f.out);
+}
+
+// encode_pretty: struct or vector<struct> -> pretty-formatted ASON
+template <typename T>
+std::string encode_pretty(const T& v) {
+    return pretty_format(encode(v));
+}
+
+// encode_pretty_typed: struct or vector<struct> -> pretty-formatted ASON with type annotations
+template <typename T>
+std::string encode_pretty_typed(const T& v) {
+    return pretty_format(encode_typed(v));
+}
+
 // decode: ASON string -> T (auto-detects single struct vs vector)
 // For single: {schema}:(data)
 // For vector: [{schema}]:(data1),(data2),...
