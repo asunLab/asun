@@ -1,0 +1,12 @@
+# Example binaries (go build output)
+examples/basic/basic
+examples/bench/bench
+examples/complex/complex
+examples/cross_compat/cross_compat
+
+# Test binaries
+*.test
+*.out
+
+# Module cache / vendor
+vendor/

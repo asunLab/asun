@@ -1,1 +1,6 @@
+# Binary
 ason-lsp
+
+# Test binaries
+*.test
+*.out
