@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	ason "github.com/example/ason"
+	ason "github.com/ason-lab/ason-go"
 )
 
 type User struct {

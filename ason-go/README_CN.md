@@ -35,7 +35,7 @@ ASON (~35 tokens, 节省 65%):
 ## 快速开始
 
 ```bash
-go get github.com/example/ason
+go get github.com/ason-lab/ason-go
 ```
 
 ### 序列化与反序列化结构体
@@ -45,7 +45,7 @@ package main
 
 import (
     "fmt"
-    ason "github.com/example/ason"
+    ason "github.com/ason-lab/ason-go"
 )
 
 type User struct {
@@ -111,7 +111,7 @@ ASON-BIN 是对任意 Go 值的紧凑二进制编码。它提供最大幅度的�
 ### API
 
 ```go
-import ason "github.com/example/ason"
+import ason "github.com/ason-lab/ason-go"
 
 // 序列化任意值为字节
 b, err := ason.MarshalBinary(&user)
