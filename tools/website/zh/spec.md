@@ -94,7 +94,7 @@ IEEE 754 双精度。格式为 `[-]digits.digits`，可有 `e` / `E` 指数。`N
 3. `:` 之后换行，首个数据元组缩进出现
 
 ```ason
-{id:int, name:str, active:bool}:
+[{id:int, name:str, active:bool}]:
   (1, Alice, true),
   (2, Bob,   false)
 ```

@@ -17,7 +17,7 @@ JSON (100 tokens):
 {"users":[{"id":1,"name":"Alice","active":true},{"id":2,"name":"Bob","active":false}]}
 
 ASON (~35 tokens, 65% saving):
-{id:int, name:str, active:bool}:(1,Alice,true),(2,Bob,false)
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
 | Aspect                | JSON         | ASON               |
@@ -98,7 +98,7 @@ std::vector<User> users = {
 
 // Schema written once, data as tuples
 auto s = ason::dump_vec(users);
-// → "{id,name,active}:(1,Alice,true),(2,Bob,false),(3,Carol Smith,true)"
+// → "[{id,name,active}]:(1,Alice,true),(2,Bob,false),(3,Carol Smith,true)"
 
 // Deserialize
 auto users2 = ason::load_vec<User>(s);
@@ -190,13 +190,13 @@ Both annotated and unannotated schemas are fully equivalent — the deserializer
 
 ```text
 /* user list */
-{id:int, name:str, active:bool}:(1,Alice,true),(2,Bob,false)
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
 ### Multiline Format
 
 ```text
-{id:int, name:str, active:bool}:
+[{id:int, name:str, active:bool}]:
   (1, Alice, true),
   (2, Bob, false),
   (3, "Carol Smith", true)

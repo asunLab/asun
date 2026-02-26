@@ -16,7 +16,7 @@ JSON (100 tokens):
 {"users":[{"id":1,"name":"Alice","active":true},{"id":2,"name":"Bob","active":false}]}
 
 ASON (~35 tokens, 节省 65%):
-{id:int, name:str, active:bool}:(1,Alice,true),(2,Bob,false)
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
 | 方面         | JSON         | ASON             |
@@ -106,7 +106,7 @@ User users[] = {
 
 // Schema 只写一次，数据为元组
 ason_buf_t buf = ason_dump_vec_User(users, 3);
-// → "{id,name,active}:(1,Alice,true),(2,Bob,false),(3,Carol Smith,true)"
+// → "[{id,name,active}]:(1,Alice,true),(2,Bob,false),(3,Carol Smith,true)"
 
 // 反序列化
 User* loaded = NULL;
@@ -229,13 +229,13 @@ ASON_FIELDS(Group, 2,
 
 ```text
 /* 用户列表 */
-{id:int, name:str, active:bool}:(1,Alice,true),(2,Bob,false)
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
 ### 多行格式
 
 ```text
-{id:int, name:str, active:bool}:
+[{id:int, name:str, active:bool}]:
   (1, Alice, true),
   (2, Bob, false),
   (3, "Carol Smith", true)

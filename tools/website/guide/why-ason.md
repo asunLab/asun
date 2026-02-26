@@ -18,7 +18,7 @@ JSON repeats field names for every object in an array. With 1 000 rows and 5 fie
 
 ```ason
 // ASON — ~35 tokens (65% reduction)
-{id:int, name:str, active:bool}:
+[{id:int, name:str, active:bool}]:
   (1, Alice, true),
   (2, Bob,   false)
 ```
@@ -75,7 +75,7 @@ In practice this means fewer retries, fewer validation errors, and lower token c
 Despite its compression, ASON remains highly readable:
 
 ```ason
-{id:int, name:str, role:str, score:float}:
+[{id:int, name:str, role:str, score:float}]:
   (1, Alice, admin,   9.5),
   (2, Bob,   viewer,  7.2),
   (3, Carol, editor,  8.8)

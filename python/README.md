@@ -18,7 +18,7 @@ JSON (100 tokens):
 {"users":[{"id":1,"name":"Alice","active":true},{"id":2,"name":"Bob","active":false}]}
 
 ASON (~35 tokens, 65% saving):
-{id:int, name:str, active:bool}:(1,Alice,true),(2,Bob,false)
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
 | Aspect           | JSON         | ASON            |
@@ -82,11 +82,11 @@ users = [
 
 # Unannotated schema
 s = ason.dump_slice(users)
-# Output: {id,name,active}:(1,Alice,true),(2,Bob,false)
+# Output: [{id,name,active}]:(1,Alice,true),(2,Bob,false)
 
 # Type-annotated schema
 s2 = ason.dump_slice_typed(users)
-# Output: {id:int,name:str,active:bool}:(1,Alice,true),(2,Bob,false)
+# Output: [{id:int,name:str,active:bool}]:(1,Alice,true),(2,Bob,false)
 
 # Load — accepts both forms
 parsed = ason.load_slice(s, User)
@@ -192,13 +192,13 @@ Annotations are **purely decorative metadata** — they do not affect parsing or
 
 ```text
 /* user list */
-{id:int, name:str, active:bool}:(1,Alice,true),(2,Bob,false)
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
 ### Multiline Format
 
 ```text
-{id:int, name:str, active:bool}:
+[{id:int, name:str, active:bool}]:
   (1, Alice, true),
   (2, Bob, false),
   (3, "Carol Smith", true)

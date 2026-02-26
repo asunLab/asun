@@ -20,10 +20,10 @@ Schema 以 `{` 和 `}` 包裹，内含逗号分隔的字段定义：
 
 ## 数据语法
 
-数据跟在 Schema 和 `:` 分隔符之后，每行是一个用 `(` `)` 包裹的元组：
+对于切片（结构体列表），需要将 Schema 用 `[` `]` 包裹：
 
 ```ason
-{name:str, age:int}:
+[{name:str, age:int}]:
   (Alice, 30),
   (Bob,   25)
 ```
@@ -39,7 +39,7 @@ Schema 以 `{` 和 `}` 包裹，内含逗号分隔的字段定义：
 Schema 可以嵌套，表示嵌套对象：
 
 ```ason
-{id:int, address:{city:str, zip:str}}:
+[{id:int, address:{city:str, zip:str}}]:
   (1, (Berlin, 10115)),
   (2, (Paris,  75001))
 ```
@@ -51,7 +51,7 @@ Schema 可以嵌套，表示嵌套对象：
 包含列表的字段使用 `[type]` 记法：
 
 ```ason
-{id:int, tags:[str]}:
+[{id:int, tags:[str]}]:
   (1, [rust, go]),
   (2, [python, c++])
 ```
@@ -61,7 +61,7 @@ Schema 可以嵌套，表示嵌套对象：
 两个逗号之间的空槽（什么都没有）表示 `null` / `None`：
 
 ```ason
-{id:int, name:str, score:float}:
+[{id:int, name:str, score:float}]:
   (1, Alice, 9.5),
   (2, Bob,       )
 ```
@@ -71,12 +71,14 @@ Schema 可以嵌套，表示嵌套对象：
 ## 语法概要
 
 ```
-document    = schema ":" rows
+document    = single | slice
+single      = schema ":" tuple
+slice       = "[" schema "]" ":" rows
 schema      = "{" fields "}"
 fields      = field ("," field)*
 field       = name (":" type)?
 type        = "int" | "float" | "str" | "bool" | schema | "[" type "]"
-rows        = tuple | (tuple ",")* tuple
+rows        = tuple ("," tuple)*
 tuple       = "(" values ")"
 values      = value ("," value)*
 value       = scalar | tuple | "[" values "]" | ""

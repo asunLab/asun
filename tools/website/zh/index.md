@@ -74,7 +74,7 @@ features:
 
 ```ason
 // ASON — 约 35 Token  (节省 65%)
-{id:int, name:str, active:bool}:
+[{id:int, name:str, active:bool}]:
   (1, Alice, true),
   (2, Bob,   false),
   (3, Carol, true)

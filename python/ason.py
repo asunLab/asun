@@ -509,12 +509,12 @@ def dump_slice(objs: list) -> str:
     parts: list[str] = []
 
     # Schema header
-    parts.append("{")
+    parts.append("[{")
     for i, fi in enumerate(si.fields):
         if i > 0:
             parts.append(",")
         parts.append(fi.name)
-    parts.append("}:")
+    parts.append("}]:")
 
     # Data rows
     for idx, obj in enumerate(objs):
@@ -527,7 +527,7 @@ def dump_slice(objs: list) -> str:
 def dump_slice_typed(objs: list, field_types: list[str] | None = None) -> str:
     """Serialize a list of dataclass instances to ASON with type annotations.
 
-    Output: {field1:type1,field2:type2,...}:(v1,v2,...),(v3,v4,...)
+    Output: [{field1:type1,field2:type2,...}]:(v1,v2,...),(v3,v4,...)
     """
     if not objs:
         raise DumpError("dump_slice_typed requires a non-empty list")
@@ -539,7 +539,7 @@ def dump_slice_typed(objs: list, field_types: list[str] | None = None) -> str:
     parts: list[str] = []
 
     # Schema header with types
-    parts.append("{")
+    parts.append("[{")
     for i, fi in enumerate(si.fields):
         if i > 0:
             parts.append(",")
@@ -550,7 +550,7 @@ def dump_slice_typed(objs: list, field_types: list[str] | None = None) -> str:
         elif fi.type_hint:
             parts.append(":")
             parts.append(fi.type_hint)
-    parts.append("}:")
+    parts.append("}]:")
 
     # Data rows
     for idx, obj in enumerate(objs):
@@ -1249,14 +1249,24 @@ def load(data: str | bytes, cls: type) -> Any:
 def load_slice(data: str | bytes, cls: type) -> list:
     """Deserialize an ASON string into a list of dataclass instances.
 
-    Input: {field1,field2,...}:(v1,v2,...),(v3,v4,...)
+    Input: [{field1,field2,...}]:(v1,v2,...),(v3,v4,...)
     """
     d = _Decoder(data)
+    d.skip_ws_comments()
+
+    if d.pos >= d.length or d.data[d.pos] != ord("["):
+        raise d.error("expected '['")
+    d.pos += 1
     d.skip_ws_comments()
 
     if d.pos >= d.length or d.data[d.pos] != ord("{"):
         raise d.error("expected '{'")
     schema_fields = d.parse_schema()
+
+    d.skip_ws_comments()
+    if d.pos >= d.length or d.data[d.pos] != ord("]"):
+        raise d.error("expected ']'")
+    d.pos += 1
 
     d.skip_ws_comments()
     if d.pos >= d.length or d.data[d.pos] != ord(":"):

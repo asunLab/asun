@@ -51,10 +51,10 @@ def main():
     typed_vec = ason.dump_slice_typed(users)
     print("Serialize list with type annotations:")
     print(f"  {typed_vec}\n")
-    assert typed_vec.startswith("{id:int,name:str,active:bool}:")
+    assert typed_vec.startswith("[{id:int,name:str,active:bool}]:")
 
     # 6. Deserialize list
-    inp = '{id:int,name:str,active:bool}:(1,Alice,true),(2,Bob,false),(3,"Carol Smith",true)'
+    inp = '[{id:int,name:str,active:bool}]:(1,Alice,true),(2,Bob,false),(3,"Carol Smith",true)'
     users = ason.load_slice(inp, User)
     print("Deserialize list:")
     for u in users:
@@ -62,7 +62,7 @@ def main():
 
     # 7. Multiline format
     print("\nMultiline format:")
-    multiline = """{id:int, name:str, active:bool}:
+    multiline = """[{id:int, name:str, active:bool}]:
   (1, Alice, true),
   (2, Bob, false),
   (3, "Carol Smith", true)"""

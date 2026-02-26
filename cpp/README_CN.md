@@ -17,7 +17,7 @@ JSON (100 tokens):
 {"users":[{"id":1,"name":"Alice","active":true},{"id":2,"name":"Bob","active":false}]}
 
 ASON (~35 tokens, 节省 65%):
-{id:int, name:str, active:bool}:(1,Alice,true),(2,Bob,false)
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
 | 方面         | JSON         | ASON             |
@@ -98,7 +98,7 @@ std::vector<User> users = {
 
 // Schema 只写一次，数据为元组
 auto s = ason::dump_vec(users);
-// → "{id,name,active}:(1,Alice,true),(2,Bob,false),(3,Carol Smith,true)"
+// → "[{id,name,active}]:(1,Alice,true),(2,Bob,false),(3,Carol Smith,true)"
 
 // 反序列化
 auto users2 = ason::load_vec<User>(s);
@@ -190,13 +190,13 @@ ASON_FIELDS(Profile,
 
 ```text
 /* 用户列表 */
-{id:int, name:str, active:bool}:(1,Alice,true),(2,Bob,false)
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
 ### 多行格式
 
 ```text
-{id:int, name:str, active:bool}:
+[{id:int, name:str, active:bool}]:
   (1, Alice, true),
   (2, Bob, false),
   (3, "Carol Smith", true)
