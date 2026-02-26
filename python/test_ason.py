@@ -160,7 +160,7 @@ def test_roundtrip():
 # ---------------------------------------------------------------------------
 
 def test_vec_load():
-    data = "{id:int,name:str,active:bool}:(1,Alice,true),(2,Bob,false)"
+    data = "[{id:int,name:str,active:bool}]:(1,Alice,true),(2,Bob,false)"
     users = ason.load_slice(data, User)
     assert_eq(len(users), 2)
     assert_eq(users[0].name, "Alice")
@@ -173,7 +173,7 @@ def test_vec_dump():
         User(id=2, name="Bob", active=False),
     ]
     got = ason.dump_slice(users)
-    assert_eq(got, "{id,name,active}:(1,Alice,true),(2,Bob,false)")
+    assert_eq(got, "[{id,name,active}]:(1,Alice,true),(2,Bob,false)")
 
 
 def test_vec_roundtrip():
@@ -264,7 +264,7 @@ def test_dump_slice_typed():
         User(id=2, name="Bob", active=False),
     ]
     got = ason.dump_slice_typed(users, ["int", "str", "bool"])
-    assert_eq(got, "{id:int,name:str,active:bool}:(1,Alice,true),(2,Bob,false)")
+    assert_eq(got, "[{id:int,name:str,active:bool}]:(1,Alice,true),(2,Bob,false)")
 
 
 def test_dump_slice_typed_auto():
@@ -272,7 +272,7 @@ def test_dump_slice_typed_auto():
         User(id=1, name="Alice", active=True),
     ]
     got = ason.dump_slice_typed(users)
-    assert got.startswith("{id:int,name:str,active:bool}:")
+    assert got.startswith("[{id:int,name:str,active:bool}]:")
 
 
 def test_float_roundtrip():
@@ -332,13 +332,13 @@ def test_load_annotated_nested():
 
 
 def test_load_annotated_vec():
-    data = "{id:int,name:str,active:bool}:(1,Alice,true),(2,Bob,false)"
+    data = "[{id:int,name:str,active:bool}]:(1,Alice,true),(2,Bob,false)"
     users = ason.load_slice(data, User)
     assert_eq(len(users), 2)
 
 
 def test_multiline():
-    data = """{id:int, name:str, active:bool}:
+    data = """[{id:int, name:str, active:bool}]:
   (1, Alice, true),
   (2, Bob, false),
   (3, "Carol Smith", true)"""

@@ -38,7 +38,7 @@ ASON 支持丰富的标量和复合类型。本页记录它们的文本格式表
 数组可以嵌套：
 
 ```ason
-{matrix:[[int]]}:
+[{matrix:[[int]]}]:
   ([[1, 2], [3, 4]]),
   ([[5, 6], [7, 8]])
 ```
@@ -58,7 +58,7 @@ Color::Rgb
 空槽（逗号间没有任何字符）表示 `None` / `null`：
 
 ```ason
-{id:int, score:float}:
+[{id:int, score:float}]:
   (1, 9.5),
   (2,    )
 ```

@@ -897,10 +897,12 @@ pub fn decode(comptime T: type, input: []const u8, allocator: Allocator) !T {
 
     if (comptime isStructSlice(T)) {
         const E = @typeInfo(T).pointer.child;
-        if (parser.pos < parser.input.len and parser.input[parser.pos] == '[') {
-            parser.pos += 1;
-            parser.skipWhitespaceAndComments();
+        // Require '[' for slice format
+        if (parser.pos >= parser.input.len or parser.input[parser.pos] != '[') {
+            return error.InvalidFormat;
         }
+        parser.pos += 1;
+        parser.skipWhitespaceAndComments();
 
         var schema_buf: [MAX_SCHEMA]SchemaField = undefined;
         var schema_count: usize = 0;
@@ -911,14 +913,18 @@ pub fn decode(comptime T: type, input: []const u8, allocator: Allocator) !T {
             has_schema = true;
             parser.skipWhitespaceAndComments();
         }
-        if (parser.pos < parser.input.len and parser.input[parser.pos] == ']') {
-            parser.pos += 1;
-            parser.skipWhitespaceAndComments();
+        // Require ']' after schema
+        if (parser.pos >= parser.input.len or parser.input[parser.pos] != ']') {
+            return error.InvalidFormat;
         }
-        if (parser.pos < parser.input.len and parser.input[parser.pos] == ':') {
-            parser.pos += 1;
-            parser.skipWhitespaceAndComments();
+        parser.pos += 1;
+        parser.skipWhitespaceAndComments();
+        // Require ':'
+        if (parser.pos >= parser.input.len or parser.input[parser.pos] != ':') {
+            return error.ExpectedColon;
         }
+        parser.pos += 1;
+        parser.skipWhitespaceAndComments();
 
         var results: std.ArrayList(E) = .{};
         errdefer results.deinit(allocator);

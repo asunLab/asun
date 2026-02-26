@@ -17,7 +17,7 @@ JSON (100 tokens):
 {"users":[{"id":1,"name":"Alice","active":true},{"id":2,"name":"Bob","active":false}]}
 
 ASON (~35 tokens, 节省 65%):
-{id:int, name:str, active:bool}:(1,Alice,true),(2,Bob,false)
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
 | 方面       | JSON         | ASON           |
@@ -133,12 +133,12 @@ fn main() -> ason::Result<()> {
 
     // 无注解 Schema
     let s = to_string_vec(&users)?;
-    assert_eq!(s, "{id,name,active}:(1,Alice,true),(2,Bob,false)");
+    assert_eq!(s, "[{id,name,active}]:(1,Alice,true),(2,Bob,false)");
 
     // 带类型注解 Schema（需实现 field_types()）
     use ason::to_string_vec_typed;
     let s2 = to_string_vec_typed(&users)?;
-    assert_eq!(s2, "{id:int,name:str,active:bool}:(1,Alice,true),(2,Bob,false)");
+    assert_eq!(s2, "[{id:int,name:str,active:bool}]:(1,Alice,true),(2,Bob,false)");
 
     // 反序列化 —— 两种格式均可
     let users2: Vec<User> = from_str_vec(&s)?;
@@ -227,13 +227,13 @@ ASON Schema 支持**可选的**类型注解。两种形式完全等价 —— �
 
 ```text
 /* 用户列表 */
-{id:int, name:str, active:bool}:(1,Alice,true),(2,Bob,false)
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
 ### 多行格式
 
 ```text
-{id:int, name:str, active:bool}:
+[{id:int, name:str, active:bool}]:
   (1, Alice, true),
   (2, Bob, false),
   (3, "Carol Smith", true)

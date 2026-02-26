@@ -38,7 +38,7 @@ ASON supports a rich set of scalar and composite types. This page documents thei
 Arrays can be nested:
 
 ```ason
-{matrix:[[int]]}:
+[{matrix:[[int]]}]:
   ([[1, 2], [3, 4]]),
   ([[5, 6], [7, 8]])
 ```
@@ -58,7 +58,7 @@ Enum variants are namespaced with `::`.
 An empty slot (nothing between commas) represents `None` / `null`:
 
 ```ason
-{id:int, score:float}:
+[{id:int, score:float}]:
   (1, 9.5),
   (2,    )
 ```

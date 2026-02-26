@@ -43,7 +43,7 @@ Fields are comma-separated. Type annotations are optional. Whitespace around fie
 Values are comma-separated and must match the schema order. Whitespace around values is stripped. Multiple tuples are comma-separated:
 
 ```ason
-{id:int, name:str}:
+[{id:int, name:str}]:
   (1, Alice),
   (2, Bob),
   (3, Carol)
@@ -85,7 +85,7 @@ Lowercase only.
 An empty slot — nothing between two commas (or between a comma and the closing parenthesis):
 
 ```ason
-{id, name, score}:
+[{id, name, score}]:
   (1, Alice, 9.5),
   (2, Bob,      )
 ```
@@ -127,7 +127,7 @@ Escape sequences inside quoted strings:
 Nested objects are represented by nested schemas and tuples:
 
 ```ason
-{id:int, address:{city:str, zip:str}}:
+[{id:int, address:{city:str, zip:str}}]:
   (1, (Berlin, 10115)),
   (2, (Paris,  75001))
 ```
@@ -137,7 +137,7 @@ Nested objects are represented by nested schemas and tuples:
 Array fields use `[...]` in both schema and data:
 
 ```ason
-{id:int, tags:[str]}:
+[{id:int, tags:[str]}]:
   (1, [rust, go]),
   (2, [python, c++])
 ```

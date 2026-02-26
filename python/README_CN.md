@@ -18,7 +18,7 @@ JSON（100 tokens）：
 {"users":[{"id":1,"name":"Alice","active":true},{"id":2,"name":"Bob","active":false}]}
 
 ASON（约 35 tokens，节省 65%）：
-{id:int, name:str, active:bool}:(1,Alice,true),(2,Bob,false)
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
 | 方面       | JSON     | ASON         |
@@ -82,11 +82,11 @@ users = [
 
 # 不带注解的模式
 s = ason.dump_slice(users)
-# 输出: {id,name,active}:(1,Alice,true),(2,Bob,false)
+# 输出: [{id,name,active}]:(1,Alice,true),(2,Bob,false)
 
 # 带类型注解的模式
 s2 = ason.dump_slice_typed(users)
-# 输出: {id:int,name:str,active:bool}:(1,Alice,true),(2,Bob,false)
+# 输出: [{id:int,name:str,active:bool}]:(1,Alice,true),(2,Bob,false)
 
 # 反序列化 — 两种形式都支持
 parsed = ason.load_slice(s, User)
@@ -192,13 +192,13 @@ ASON 模式支持**可选**的类型注解。两种形式完全等价 — 加载
 
 ```text
 /* 用户列表 */
-{id:int, name:str, active:bool}:(1,Alice,true),(2,Bob,false)
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
 ### 多行格式
 
 ```text
-{id:int, name:str, active:bool}:
+[{id:int, name:str, active:bool}]:
   (1, Alice, true),
   (2, Bob, false),
   (3, "Carol Smith", true)

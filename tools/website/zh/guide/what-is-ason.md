@@ -11,7 +11,7 @@ ASON 将 **Schema（结构）** 与 **数据（值）** 分离。字段名只声
 
 ```ason
 // Schema 只声明一次——数据不重复 Key
-{id:int, name:str, active:bool}:
+[{id:int, name:str, active:bool}]:
   (1, Alice, true),
   (2, Bob,   false),
   (3, Carol, true)

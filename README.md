@@ -25,7 +25,7 @@ dramatic token reduction while preserving human readability.
 
 ```ason
 // ASON — ~35 tokens (65% savings)
-{id:int, name:str, active:bool}:
+[{id:int, name:str, active:bool}]:
   (1, Alice, true),
   (2, Bob,   false)
 ```
@@ -101,7 +101,7 @@ impl StructSchema for User {
 // Single struct  →  "{id,name,active}:(1,Alice,true)"
 let s = to_string(&user)?;
 
-// Vec<T>  →  "{id,name,active}:\n  (1,Alice,true),\n  (2,Bob,false)"
+// Vec<T>  →  "[{id,name,active}]:\n  (1,Alice,true),\n  (2,Bob,false)"
 let s = to_string_vec(&users)?;
 
 // With type annotations
@@ -270,27 +270,27 @@ cargo run --release --example complex
 // Single struct
 {id, name, active}:(1, Alice, true)
 
-// Vec of structs  (schema declared once)
-{id:int, name:str, active:bool}:
+// Vec of structs  (schema declared once, bracket wrapping required)
+[{id:int, name:str, active:bool}]:
   (1, Alice, true),
   (2, Bob,   false),
   (3, Carol, true)
 
-// Nested struct
-{id:int, address:{city:str, zip:str}}:
+// Nested struct — multiple rows
+[{id:int, address:{city:str, zip:str}}]:
   (1, (Berlin, 10115)),
   (2, (Paris,  75001))
 
-// Nested arrays
-{id:int, tags:[str]}:
+// Nested arrays — multiple rows
+[{id:int, tags:[str]}]:
   (1, [rust, go]),
   (2, [python])
 
 // Enum value
 Role::Admin
 
-// Option  (empty slot = None)
-{id, name, score}:
+// Option  (empty slot = None) — multiple rows
+[{id, name, score}]:
   (1, Alice,  9.5),
   (2, Bob,       )    ← score is None
 ```

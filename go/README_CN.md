@@ -18,7 +18,7 @@ JSON (100 tokens):
 {"users":[{"id":1,"name":"Alice","active":true},{"id":2,"name":"Bob","active":false}]}
 
 ASON (~35 tokens, 节省 65%):
-{id:int, name:str, active:bool}:(1,Alice,true),(2,Bob,false)
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
 | 方面       | JSON         | ASON                 |
@@ -94,11 +94,11 @@ users := []User{
 
 // 无注解 Schema
 b, _ := ason.MarshalSlice(users)
-// 输出: {id,name,active}:(1,Alice,true),(2,Bob,false)
+// 输出: [{id,name,active}]:(1,Alice,true),(2,Bob,false)
 
 // 带类型注解 Schema
 b2, _ := ason.MarshalSliceTyped(users, []string{"int", "str", "bool"})
-// 输出: {id:int,name:str,active:bool}:(1,Alice,true),(2,Bob,false)
+// 输出: [{id:int,name:str,active:bool}]:(1,Alice,true),(2,Bob,false)
 
 // 反序列化 —— 两种格式均可
 var parsed []User
@@ -239,13 +239,13 @@ ASON Schema 支持**可选的**类型注解。两种形式完全等价 —— �
 
 ```text
 /* 用户列表 */
-{id:int, name:str, active:bool}:(1,Alice,true),(2,Bob,false)
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
 ### 多行格式
 
 ```text
-{id:int, name:str, active:bool}:
+[{id:int, name:str, active:bool}]:
   (1, Alice, true),
   (2, Bob, false),
   (3, "Carol Smith", true)

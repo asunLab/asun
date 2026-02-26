@@ -17,7 +17,7 @@ JSON (100 tokens):
 {"users":[{"id":1,"name":"Alice","active":true},{"id":2,"name":"Bob","active":false}]}
 
 ASON (~35 tokens, 65% saving):
-{id:int, name:str, active:bool}:(1,Alice,true),(2,Bob,false)
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
 | Aspect              | JSON         | ASON             |
@@ -133,12 +133,12 @@ fn main() -> ason::Result<()> {
 
     // Unannotated schema
     let s = to_string_vec(&users)?;
-    assert_eq!(s, "{id,name,active}:(1,Alice,true),(2,Bob,false)");
+    assert_eq!(s, "[{id,name,active}]:(1,Alice,true),(2,Bob,false)");
 
     // Type-annotated schema (requires field_types())
     use ason::to_string_vec_typed;
     let s2 = to_string_vec_typed(&users)?;
-    assert_eq!(s2, "{id:int,name:str,active:bool}:(1,Alice,true),(2,Bob,false)");
+    assert_eq!(s2, "[{id:int,name:str,active:bool}]:(1,Alice,true),(2,Bob,false)");
 
     // Deserialize — accepts both forms
     let users2: Vec<User> = from_str_vec(&s)?;
@@ -227,13 +227,13 @@ Annotations are **purely decorative metadata** — they do not affect parsing or
 
 ```text
 /* user list */
-{id:int, name:str, active:bool}:(1,Alice,true),(2,Bob,false)
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
 ### Multiline Format
 
 ```text
-{id:int, name:str, active:bool}:
+[{id:int, name:str, active:bool}]:
   (1, Alice, true),
   (2, Bob, false),
   (3, "Carol Smith", true)

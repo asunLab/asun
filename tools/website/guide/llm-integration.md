@@ -20,7 +20,7 @@ Even with function calling / tool use, JSON-based structured output has high fai
 ASON requires fewer special characters. Most string values are unquoted:
 
 ```ason
-{name:str, role:str}:
+[{name:str, role:str}]:
   (Alice, admin),
   (Bob,   viewer)
 ```
@@ -33,10 +33,10 @@ Include the schema once in the system prompt or as a header:
 
 ```
 Respond with ASON using this schema:
-{id:int, name:str, sentiment:str, score:float}
+[{id:int, name:str, sentiment:str, score:float}]
 
 Example:
-{id:int, name:str, sentiment:str, score:float}:
+[{id:int, name:str, sentiment:str, score:float}]:
   (1, Product A, positive, 0.92),
   (2, Product B, neutral,  0.51)
 

@@ -20,15 +20,15 @@ Type annotations are optional hints for humans and tooling — they do not chang
 
 ## Data Syntax
 
-Data follows the schema and a `:` separator. Each row is a tuple wrapped in `(` `)`:
+For a slice (list of structs), wrap the schema in `[` `]`:
 
 ```ason
-{name:str, age:int}:
+[{name:str, age:int}]:
   (Alice, 30),
   (Bob,   25)
 ```
 
-For a single struct (not a list), the schema and data are on one line:
+For a single struct (not a list), no wrapping needed:
 
 ```ason
 {name, age}:(Alice, 30)
@@ -39,7 +39,7 @@ For a single struct (not a list), the schema and data are on one line:
 Schemas can be nested to represent nested objects:
 
 ```ason
-{id:int, address:{city:str, zip:str}}:
+[{id:int, address:{city:str, zip:str}}]:
   (1, (Berlin, 10115)),
   (2, (Paris,  75001))
 ```
@@ -51,7 +51,7 @@ The inner schema `{city:str, zip:str}` is substituted by an inner tuple `(Berlin
 Fields that contain lists use `[type]` notation:
 
 ```ason
-{id:int, tags:[str]}:
+[{id:int, tags:[str]}]:
   (1, [rust, go]),
   (2, [python, c++])
 ```
@@ -61,7 +61,7 @@ Fields that contain lists use `[type]` notation:
 An empty slot between commas represents `null` / `None`:
 
 ```ason
-{id:int, name:str, score:float}:
+[{id:int, name:str, score:float}]:
   (1, Alice, 9.5),
   (2, Bob,       )
 ```
@@ -71,12 +71,14 @@ An empty slot between commas represents `null` / `None`:
 ## Full Grammar Summary
 
 ```
-document    = schema ":" rows
+document    = single | slice
+single      = schema ":" tuple
+slice       = "[" schema "]" ":" rows
 schema      = "{" fields "}"
 fields      = field ("," field)*
 field       = name (":" type)?
 type        = "int" | "float" | "str" | "bool" | schema | "[" type "]"
-rows        = tuple | (tuple ",")* tuple
+rows        = tuple ("," tuple)*
 tuple       = "(" values ")"
 values      = value ("," value)*
 value       = scalar | tuple | "[" values "]" | ""

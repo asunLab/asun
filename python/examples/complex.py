@@ -203,7 +203,7 @@ def main():
     # 2. Vec with nested structs
     # -------------------------------------------------------------------
     print("2. Vec with nested structs:")
-    inp = """{id:int,name:str,dept:{title:str},skills:[str],active:bool}:
+    inp = """[{id:int,name:str,dept:{title:str},skills:[str],active:bool}]:
   (1, Alice, (Manager), [Rust, Go], true),
   (2, Bob, (Engineer), [Python], false),
   (3, "Carol Smith", (Director), [Leadership, Strategy], true)"""

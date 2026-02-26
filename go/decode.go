@@ -13,9 +13,9 @@ import (
 
 // Decode parses ASON data and stores the result in v.
 // v must be a pointer to a struct or a pointer to a slice of structs.
-// Single struct input: {field1,field2,...}:(val1,val2,...)
-// Slice input: [{field1,field2,...}]:(val1,val2,...),(val3,val4,...)
-// Also accepts type-annotated schemas.
+// Single struct input:  {field1,field2,...}:(val1,val2,...)
+// Slice input:         [{field1,field2,...}]:(val1,val2,...),(val3,val4,...)
+// The [{...}]: bracket wrapper is required for slice targets.
 func Decode(data []byte, v any) error {
 	d := decoder{
 		data: data,
@@ -23,8 +23,17 @@ func Decode(data []byte, v any) error {
 	}
 	d.skipWhitespaceAndComments()
 
-	// Auto-detect format: [{...}]: for slice, {...}: for single
-	if d.pos < len(d.data) && d.data[d.pos] == '[' && d.pos+1 < len(d.data) && d.data[d.pos+1] == '{' {
+	// Detect target type and input format
+	rv := reflect.ValueOf(v)
+	isSliceTarget := rv.Kind() == reflect.Ptr && rv.Elem().Kind() == reflect.Slice
+	startsWithBracket := d.pos < len(d.data) && d.data[d.pos] == '[' &&
+		d.pos+1 < len(d.data) && d.data[d.pos+1] == '{'
+
+	// Strict format enforcement: slices require [{...}]:, structs require {...}:
+	if isSliceTarget && !startsWithBracket {
+		return &UnmarshalError{d.pos, "Decode requires '[{...}]:' format for slice types"}
+	}
+	if startsWithBracket {
 		return d.decodeSliceTop(v)
 	}
 	return d.unmarshalTop(v)

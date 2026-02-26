@@ -43,7 +43,7 @@ schema ":" data
 值以逗号分隔，必须与 Schema 顺序对应。值前后的空白被去除。多个元组以逗号分隔：
 
 ```ason
-{id:int, name:str}:
+[{id:int, name:str}]:
   (1, Alice),
   (2, Bob),
   (3, Carol)
@@ -85,7 +85,7 @@ false
 空槽 —— 两个逗号之间（或逗号与右括号之间）没有任何字符：
 
 ```ason
-{id, name, score}:
+[{id, name, score}]:
   (1, Alice, 9.5),
   (2, Bob,      )
 ```
@@ -127,7 +127,7 @@ hello world
 嵌套对象用嵌套 Schema 和嵌套元组表示：
 
 ```ason
-{id:int, address:{city:str, zip:str}}:
+[{id:int, address:{city:str, zip:str}}]:
   (1, (Berlin, 10115)),
   (2, (Paris,  75001))
 ```
@@ -137,7 +137,7 @@ hello world
 数组字段在 Schema 和数据中均使用 `[...]`：
 
 ```ason
-{id:int, tags:[str]}:
+[{id:int, tags:[str]}]:
   (1, [rust, go]),
   (2, [python, c++])
 ```
