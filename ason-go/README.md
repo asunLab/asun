@@ -35,7 +35,7 @@ ASON (~35 tokens, 65% saving):
 ## Quick Start
 
 ```bash
-go get github.com/example/ason
+go get github.com/ason-lab/ason-go
 ```
 
 ### Marshal & Unmarshal a Struct
@@ -45,7 +45,7 @@ package main
 
 import (
     "fmt"
-    ason "github.com/example/ason"
+    ason "github.com/ason-lab/ason-go"
 )
 
 type User struct {
@@ -112,7 +112,7 @@ ASON-BIN is a compact binary encoding of any Go value. It provides the largest p
 ### API
 
 ```go
-import ason "github.com/example/ason"
+import ason "github.com/ason-lab/ason-go"
 
 // Marshal any value to bytes
 b, err := ason.MarshalBinary(&user)

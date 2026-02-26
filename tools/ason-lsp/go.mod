@@ -1,3 +1,3 @@
-module github.com/example/ason-lsp
+module github.com/ason-lab/ason-go-lsp
 
 go 1.25.0
