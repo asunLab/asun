@@ -728,6 +728,39 @@ void test_bad_format_extra_tuples(void) {
     PASS();
 }
 
+void test_good_format_single(void) {
+    /* {schema}: (1, Alice) — single struct with one tuple: MUST succeed */
+    TEST(good_format_single);
+    const char* good = "{id:int,name:str}:(1,Alice)";
+    TFmtRow r = {0};
+    ason_err_t err = ason_decode_TFmtRow(good, strlen(good), &r);
+    if (err != ASON_OK) { FAIL("should accept single struct with one tuple"); }
+    ASSERT_EQ_I(r.id, 1);
+    ASSERT_EQ_S(r.name.data, "Alice");
+    free_tfmtrow(&r);
+    PASS();
+}
+
+void test_good_format_vec_single(void) {
+    /* [{schema}]: (1, Alice) — array schema with one tuple: MUST succeed */
+    TEST(good_format_vec_single);
+    const char* good = "[{id:int,name:str}]:(1,Alice)";
+    TFmtRow* rows = NULL;
+    size_t count = 0;
+    ason_err_t err = ason_decode_vec_TFmtRow(good, strlen(good), &rows, &count);
+    if (err != ASON_OK) { FAIL("should accept [{schema}]: with single tuple"); }
+    if (count != 1) {
+        for (size_t i = 0; i < count; i++) free_tfmtrow(&rows[i]);
+        free(rows);
+        FAIL("expected 1 row");
+    }
+    ASSERT_EQ_I(rows[0].id, 1);
+    ASSERT_EQ_S(rows[0].name.data, "Alice");
+    free_tfmtrow(&rows[0]);
+    free(rows);
+    PASS();
+}
+
 /* ===========================================================================
  * encodePretty -> decode roundtrip tests
  * =========================================================================== */
@@ -913,6 +946,8 @@ int main(void) {
     test_bad_format_trailing_rows();
     test_good_format_as_vec();
     test_bad_format_extra_tuples();
+    test_good_format_single();
+    test_good_format_vec_single();
 
     printf("\n--- encodePretty -> decode roundtrips ---\n");
     test_pretty_simple_roundtrip();

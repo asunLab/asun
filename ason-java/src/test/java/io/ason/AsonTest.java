@@ -504,6 +504,21 @@ public class AsonTest {
         assertEquals("Carol", rows.get(2).name);
     }
 
+    @Test void testGoodFormatSingleStruct() {
+        // {id:int,name:str}: (1, Alice) — single struct, one tuple: MUST succeed
+        Row r = Ason.decode("{id:int,name:str}:(1,Alice)", Row.class);
+        assertEquals(1L, r.id);
+        assertEquals("Alice", r.name);
+    }
+
+    @Test void testGoodFormatVecSingleItem() {
+        // [{id:int,name:str}]: (1, Alice) — array schema, one tuple: MUST succeed
+        List<Row> rows = Ason.decodeList("[{id:int,name:str}]:(1,Alice)", Row.class);
+        assertEquals(1, rows.size());
+        assertEquals(1L, rows.get(0).id);
+        assertEquals("Alice", rows.get(0).name);
+    }
+
     @Test void testBadFormatExtraTuplesThrows() {
         String bad = "{id:int,name:str}:(10,Dave),(11,Eve)";
         assertThrows(Exception.class, () -> Ason.decode(bad, Row.class),

@@ -753,6 +753,31 @@ func TestGoodFormatAsSlice(t *testing.T) {
 	}
 }
 
+func TestGoodFormatSingleStruct(t *testing.T) {
+	// {id:int,name:str}: (1, Alice) — single struct, one tuple: MUST succeed
+	var r Row
+	if err := Decode([]byte("{id:int,name:str}:(1,Alice)"), &r); err != nil {
+		t.Fatalf("should accept single struct with one tuple: %v", err)
+	}
+	if r.ID != 1 || r.Name != "Alice" {
+		t.Fatalf("unexpected: %+v", r)
+	}
+}
+
+func TestGoodFormatVecSingleItem(t *testing.T) {
+	// [{id:int,name:str}]: (1, Alice) — array schema, one tuple: MUST succeed
+	var rows []Row
+	if err := Decode([]byte("[{id:int,name:str}]:(1,Alice)"), &rows); err != nil {
+		t.Fatalf("should accept [{schema}]: with single tuple: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected 1, got %d", len(rows))
+	}
+	if rows[0].ID != 1 || rows[0].Name != "Alice" {
+		t.Fatalf("unexpected: %+v", rows[0])
+	}
+}
+
 func TestBadFormatExtraTuples(t *testing.T) {
 	// Two tuples without vec wrapper
 	var r Row

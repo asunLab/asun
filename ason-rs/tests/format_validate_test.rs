@@ -81,6 +81,29 @@ mod format_validation {
         assert_eq!(users[1].name, "Bob");
     }
 
+    #[test]
+    fn test_good_format_single_struct() {
+        // {id:int, name:str}: (1, Alice) — single struct, one tuple: MUST succeed
+        let good = "{id:int, name:str}:(1,Alice)";
+        let result = decode::<FmtUser>(good);
+        assert!(result.is_ok(), "should accept single struct with one tuple");
+        let u = result.unwrap();
+        assert_eq!(u.id, 1);
+        assert_eq!(u.name, "Alice");
+    }
+
+    #[test]
+    fn test_good_format_vec_single_item() {
+        // [{id:int, name:str}]: (1, Alice) — array schema with one tuple: MUST succeed
+        let good = "[{id:int, name:str}]:(1,Alice)";
+        let result = decode::<Vec<FmtUser>>(good);
+        assert!(result.is_ok(), "should accept [{{}}]: with single tuple");
+        let users = result.unwrap();
+        assert_eq!(users.len(), 1);
+        assert_eq!(users[0].id, 1);
+        assert_eq!(users[0].name, "Alice");
+    }
+
     // -------------------------------------------------------------------------
     // encodePretty -> decode roundtrip tests
     // -------------------------------------------------------------------------
