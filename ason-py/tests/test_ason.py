@@ -280,3 +280,73 @@ class TestSpecialFloats:
         rec = {"v": float("-inf")}
         out = ason.decode(ason.encode(rec, "{v:float}"))
         assert math.isinf(out["v"]) and out["v"] < 0
+
+
+# ---------------------------------------------------------------------------
+# 7.  Format validation
+#   - [{schema}]: (r1),(r2),(r3)  ✔ correct (array, multiple)
+#   - {schema}: (r1)             ✔ correct (single struct, one tuple)
+#   - [{schema}]: (r1)           ✔ correct (array, single element)
+#   - {schema}: (r1),(r2),(r3)   ✘ wrong  (single struct schema, multiple tuples)
+# ---------------------------------------------------------------------------
+
+BAD_FMT  = "{id:int, name:str}:\n  (1, Alice),\n  (2, Bob),\n  (3, Carol)"
+GOOD_FMT = "[{id:int, name:str}]:\n  (1, Alice),\n  (2, Bob),\n  (3, Carol)"
+
+
+class TestFormatValidation:
+    # --- Scenario 4 (incorrect): single struct schema with multiple tuples ---
+
+    def test_bad_format_multi_tuples_for_single(self):
+        """Single struct schema with multiple tuples must be rejected."""
+        with pytest.raises(ason.AsonError):
+            ason.decode(BAD_FMT)
+
+    def test_bad_format_extra_tuples(self):
+        """Two tuples after single struct schema must be rejected."""
+        with pytest.raises(ason.AsonError):
+            ason.decode("{id:int,name:str}:(10,Dave),(11,Eve)")
+
+    def test_bad_format_no_vec_wrapper(self):
+        """Five rows without [] wrapper must be rejected."""
+        with pytest.raises(ason.AsonError):
+            ason.decode("{id,name}:(1,A),(2,B),(3,C),(4,D),(5,E)")
+
+    # --- Scenario 1 (correct): array schema with multiple tuples ---
+
+    def test_good_format_array_multi(self):
+        """[{schema}]: with multiple tuples must succeed."""
+        out = ason.decode(GOOD_FMT)
+        assert isinstance(out, list)
+        assert len(out) == 3
+        assert out[0] == {"id": 1, "name": "Alice"}
+        assert out[2] == {"id": 3, "name": "Carol"}
+
+    # --- Scenario 2 (correct): single struct schema with one tuple ---
+
+    def test_good_format_single_struct(self):
+        """Single struct schema with one tuple must succeed."""
+        out = ason.decode("{id:int,name:str}:(1,Alice)")
+        assert out == {"id": 1, "name": "Alice"}
+
+    def test_good_format_single_struct_typed(self):
+        """Typed single struct schema with one tuple must succeed."""
+        text = ason.encode({"id": 42, "name": "Bob"}, "{id:int, name:str}")
+        out = ason.decode(text)
+        assert out == {"id": 42, "name": "Bob"}
+
+    # --- Scenario 3 (correct): array schema with a single element ---
+
+    def test_good_format_vec_single_item(self):
+        """[{schema}]: with exactly one tuple must succeed."""
+        out = ason.decode("[{id:int,name:str}]:(1,Alice)")
+        assert isinstance(out, list)
+        assert len(out) == 1
+        assert out[0] == {"id": 1, "name": "Alice"}
+
+    def test_good_format_vec_single_item_via_encode(self):
+        """encode + decode roundtrip for a single-element list."""
+        rows = [{"id": 7, "name": "Carol"}]
+        text = ason.encode(rows, "[{id:int, name:str}]")
+        out = ason.decode(text)
+        assert out == rows
