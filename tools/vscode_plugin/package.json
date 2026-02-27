@@ -11,6 +11,9 @@
   "engines": {
     "vscode": "^1.75.0"
   },
+  "activationEvents": [
+    "onLanguage:ason"
+  ],
   "categories": [
     "Programming Languages",
     "Formatters",
@@ -115,10 +118,12 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run build-lsp && npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "lint": "eslint src --ext ts"
+    "lint": "eslint src --ext ts",
+    "build-lsp": "cd ../ason-zig-lsp && zig build -Drelease=true && mkdir -p ../vscode_plugin/server && cp zig-out/bin/ason-zig-lsp ../vscode_plugin/server/ason-zig-lsp",
+    "deploy-lsp": "npm run build-lsp && cp server/ason-zig-lsp \"$(node -e \"const p=require('path'),os=require('os'),f=require('fs');const ext=p.join(os.homedir(),'.vscode','extensions');const d=f.readdirSync(ext).find(x=>x.startsWith('ason.ason-vscode'));if(d){console.log(p.join(ext,d,'server','ason-zig-lsp'))}\")\""
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"

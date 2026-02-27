@@ -1,0 +1,1013 @@
+//! LSP features: hover, completion, formatting, inlay hints, JSON conversion.
+
+const std = @import("std");
+const ArrayList = std.array_list.Managed;
+const parser = @import("parser.zig");
+const lex = @import("lexer.zig");
+const Node = parser.Node;
+const NodeKind = parser.NodeKind;
+const Token = lex.Token;
+const TK = lex.TokKind;
+
+// ── Hover ──────────────────────────────────────────────────────────────────────
+
+pub fn hoverInfo(root: Node, line: u32, col: u32, alloc: std.mem.Allocator) ![]const u8 {
+    const n = findNodeAt(root, line, col) orelse return try std.fmt.allocPrint(alloc, "", .{});
+    return hoverNode(n, alloc);
+}
+
+fn hoverNode(n: Node, alloc: std.mem.Allocator) ![]const u8 {
+    switch (n.kind) {
+        .field => {
+            var sb = ArrayList(u8).init(alloc);
+            const w = sb.writer();
+            try w.print("**Field** `{s}`", .{n.token.value});
+            if (n.children.len > 0) {
+                const c = n.children[0];
+                switch (c.kind) {
+                    .type_annot => try w.print(" : `{s}`", .{c.token.value}),
+                    .schema => try w.writeAll(" : nested object"),
+                    .array_schema => try w.writeAll(" : object array"),
+                    else => {},
+                }
+            }
+            return sb.toOwnedSlice();
+        },
+        .type_annot => {
+            const t = n.token.value;
+            if (std.mem.eql(u8, t, "int") or std.mem.eql(u8, t, "integer"))
+                return "**Type** `int`\n\nInteger value (e.g., `42`, `-100`)";
+            if (std.mem.eql(u8, t, "float") or std.mem.eql(u8, t, "double"))
+                return "**Type** `float`\n\nFloating-point value (e.g., `3.14`)";
+            if (std.mem.eql(u8, t, "str") or std.mem.eql(u8, t, "string"))
+                return "**Type** `str`\n\nString value (quoted or unquoted)";
+            if (std.mem.eql(u8, t, "bool") or std.mem.eql(u8, t, "boolean"))
+                return "**Type** `bool`\n\nBoolean: `true` or `false`";
+            return try std.fmt.allocPrint(alloc, "**Type** `{s}`", .{t});
+        },
+        .schema => {
+            var sb = ArrayList(u8).init(alloc);
+            const w = sb.writer();
+            const fields = schemaFields(n);
+            try w.print("**Schema** — {d} field(s)\n\n", .{fields.len});
+            for (fields) |f| {
+                try w.print("- `{s}`", .{f.token.value});
+                if (f.children.len > 0 and f.children[0].kind == .type_annot)
+                    try w.print(" : {s}", .{f.children[0].token.value});
+                try w.writeAll("\n");
+            }
+            return sb.toOwnedSlice();
+        },
+        .tuple => return "**Data Tuple** `(...)`\n\nOrdered values matching the schema fields.",
+        .array => return "**Array** `[...]`",
+        .map_type => return "**Map Type** `map[K,V]`\n\nKey-value pair collection.",
+        .value => {
+            const t = n.token;
+            switch (t.kind) {
+                .number => return try std.fmt.allocPrint(alloc, "**Number** `{s}`", .{t.value}),
+                .bool_val => return try std.fmt.allocPrint(alloc, "**Boolean** `{s}`", .{t.value}),
+                .string => return "**Quoted String**",
+                else => {
+                    const trimmed = std.mem.trim(u8, t.value, " \t");
+                    if (trimmed.len == 0) return "**Null** — empty value";
+                    return try std.fmt.allocPrint(alloc, "**String** `{s}`", .{trimmed});
+                },
+            }
+        },
+        else => return try std.fmt.allocPrint(alloc, "", .{}),
+    }
+}
+
+// ── Completion ─────────────────────────────────────────────────────────────────
+
+pub const CompItem = struct {
+    label: []const u8,
+    kind: u8, // LSP kind: 1=Text 6=Variable 12=Value 14=Keyword 15=Snippet
+    detail: []const u8,
+    insert_text: []const u8,
+};
+
+pub fn complete(root: Node, line: u32, col: u32, alloc: std.mem.Allocator) ![]CompItem {
+    const ctx = findContext(root, line, col);
+    return switch (ctx) {
+        .schema_type  => typeCompletions(alloc),
+        .schema_field => schemaKwCompletions(alloc),
+        .data_value   => dataValueCompletions(alloc),
+        .top_level    => topLevelCompletions(alloc),
+        else          => &.{},
+    };
+}
+
+const CompCtx = enum { unknown, schema_type, schema_field, data_value, top_level };
+
+fn findContext(root: Node, line: u32, col: u32) CompCtx {
+    const n = findNodeAt(root, line, col) orelse return .top_level;
+    return switch (n.kind) {
+        .schema      => .schema_field,
+        .field       => .schema_field,
+        .type_annot  => .schema_type,
+        .tuple, .value, .array => .data_value,
+        else         => .top_level,
+    };
+}
+
+fn typeCompletions(alloc: std.mem.Allocator) ![]CompItem {
+    const items = &[_]CompItem{
+        .{ .label = "int",     .kind = 14, .detail = "Integer type",           .insert_text = "int" },
+        .{ .label = "float",   .kind = 14, .detail = "Float type",             .insert_text = "float" },
+        .{ .label = "str",     .kind = 14, .detail = "String type",            .insert_text = "str" },
+        .{ .label = "bool",    .kind = 14, .detail = "Boolean type",           .insert_text = "bool" },
+        .{ .label = "string",  .kind = 14, .detail = "String type (alias)",    .insert_text = "string" },
+        .{ .label = "integer", .kind = 14, .detail = "Integer type (alias)",   .insert_text = "integer" },
+        .{ .label = "double",  .kind = 14, .detail = "Float type (alias)",     .insert_text = "double" },
+        .{ .label = "boolean", .kind = 14, .detail = "Boolean type (alias)",   .insert_text = "boolean" },
+        .{ .label = "map",     .kind = 14, .detail = "Map type",               .insert_text = "map[str,str]" },
+    };
+    const out = try alloc.alloc(CompItem, items.len);
+    @memcpy(out, items);
+    return out;
+}
+
+fn schemaKwCompletions(alloc: std.mem.Allocator) ![]CompItem {
+    const items = &[_]CompItem{
+        .{ .label = "field", .kind = 6, .detail = "Add a field", .insert_text = "field" },
+    };
+    const out = try alloc.alloc(CompItem, 1);
+    out[0] = items[0];
+    return out;
+}
+
+fn dataValueCompletions(alloc: std.mem.Allocator) ![]CompItem {
+    const out = try alloc.alloc(CompItem, 2);
+    out[0] = .{ .label = "true",  .kind = 12, .detail = "Boolean true",  .insert_text = "true" };
+    out[1] = .{ .label = "false", .kind = 12, .detail = "Boolean false", .insert_text = "false" };
+    return out;
+}
+
+fn topLevelCompletions(alloc: std.mem.Allocator) ![]CompItem {
+    const out = try alloc.alloc(CompItem, 3);
+    out[0] = .{ .label = "{schema}:(data)",   .kind = 15, .detail = "Single object",  .insert_text = "{$1}:($2)" };
+    out[1] = .{ .label = "[{schema}]:(data)", .kind = 15, .detail = "Object array",   .insert_text = "[{$1}]:($2)" };
+    out[2] = .{ .label = "[values]",          .kind = 15, .detail = "Plain array",    .insert_text = "[$1]" };
+    return out;
+}
+
+// ── Format ─────────────────────────────────────────────────────────────────────
+
+const MAX_LINE = 100;
+
+pub fn format(src: []const u8, alloc: std.mem.Allocator) ![]const u8 {
+    var result = try parser.parse(src, alloc);
+    defer result.deinit();
+    var sb = ArrayList(u8).init(alloc);
+    try formatNode(result.root, 0, &sb);
+    return sb.toOwnedSlice();
+}
+
+fn nodeWidth(n: Node) isize {
+    switch (n.kind) {
+        .document, .single_object, .object_array => return -1,
+        .schema => {
+            var total: isize = 2;
+            for (n.children, 0..) |c, i| {
+                if (i > 0) total += 2;
+                const w = nodeWidth(c);
+                if (w < 0) return -1;
+                total += w;
+            }
+            return total;
+        },
+        .field => {
+            var total: isize = @intCast(n.token.value.len);
+            if (n.children.len > 0) {
+                const c = n.children[0];
+                if (c.kind == .type_annot) {
+                    total += 1 + @as(isize, @intCast(c.token.value.len));
+                } else if (c.kind == .schema) {
+                    const w = nodeWidth(c);
+                    if (w < 0) return -1;
+                    total += 1 + w;
+                } else if (c.kind == .array_schema) {
+                    if (c.children.len > 0) {
+                        const w = nodeWidth(c.children[0]);
+                        if (w < 0) return -1;
+                        total += 3 + w;
+                    }
+                }
+            }
+            return total;
+        },
+        .tuple, .array => {
+            var total: isize = 2;
+            for (n.children, 0..) |c, i| {
+                if (i > 0) total += 2;
+                const w = nodeWidth(c);
+                if (w < 0) return -1;
+                total += w;
+            }
+            return total;
+        },
+        .value => return @intCast(std.mem.trim(u8, n.token.value, " \t").len),
+        .map_type => return @intCast(n.token.value.len),
+        else => return 0,
+    }
+}
+
+fn isComplex(n: Node) bool {
+    const w = nodeWidth(n);
+    return w < 0 or w > MAX_LINE;
+}
+
+fn indent(level: usize, sb: *ArrayList(u8)) !void {
+    var i: usize = 0;
+    while (i < level) : (i += 1) try sb.appendSlice("  ");
+}
+
+fn formatInline(n: Node, sb: *ArrayList(u8)) !void {
+    const w = sb.writer();
+    switch (n.kind) {
+        .schema => {
+            try w.writeAll("{");
+            for (n.children, 0..) |c, i| {
+                if (i > 0) try w.writeAll(", ");
+                try formatInline(c, sb);
+            }
+            try w.writeAll("}");
+        },
+        .field => {
+            try w.writeAll(n.token.value);
+            if (n.children.len > 0) {
+                const c = n.children[0];
+                if (c.kind == .type_annot) {
+                    try w.print(":{s}", .{c.token.value});
+                } else if (c.kind == .schema) {
+                    try w.writeAll(":");
+                    try formatInline(c, sb);
+                } else if (c.kind == .array_schema) {
+                    try w.writeAll(":[");
+                    if (c.children.len > 0) try formatInline(c.children[0], sb);
+                    try w.writeAll("]");
+                }
+            }
+        },
+        .tuple => {
+            try w.writeAll("(");
+            for (n.children, 0..) |c, i| {
+                if (i > 0) try w.writeAll(", ");
+                try formatInline(c, sb);
+            }
+            try w.writeAll(")");
+        },
+        .array => {
+            try w.writeAll("[");
+            for (n.children, 0..) |c, i| {
+                if (i > 0) try w.writeAll(", ");
+                try formatInline(c, sb);
+            }
+            try w.writeAll("]");
+        },
+        .value => try w.writeAll(std.mem.trim(u8, n.token.value, " \t")),
+        .map_type => try w.writeAll(n.token.value),
+        .array_schema => {
+            try w.writeAll("[");
+            if (n.children.len > 0) try formatInline(n.children[0], sb);
+            try w.writeAll("]");
+        },
+        else => {},
+    }
+}
+
+fn formatNode(n: Node, lvl: usize, sb: *ArrayList(u8)) !void {
+    const w = sb.writer();
+    switch (n.kind) {
+        .document => {
+            if (n.children.len == 0) return;
+            const first = n.children[0];
+            const has_schema = (first.kind == .schema or first.kind == .array_schema);
+            if (has_schema) {
+                // Emit schema header (array_schema wraps inner schema in [...])
+                if (first.kind == .array_schema) {
+                    try w.writeAll("[");
+                    if (first.children.len > 0) try formatNode(first.children[0], lvl, sb);
+                    try w.writeAll("]");
+                } else {
+                    try formatNode(first, lvl, sb);
+                }
+                try w.writeAll(":");
+                // Emit data rows separated by commas
+                const rows = n.children[1..];
+                for (rows, 0..) |c, ri| {
+                    if (ri > 0) try w.writeAll(",");
+                    try w.writeAll("\n");
+                    try formatNode(c, lvl, sb);
+                }
+                try w.writeAll("\n");
+            } else {
+                for (n.children) |c| try formatNode(c, lvl, sb);
+            }
+        },
+        .schema => {
+            if (!isComplex(n)) {
+                try formatInline(n, sb);
+            } else {
+                try w.writeAll("{\n");
+                for (n.children, 0..) |c, i| {
+                    try indent(lvl + 1, sb);
+                    try formatNode(c, lvl + 1, sb);
+                    if (i < n.children.len - 1) try w.writeAll(",");
+                    try w.writeAll("\n");
+                }
+                try indent(lvl, sb);
+                try w.writeAll("}");
+            }
+        },
+        .field => {
+            try w.writeAll(n.token.value);
+            if (n.children.len > 0) {
+                const c = n.children[0];
+                if (c.kind == .type_annot) {
+                    try w.print(":{s}", .{c.token.value});
+                } else if (c.kind == .schema) {
+                    try w.writeAll(":");
+                    try formatNode(c, lvl, sb);
+                } else if (c.kind == .array_schema) {
+                    try w.writeAll(":[");
+                    if (c.children.len > 0) try formatNode(c.children[0], lvl, sb);
+                    try w.writeAll("]");
+                }
+            }
+        },
+        .tuple => {
+            if (!isComplex(n)) {
+                try formatInline(n, sb);
+            } else {
+                try w.writeAll("(\n");
+                for (n.children, 0..) |c, i| {
+                    try indent(lvl + 1, sb);
+                    try formatNode(c, lvl + 1, sb);
+                    if (i < n.children.len - 1) try w.writeAll(",");
+                    try w.writeAll("\n");
+                }
+                try indent(lvl, sb);
+                try w.writeAll(")");
+            }
+        },
+        .array => {
+            if (!isComplex(n)) {
+                try formatInline(n, sb);
+            } else {
+                try w.writeAll("[\n");
+                for (n.children, 0..) |c, i| {
+                    try indent(lvl + 1, sb);
+                    try formatNode(c, lvl + 1, sb);
+                    if (i < n.children.len - 1) try w.writeAll(",");
+                    try w.writeAll("\n");
+                }
+                try indent(lvl, sb);
+                try w.writeAll("]");
+            }
+        },
+        .array_schema => {
+            try w.writeAll("[");
+            if (n.children.len > 0) try formatNode(n.children[0], lvl, sb);
+            try w.writeAll("]");
+        },
+        .value => try w.writeAll(std.mem.trim(u8, n.token.value, " \t")),
+        .map_type => try w.writeAll(n.token.value),
+        else => {},
+    }
+}
+
+// ── Compress ───────────────────────────────────────────────────────────────────
+
+pub fn compress(src: []const u8, alloc: std.mem.Allocator) ![]const u8 {
+    var result = try parser.parse(src, alloc);
+    defer result.deinit();
+    var sb = ArrayList(u8).init(alloc);
+    try compressNode(result.root, &sb);
+    return sb.toOwnedSlice();
+}
+
+fn compressNode(n: Node, sb: *ArrayList(u8)) !void {
+    const w = sb.writer();
+    switch (n.kind) {
+        .document => {
+            if (n.children.len == 0) return;
+            const first = n.children[0];
+            const has_schema = (first.kind == .schema or first.kind == .array_schema);
+            if (has_schema) {
+                if (first.kind == .array_schema) {
+                    try w.writeAll("[");
+                    if (first.children.len > 0) try compressNode(first.children[0], sb);
+                    try w.writeAll("]");
+                } else {
+                    try compressNode(first, sb);
+                }
+                try w.writeAll(":");
+                for (n.children[1..], 0..) |c, ri| {
+                    if (ri > 0) try w.writeAll(",");
+                    try compressNode(c, sb);
+                }
+            } else {
+                for (n.children) |c| try compressNode(c, sb);
+            }
+        },
+        .schema => {
+            try w.writeAll("{");
+            for (n.children, 0..) |c, i| {
+                if (i > 0) try w.writeAll(",");
+                try compressNode(c, sb);
+            }
+            try w.writeAll("}");
+        },
+        .field => {
+            try w.writeAll(n.token.value);
+            if (n.children.len > 0) {
+                const c = n.children[0];
+                if (c.kind == .type_annot) {
+                    try w.print(":{s}", .{c.token.value});
+                } else if (c.kind == .schema) {
+                    try w.writeAll(":");
+                    try compressNode(c, sb);
+                } else if (c.kind == .array_schema) {
+                    try w.writeAll(":[");
+                    if (c.children.len > 0) try compressNode(c.children[0], sb);
+                    try w.writeAll("]");
+                }
+            }
+        },
+        .tuple => {
+            try w.writeAll("(");
+            for (n.children, 0..) |c, i| {
+                if (i > 0) try w.writeAll(",");
+                try compressNode(c, sb);
+            }
+            try w.writeAll(")");
+        },
+        .array => {
+            try w.writeAll("[");
+            for (n.children, 0..) |c, i| {
+                if (i > 0) try w.writeAll(",");
+                try compressNode(c, sb);
+            }
+            try w.writeAll("]");
+        },
+        .array_schema => {
+            try w.writeAll("[");
+            if (n.children.len > 0) try compressNode(n.children[0], sb);
+            try w.writeAll("]");
+        },
+        .value => try w.writeAll(std.mem.trim(u8, n.token.value, " \t")),
+        .map_type => try w.writeAll(n.token.value),
+        else => {},
+    }
+}
+
+// ── Inlay Hints ────────────────────────────────────────────────────────────────
+
+pub const InlayHint = struct {
+    line: u32,
+    col: u32,
+    label: []const u8,
+};
+
+pub fn inlayHints(root: Node, alloc: std.mem.Allocator) ![]InlayHint {
+    var hints = ArrayList(InlayHint).init(alloc);
+    try walkHints(root, &hints, alloc);
+    return hints.toOwnedSlice();
+}
+
+fn walkHints(n: Node, hints: *ArrayList(InlayHint), alloc: std.mem.Allocator) !void {
+    // Walk any schema+tuple pairs at document level
+    if (n.kind == .document) {
+        var schema_node: ?Node = null;
+        for (n.children) |c| {
+            if (c.kind == .schema or c.kind == .array_schema) {
+                schema_node = c;
+            } else if (c.kind == .tuple) {
+                if (schema_node) |s| {
+                    try tupleHints(s, c, hints, alloc);
+                }
+            }
+        }
+        return; // children already walked via tupleHints recursion
+    }
+    for (n.children) |c| try walkHints(c, hints, alloc);
+}
+
+fn schemaFields(n: Node) []Node {
+    if (n.kind == .schema) {
+        return n.children; // children are fields
+    }
+    if (n.kind == .array_schema and n.children.len > 0) {
+        return schemaFields(n.children[0]);
+    }
+    return &.{};
+}
+
+fn tupleHints(schema: Node, tuple: Node, hints: *ArrayList(InlayHint), alloc: std.mem.Allocator) !void {
+    if (tuple.kind != .tuple) return;
+    const fields = schemaFields(schema);
+    for (tuple.children, 0..) |child, i| {
+        if (i >= fields.len) break;
+        const field = fields[i];
+        const field_name = field.token.value;
+        const label = try std.fmt.allocPrint(alloc, "{s}:", .{field_name});
+        try hints.append(.{ .line = child.token.line, .col = child.token.col, .label = label });
+        // Recurse into nested schemas
+        if (field.children.len > 0) {
+            const ftype = field.children[0];
+            if (ftype.kind == .schema and child.kind == .tuple) {
+                try tupleHints(ftype, child, hints, alloc);
+            } else if (ftype.kind == .array_schema and child.kind == .array) {
+                const inner = if (ftype.children.len > 0) ftype.children[0] else ftype;
+                for (child.children) |elem| {
+                    if (elem.kind == .tuple) try tupleHints(inner, elem, hints, alloc);
+                }
+            }
+        }
+    }
+}
+
+// ── ASON → JSON ────────────────────────────────────────────────────────────────
+
+pub fn asonToJson(src: []const u8, alloc: std.mem.Allocator) ![]const u8 {
+    var result = try parser.parse(src, alloc);
+    defer result.deinit();
+
+    // Check for parse errors
+    for (result.diags) |d| {
+        if (d.severity == .err)
+            return error.ParseError;
+    }
+
+    var sb = ArrayList(u8).init(alloc);
+    try nodeToJson(result.root, &sb, alloc, 0);
+    return sb.toOwnedSlice();
+}
+
+fn nodeToJson(n: Node, sb: *ArrayList(u8), alloc: std.mem.Allocator, _indent: usize) error{OutOfMemory}!void {
+    const w = sb.writer();
+    switch (n.kind) {
+        .document => {
+            if (n.children.len == 0) { try w.writeAll("null"); return; }
+            const first = n.children[0];
+            if (first.kind == .schema or first.kind == .array_schema) {
+                var data_count: usize = 0;
+                for (n.children[1..]) |c| {
+                    if (c.kind == .tuple) data_count += 1;
+                }
+                if (first.kind == .array_schema) {
+                    // [{schema}]:(tuple),(tuple)... → JSON array of objects
+                    const inner_schema = if (first.children.len > 0) first.children[0] else first;
+                    try w.writeAll("[");
+                    var first_elem = true;
+                    for (n.children[1..]) |c| {
+                        if (c.kind == .tuple) {
+                            if (!first_elem) try w.writeAll(", ");
+                            first_elem = false;
+                            try schemaAndTupleToJson(inner_schema, c, sb, alloc, 0);
+                        }
+                    }
+                    try w.writeAll("]");
+                    return;
+                }
+                // Plain schema
+                if (data_count == 1) {
+                    for (n.children[1..]) |c| {
+                        if (c.kind == .tuple) {
+                            try schemaAndTupleToJson(first, c, sb, alloc, 0);
+                            return;
+                        }
+                    }
+                } else if (data_count > 1) {
+                    try w.writeAll("[");
+                    var first_elem = true;
+                    for (n.children[1..]) |c| {
+                        if (c.kind == .tuple) {
+                            if (!first_elem) try w.writeAll(", ");
+                            first_elem = false;
+                            try schemaAndTupleToJson(first, c, sb, alloc, 0);
+                        }
+                    }
+                    try w.writeAll("]");
+                    return;
+                }
+            }
+            try nodeToJson(n.children[0], sb, alloc, _indent);
+        },
+        .schema => {
+            // schema with a following tuple is a single object
+            try w.writeAll("{}");
+        },
+        .tuple => {
+            // tuple without context, emit as array
+            try w.writeAll("[");
+            for (n.children, 0..) |c, i| {
+                if (i > 0) try w.writeAll(", ");
+                try nodeToJson(c, sb, alloc, _indent);
+            }
+            try w.writeAll("]");
+        },
+        .array => {
+            try w.writeAll("[");
+            for (n.children, 0..) |c, i| {
+                if (i > 0) try w.writeAll(", ");
+                try nodeToJson(c, sb, alloc, _indent);
+            }
+            try w.writeAll("]");
+        },
+        .value => try valueToJson(n.token, sb),
+        else => try w.writeAll("null"),
+    }
+}
+
+fn schemaAndTupleToJson(schema: Node, tuple: Node, sb: *ArrayList(u8), alloc: std.mem.Allocator, lvl: usize) !void {
+    _ = lvl;
+    const w = sb.writer();
+    const fields = schemaFields(schema);
+    try w.writeAll("{");
+    for (fields, 0..) |f, i| {
+        if (i > 0) try w.writeAll(", ");
+        try w.print("\"{s}\": ", .{f.token.value});
+        if (i < tuple.children.len) {
+            const child = tuple.children[i];
+            if (f.children.len > 0) {
+                const ftype = f.children[0];
+                if (ftype.kind == .schema and child.kind == .tuple) {
+                    // Nested object
+                    try schemaAndTupleToJson(ftype, child, sb, alloc, 0);
+                    continue;
+                } else if (ftype.kind == .array_schema and child.kind == .array) {
+                    // Array of sub-objects: [{subSchema}] paired with [(t1),(t2),...]
+                    const inner = if (ftype.children.len > 0) ftype.children[0] else ftype;
+                    try w.writeAll("[");
+                    for (child.children, 0..) |elem, ei| {
+                        if (ei > 0) try w.writeAll(", ");
+                        if (elem.kind == .tuple) {
+                            try schemaAndTupleToJson(inner, elem, sb, alloc, 0);
+                        } else {
+                            try nodeToJson(elem, sb, alloc, 0);
+                        }
+                    }
+                    try w.writeAll("]");
+                    continue;
+                }
+            }
+            try nodeToJson(child, sb, alloc, 0);
+        } else {
+            try w.writeAll("null");
+        }
+    }
+    try w.writeAll("}");
+}
+
+fn valueToJson(t: Token, sb: *ArrayList(u8)) !void {
+    const w = sb.writer();
+    switch (t.kind) {
+        .number => try w.writeAll(t.value),
+        .bool_val => try w.writeAll(t.value),
+        .string => {
+            // value already includes quotes, just emit
+            try w.writeAll(t.value);
+        },
+        else => {
+            const v = std.mem.trim(u8, t.value, " \t");
+            if (v.len == 0) {
+                try w.writeAll("null");
+            } else if (std.mem.eql(u8, v, "true") or std.mem.eql(u8, v, "false")) {
+                try w.writeAll(v);
+            } else if (lex.isNumber(v)) {
+                try w.writeAll(v);
+            } else {
+                // Output as JSON string
+                try w.writeByte('"');
+                for (v) |c| {
+                    if (c == '"') try w.writeAll("\\\"")
+                    else if (c == '\\') try w.writeAll("\\\\")
+                    else if (c == '\n') try w.writeAll("\\n")
+                    else try w.writeByte(c);
+                }
+                try w.writeByte('"');
+            }
+        },
+    }
+}
+
+// ── JSON → ASON ────────────────────────────────────────────────────────────────
+
+pub fn jsonToAson(src: []const u8, alloc: std.mem.Allocator) ![]const u8 {
+    const parsed = try std.json.parseFromSlice(std.json.Value, alloc, src, .{});
+    defer parsed.deinit();
+    var sb = ArrayList(u8).init(alloc);
+    try jsonValueToAson(parsed.value, &sb, alloc);
+    return sb.toOwnedSlice();
+}
+
+fn jsonValueToAson(v: std.json.Value, sb: *ArrayList(u8), alloc: std.mem.Allocator) error{OutOfMemory}!void {
+    const w = sb.writer();
+    switch (v) {
+        .null => try w.writeAll(""),
+        .bool => |b| try w.writeAll(if (b) "true" else "false"),
+        .integer => |i| try w.print("{d}", .{i}),
+        .float => |f| try w.print("{d}", .{f}),
+        .string => |s| {
+            if (needsQuote(s)) {
+                try w.writeByte('"');
+                for (s) |c| {
+                    if (c == '"') try w.writeAll("\\\"")
+                    else if (c == '\\') try w.writeAll("\\\\")
+                    else try w.writeByte(c);
+                }
+                try w.writeByte('"');
+            } else {
+                try w.writeAll(s);
+            }
+        },
+        .object => |obj| try jsonObjectToAson(obj, sb, alloc),
+        .array => |arr| try jsonArrayToAson(arr.items, sb, alloc),
+        .number_string => |s| try w.writeAll(s),
+    }
+}
+
+fn sortedKeys(obj: std.json.ObjectMap, alloc: std.mem.Allocator) error{OutOfMemory}![][]const u8 {
+    var keys = ArrayList([]const u8).init(alloc);
+    var it = obj.iterator();
+    while (it.next()) |e| try keys.append(e.key_ptr.*);
+    const S = struct {
+        fn lessThan(_: void, a: []const u8, b: []const u8) bool {
+            return std.mem.order(u8, a, b) == .lt;
+        }
+    };
+    std.mem.sort([]const u8, keys.items, {}, S.lessThan);
+    return keys.toOwnedSlice();
+}
+
+const FieldPair = struct { schema: []const u8, data: []const u8 };
+
+fn jsonObjectToAson(obj: std.json.ObjectMap, sb: *ArrayList(u8), alloc: std.mem.Allocator) error{OutOfMemory}!void {
+    const w = sb.writer();
+    if (obj.count() == 0) {
+        try w.writeAll("{}:()");
+        return;
+    }
+    const keys = try sortedKeys(obj, alloc);
+    var schema_parts = ArrayList(u8).init(alloc);
+    var data_parts   = ArrayList(u8).init(alloc);
+    const sw = schema_parts.writer();
+    const dw = data_parts.writer();
+
+    for (keys, 0..) |k, i| {
+        const val = obj.get(k) orelse .null;
+        if (i > 0) {
+            try sw.writeAll(",");
+            try dw.writeAll(",");
+        }
+        const pair = try jsonFieldToAson(k, val, alloc);
+        try sw.writeAll(pair.schema);
+        try dw.writeAll(pair.data);
+    }
+    try w.print("{{{s}}}:({s})", .{ schema_parts.items, data_parts.items });
+}
+
+fn jsonFieldToAson(key: []const u8, val: std.json.Value, alloc: std.mem.Allocator) error{OutOfMemory}!FieldPair {
+    var s = ArrayList(u8).init(alloc);
+    var d = ArrayList(u8).init(alloc);
+    const sw = s.writer();
+    const dw = d.writer();
+    switch (val) {
+        .null   => { try sw.print("{s}:str", .{key}); },
+        .bool   => |b| { try sw.print("{s}:bool", .{key}); try dw.writeAll(if (b) "true" else "false"); },
+        .integer => |i| { try sw.print("{s}:int", .{key}); try dw.print("{d}", .{i}); },
+        .float  => |f| { try sw.print("{s}:float", .{key}); try dw.print("{d}", .{f}); },
+        .string => |str| {
+            try sw.print("{s}:str", .{key});
+            if (needsQuote(str)) {
+                try dw.writeByte('"');
+                for (str) |c| {
+                    if (c == '"') try dw.writeAll("\\\"") else try dw.writeByte(c);
+                }
+                try dw.writeByte('"');
+            } else {
+                try dw.writeAll(str);
+            }
+        },
+        .object => |obj| {
+            var inner_s = ArrayList(u8).init(alloc);
+            var inner_d = ArrayList(u8).init(alloc);
+            const ks = try sortedKeys(obj, alloc);
+            for (ks, 0..) |ik, i| {
+                const iv = obj.get(ik) orelse .null;
+                const p2 = try jsonFieldToAson(ik, iv, alloc);
+                if (i > 0) {
+                    try inner_s.writer().writeAll(",");
+                    try inner_d.writer().writeAll(",");
+                }
+                try inner_s.writer().writeAll(p2.schema);
+                try inner_d.writer().writeAll(p2.data);
+            }
+            try sw.print("{s}:{{{s}}}", .{ key, inner_s.items });
+            try dw.print("({s})", .{inner_d.items});
+        },
+        .array => |arr| {
+            const items = arr.items;
+            if (items.len > 0) {
+                switch (items[0]) {
+                    .object => |first_obj| {
+                        const ks = try sortedKeys(first_obj, alloc);
+                        var inner_s = ArrayList(u8).init(alloc);
+                        for (ks, 0..) |ik, i| {
+                            const iv = first_obj.get(ik) orelse .null;
+                            const p2 = try jsonFieldToAson(ik, iv, alloc);
+                            if (i > 0) try inner_s.writer().writeAll(",");
+                            try inner_s.writer().writeAll(p2.schema);
+                        }
+                        try sw.print("{s}:[{{{s}}}]", .{ key, inner_s.items });
+                        // data: array of tuples
+                        var dat = ArrayList(u8).init(alloc);
+                        try dat.writer().writeAll("[");
+                        for (items, 0..) |elem, ei| {
+                            if (ei > 0) try dat.writer().writeAll(",");
+                            switch (elem) {
+                                .object => |eobj| {
+                                    var td = ArrayList(u8).init(alloc);
+                                    for (ks, 0..) |ik, kIdx| {
+                                        const iv = eobj.get(ik) orelse .null;
+                                        const p2 = try jsonFieldToAson(ik, iv, alloc);
+                                        if (kIdx > 0) try td.writer().writeAll(",");
+                                        try td.writer().writeAll(p2.data);
+                                    }
+                                    try dat.writer().print("({s})", .{td.items});
+                                },
+                                else => try jsonValueToAson(elem, &dat, alloc),
+                            }
+                        }
+                        try dat.writer().writeAll("]");
+                        try dw.writeAll(dat.items);
+                        return FieldPair{ .schema = try s.toOwnedSlice(), .data = try d.toOwnedSlice() };
+                    },
+                    else => {},
+                }
+            }
+            // plain array
+            const elem_type = inferArrayType(items);
+            try sw.print("{s}:[{s}]", .{ key, elem_type });
+            var elems = ArrayList(u8).init(alloc);
+            try elems.writer().writeAll("[");
+            for (items, 0..) |elem, i| {
+                if (i > 0) try elems.writer().writeAll(",");
+                try jsonValueToAson(elem, &elems, alloc);
+            }
+            try elems.writer().writeAll("]");
+            try dw.writeAll(elems.items);
+        },
+        .number_string => |ns| { try sw.print("{s}:str", .{key}); try dw.writeAll(ns); },
+    }
+    return FieldPair{ .schema = try s.toOwnedSlice(), .data = try d.toOwnedSlice() };
+}
+
+fn jsonArrayToAson(items: []std.json.Value, sb: *ArrayList(u8), alloc: std.mem.Allocator) error{OutOfMemory}!void {
+    const w = sb.writer();
+    if (items.len == 0) { try w.writeAll("[]"); return; }
+    // Array of objects → object-array format
+    if (items[0] == .object) {
+        const first_obj = items[0].object;
+        const keys = try sortedKeys(first_obj, alloc);
+        // Build the schema header once from the first element
+        var schema_parts = ArrayList(u8).init(alloc);
+        for (keys, 0..) |k, i| {
+            const iv = first_obj.get(k) orelse .null;
+            const p2 = try jsonFieldToAson(k, iv, alloc);
+            if (i > 0) try schema_parts.writer().writeAll(",");
+            try schema_parts.writer().writeAll(p2.schema);
+        }
+        try w.print("[{{{s}}}]:\n", .{schema_parts.items});
+        // Write each element as a tuple, using writeValueData to avoid
+        // per-element schema+data slice allocations.
+        for (items, 0..) |elem, ei| {
+            try w.writeAll("  (");
+            if (elem == .object) {
+                const eobj = elem.object;
+                for (keys, 0..) |k, i| {
+                    if (i > 0) try w.writeAll(",");
+                    const iv = eobj.get(k) orelse .null;
+                    try writeValueData(iv, w, alloc);
+                }
+            }
+            try w.writeAll(")");
+            if (ei < items.len - 1) try w.writeAll(",");
+            try w.writeAll("\n");
+        }
+        return;
+    }
+    // plain array
+    try w.writeAll("[");
+    for (items, 0..) |elem, i| {
+        if (i > 0) try w.writeAll(",");
+        try jsonValueToAson(elem, sb, alloc);
+    }
+    try w.writeAll("]");
+}
+
+/// Write only the data value (no schema prefix) directly to writer w.
+/// Avoids allocating intermediate ArrayList buffers per element.
+fn writeValueData(val: std.json.Value, w: anytype, alloc: std.mem.Allocator) error{OutOfMemory}!void {
+    switch (val) {
+        .null => {},
+        .bool => |b| try w.writeAll(if (b) "true" else "false"),
+        .integer => |i| try w.print("{d}", .{i}),
+        .float => |f| try w.print("{d}", .{f}),
+        .string => |s| {
+            if (needsQuote(s)) {
+                try w.writeByte('"');
+                for (s) |c| {
+                    if (c == '"') try w.writeAll("\\\"")
+                    else if (c == '\\') try w.writeAll("\\\\")
+                    else try w.writeByte(c);
+                }
+                try w.writeByte('"');
+            } else {
+                try w.writeAll(s);
+            }
+        },
+        .object => |obj| {
+            try w.writeAll("(");
+            const ks = try sortedKeys(obj, alloc);
+            for (ks, 0..) |k, i| {
+                if (i > 0) try w.writeAll(",");
+                const iv = obj.get(k) orelse .null;
+                try writeValueData(iv, w, alloc);
+            }
+            try w.writeAll(")");
+        },
+        .array => |arr| {
+            if (arr.items.len > 0 and arr.items[0] == .object) {
+                const first_obj = arr.items[0].object;
+                const ks = try sortedKeys(first_obj, alloc);
+                try w.writeAll("[");
+                for (arr.items, 0..) |elem, i| {
+                    if (i > 0) try w.writeAll(",");
+                    try w.writeAll("(");
+                    if (elem == .object) {
+                        const eobj = elem.object;
+                        for (ks, 0..) |k, j| {
+                            if (j > 0) try w.writeAll(",");
+                            const iv = eobj.get(k) orelse .null;
+                            try writeValueData(iv, w, alloc);
+                        }
+                    }
+                    try w.writeAll(")");
+                }
+                try w.writeAll("]");
+            } else {
+                try w.writeAll("[");
+                for (arr.items, 0..) |elem, i| {
+                    if (i > 0) try w.writeAll(",");
+                    var tmp = ArrayList(u8).init(alloc);
+                    try jsonValueToAson(elem, &tmp, alloc);
+                    try w.writeAll(tmp.items);
+                }
+                try w.writeAll("]");
+            }
+        },
+        .number_string => |ns| try w.writeAll(ns),
+    }
+}
+
+fn inferArrayType(items: []std.json.Value) []const u8 {
+    if (items.len == 0) return "str";
+    switch (items[0]) {
+        .integer => return "int",
+        .float   => return "float",
+        .bool    => return "bool",
+        .string  => return "str",
+        else     => return "str",
+    }
+}
+
+fn needsQuote(s: []const u8) bool {
+    if (s.len == 0) return true;
+    for (s) |c| {
+        if (c == ',' or c == ')' or c == '(' or c == '[' or c == ']' or
+            c == '{' or c == '}' or c == ':' or c == '"' or c == '\n' or
+            c == '\r' or c == '\t' or c == ' ' or c == '/') return true;
+    }
+    return false;
+}
+
+// ── Find node at position ──────────────────────────────────────────────────────
+
+pub fn findNodeAt(root: Node, line: u32, col: u32) ?Node {
+    var best: ?Node = null;
+    findNodeAtRecurse(root, line, col, &best);
+    return best;
+}
+
+fn findNodeAtRecurse(n: Node, line: u32, col: u32, best: *?Node) void {
+    const t = n.token;
+    const start_ok = t.line < line or (t.line == line and t.col <= col);
+    // Use the token itself as end (approximation)
+    const end_ok   = t.end_line > line or (t.end_line == line and t.end_col >= col);
+    if (start_ok and end_ok) best.* = n;
+    for (n.children) |c| findNodeAtRecurse(c, line, col, best);
+}

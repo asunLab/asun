@@ -11,18 +11,18 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-LSP_DIR="$(cd "$PLUGIN_DIR/../ason-lsp" && pwd)"
+LSP_DIR="$(cd "$PLUGIN_DIR/../ason-zig-lsp" && pwd)"
 SERVER_DIR="$PLUGIN_DIR/server"
 
 # ── 平台定义 ──────────────────────────────────────────────────────────────────
-# 格式: "vscode-target:GOOS:GOARCH:binary-suffix"
+# 格式: "vscode-target:zig-target:binary-suffix"
 ALL_TARGETS=(
-    "darwin-arm64:darwin:arm64:"
-    "darwin-x64:darwin:amd64:"
-    "linux-x64:linux:amd64:"
-    "linux-arm64:linux:arm64:"
-    "win32-x64:windows:amd64:.exe"
-    "win32-arm64:windows:arm64:.exe"
+    "darwin-arm64:aarch64-macos:"
+    "darwin-x64:x86_64-macos:"
+    "linux-x64:x86_64-linux:"
+    "linux-arm64:aarch64-linux:"
+    "win32-x64:x86_64-windows:.exe"
+    "win32-arm64:aarch64-windows:.exe"
 )
 
 # ── 辅助函数 ──────────────────────────────────────────────────────────────────
@@ -51,21 +51,23 @@ detect_current_target() {
     echo "${os}-${arch}"
 }
 
-# ── 编译 ason-lsp ─────────────────────────────────────────────────────────────
+# ── 编译 ason-zig-lsp ────────────────────────────────────────────────────────
 
 build_lsp() {
-    local goos="$1" goarch="$2" suffix="$3" output
+    local zig_target="$1" suffix="$2"
+    local output="$SERVER_DIR/ason-zig-lsp${suffix}"
+    local prefix="$LSP_DIR/zig-out-${zig_target}"
 
-    output="$SERVER_DIR/ason-lsp${suffix}"
-    log "Compiling ason-lsp for ${goos}/${goarch} ..."
-
+    log "Compiling ason-zig-lsp for ${zig_target} ..."
     mkdir -p "$SERVER_DIR"
 
     (
         cd "$LSP_DIR"
-        GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=0 \
-            go build -trimpath -ldflags="-s -w" -o "$output" .
+        zig build -Dtarget="${zig_target}" --release=safe -p "$prefix"
     )
+
+    cp "$prefix/bin/ason-zig-lsp${suffix}" "$output"
+    rm -rf "$prefix"
 
     ok "Built: $output ($(du -h "$output" | awk '{print $1}'))"
 }
@@ -107,7 +109,7 @@ main() {
 
     echo ""
     echo "╔═══════════════════════════════════════════════════╗"
-    echo "║    ASON VS Code Extension — Build Script         ║"
+    echo "║    ASON VS Code Extension — Build Script          ║"
     echo "╚═══════════════════════════════════════════════════╝"
     echo ""
 
@@ -121,10 +123,10 @@ main() {
         log "Building for current platform: ${current}"
 
         for entry in "${ALL_TARGETS[@]}"; do
-            IFS=':' read -r target goos goarch suffix <<< "$entry"
+            IFS=':' read -r target zig_target suffix <<< "$entry"
             if [[ "$target" == "$current" ]]; then
                 clean_server
-                build_lsp "$goos" "$goarch" "$suffix"
+                build_lsp "$zig_target" "$suffix"
                 package_vsix "$target"
                 built=1
                 break
@@ -139,9 +141,9 @@ main() {
     elif [[ "$mode" == "all" ]]; then
         # 构建所有平台
         for entry in "${ALL_TARGETS[@]}"; do
-            IFS=':' read -r target goos goarch suffix <<< "$entry"
+            IFS=':' read -r target zig_target suffix <<< "$entry"
             clean_server
-            build_lsp "$goos" "$goarch" "$suffix"
+            build_lsp "$zig_target" "$suffix"
             package_vsix "$target"
             built=$((built + 1))
         done
@@ -149,10 +151,10 @@ main() {
     else
         # 构建指定平台
         for entry in "${ALL_TARGETS[@]}"; do
-            IFS=':' read -r target goos goarch suffix <<< "$entry"
+            IFS=':' read -r target zig_target suffix <<< "$entry"
             if [[ "$target" == "$mode" ]]; then
                 clean_server
-                build_lsp "$goos" "$goarch" "$suffix"
+                build_lsp "$zig_target" "$suffix"
                 package_vsix "$target"
                 built=1
                 break
@@ -163,7 +165,7 @@ main() {
             err "Unknown target: ${mode}"
             echo "Available targets:"
             for entry in "${ALL_TARGETS[@]}"; do
-                IFS=':' read -r target _ _ _ <<< "$entry"
+                IFS=':' read -r target _ _ <<< "$entry"
                 echo "  - $target"
             done
             exit 1

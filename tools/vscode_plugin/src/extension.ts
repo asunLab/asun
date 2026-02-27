@@ -15,26 +15,39 @@ import {
   LanguageClient,
   LanguageClientOptions,
   ServerOptions,
+  State,
   TransportKind,
   ExecuteCommandRequest,
 } from "vscode-languageclient/node";
 
 let client: LanguageClient;
+let commandsRegistered = false;
 
-export function activate(context: ExtensionContext) {
-  // Register commands FIRST so they are always available,
-  // even if the LSP binary is not found yet.
-  context.subscriptions.push(
-    commands.registerCommand("ason.format", () => formatDocument()),
-    commands.registerCommand("ason.compress", () => compressDocument()),
-    commands.registerCommand("ason.toJSON", () => asonToJSON()),
-    commands.registerCommand("ason.fromJSON", () => jsonToASON()),
-  );
+export async function activate(context: ExtensionContext) {
+  // Guard command registration — only once per extension host lifetime.
+  // On hot-reload / window-reload activate() is called again but commands
+  // already exist; registering them a second time throws "command already exists".
+  if (!commandsRegistered) {
+    commandsRegistered = true;
+    const cmds: [string, () => any][] = [
+      ["ason.format", () => formatDocument()],
+      ["ason.compress", () => compressDocument()],
+      ["ason.toJSON", () => asonToJSON()],
+      ["ason.fromJSON", () => jsonToASON()],
+    ];
+    for (const [id, handler] of cmds) {
+      try {
+        context.subscriptions.push(commands.registerCommand(id, handler));
+      } catch {
+        // Command already registered by another instance (dev + installed overlap)
+      }
+    }
+  }
 
   const serverPath = resolveServerPath(context);
   if (!serverPath) {
     window.showErrorMessage(
-      "ASON LSP binary not found. Please set ason.lspPath in settings or ensure ason-lsp is in PATH.",
+      "ASON LSP binary not found. Please set ason.lspPath in settings or ensure ason-zig-lsp (or ason-lsp) is in PATH.",
     );
     return;
   }
@@ -59,6 +72,12 @@ export function activate(context: ExtensionContext) {
     },
   };
 
+  // If already running (e.g. rare double-activation edge case), skip.
+  // deactivate() handles cleanup — do NOT stop here to avoid spurious SIGKILL cycles.
+  if (client) {
+    return;
+  }
+
   client = new LanguageClient(
     "ason-lsp",
     "ASON Language Server",
@@ -66,7 +85,14 @@ export function activate(context: ExtensionContext) {
     clientOptions,
   );
 
-  client.start();
+  try {
+    await client.start();
+    context.subscriptions.push(client);
+  } catch (err: any) {
+    window.showErrorMessage(
+      `ASON Language Server failed to start: ${err?.message ?? err}\nBinary: ${serverPath}`,
+    );
+  }
 }
 
 export function deactivate(): Thenable<void> | undefined {
@@ -94,13 +120,16 @@ function resolveServerPath(context: ExtensionContext): string | undefined {
   }
 
   // 2. Check bundled binary inside extension (like rust-analyzer)
+  //    Prefer ason-zig-lsp (Zig implementation), fall back to ason-lsp (Go).
   const isWindows = process.platform === "win32";
-  const binaryName = isWindows ? "ason-lsp.exe" : "ason-lsp";
+  const ext = isWindows ? ".exe" : "";
   const bundledPaths = [
-    // Primary: server/ directory inside extension
-    path.resolve(context.extensionPath, "server", binaryName),
-    // Fallback: sibling ason-lsp directory (development mode)
-    path.resolve(context.extensionPath, "..", "ason-lsp", binaryName),
+    // Zig LSP — primary (bundled server/ or dev sibling directory)
+    path.resolve(context.extensionPath, "server", `ason-zig-lsp${ext}`),
+    path.resolve(context.extensionPath, "..", "ason-zig-lsp", "zig-out", "bin", `ason-zig-lsp${ext}`),
+    // Go LSP — fallback
+    path.resolve(context.extensionPath, "server", `ason-lsp${ext}`),
+    path.resolve(context.extensionPath, "..", "ason-lsp", `ason-lsp${ext}`),
   ];
   for (const bp of bundledPaths) {
     if (fs.existsSync(bp)) {
@@ -116,16 +145,18 @@ function resolveServerPath(context: ExtensionContext): string | undefined {
     }
   }
 
-  // 3. Check PATH
+  // 3. Check PATH — prefer ason-zig-lsp, fall back to ason-lsp
   const { execSync } = require("child_process");
-  try {
-    const cmd = isWindows ? "where ason-lsp" : "which ason-lsp";
-    const which = execSync(cmd, { encoding: "utf8" }).trim();
-    if (which && fs.existsSync(which)) {
-      return which;
+  for (const binaryName of ["ason-zig-lsp", "ason-lsp"]) {
+    try {
+      const cmd = isWindows ? `where ${binaryName}` : `which ${binaryName}`;
+      const which = execSync(cmd, { encoding: "utf8" }).trim();
+      if (which && fs.existsSync(which)) {
+        return which;
+      }
+    } catch {
+      // not in PATH, try next
     }
-  } catch {
-    // not in PATH
   }
 
   return undefined;
@@ -153,7 +184,7 @@ async function compressDocument() {
     return;
   }
 
-  if (!client) {
+  if (!client || client.state !== State.Running) {
     window.showErrorMessage("ASON language server not running.");
     return;
   }
@@ -190,7 +221,7 @@ async function asonToJSON() {
     return;
   }
 
-  if (!client) {
+  if (!client || client.state !== State.Running) {
     window.showErrorMessage("ASON language server not running.");
     return;
   }
@@ -235,7 +266,7 @@ async function jsonToASON() {
     jsonText = input;
   }
 
-  if (!client) {
+  if (!client || client.state !== State.Running) {
     window.showErrorMessage("ASON language server not running.");
     return;
   }
