@@ -1,0 +1,7 @@
+.{
+    .name = .ason_zig_lsp,
+    .fingerprint = 0x5dec3a483df78ccf,
+    .version = "0.1.0",
+    .minimum_zig_version = "0.15.0",
+    .paths = .{"."},
+}
