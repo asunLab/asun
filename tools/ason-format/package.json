@@ -1,0 +1,29 @@
+{
+  "name": "ason-format",
+  "version": "0.1.0",
+  "description": "Syntax highlighter for ASON (Array-Schema Object Notation) — zero deps, browser + Node.js",
+  "type": "module",
+  "main": "./dist/ason-format.cjs",
+  "module": "./dist/ason-format.js",
+  "types": "./dist/ason-format.d.ts",
+  "exports": {
+    ".": {
+      "types":   "./dist/ason-format.d.ts",
+      "import":  "./dist/ason-format.js",
+      "require": "./dist/ason-format.cjs"
+    },
+    "./css": "./dist/ason-format.css"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc --emitDeclarationOnly --outDir dist && node build.mjs",
+    "dev":   "node build.mjs && echo 'open examples/demo.html in a browser'",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.0"
+  },
+  "keywords": ["ason", "syntax-highlight", "formatter", "code-highlight"],
+  "license": "MIT"
+}

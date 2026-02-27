@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ason-format — demo</title>
+  <link rel="stylesheet" href="../dist/ason-format.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #1a1b26;
+      color: #a9b1d6;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .container { max-width: 1000px; margin: 0 auto; }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #c0caf5;
+      margin-bottom: 0.25rem;
+    }
+    .subtitle {
+      color: #565f89;
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+
+    /* ── Controls ── */
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .controls label {
+      font-size: 0.8rem;
+      color: #565f89;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .btn-group { display: flex; gap: 0.25rem; }
+    .btn {
+      padding: 0.3rem 0.75rem;
+      border-radius: 5px;
+      border: 1px solid #2f3549;
+      background: #24283b;
+      color: #7aa2f7;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: background 0.15s;
+    }
+    .btn:hover   { background: #2f3549; }
+    .btn.active  { background: #7aa2f7; color: #1a1b26; border-color: #7aa2f7; }
+
+    /* ── Two-column layout ── */
+    .editor-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    @media (max-width: 700px) { .editor-row { grid-template-columns: 1fr; } }
+
+    .panel-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #565f89;
+      margin-bottom: 0.4rem;
+    }
+
+    textarea {
+      width: 100%;
+      height: 380px;
+      background: #24283b;
+      color: #a9b1d6;
+      border: 1px solid #2f3549;
+      border-radius: 0.5em;
+      padding: 1em 1.25em;
+      font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+      font-size: 0.875rem;
+      line-height: 1.7;
+      resize: vertical;
+      outline: none;
+    }
+    textarea:focus { border-color: #7aa2f7; }
+
+    #output {
+      height: 380px;
+      overflow: auto;
+      border-radius: 0.5em;
+    }
+    /* override ason-highlight height */
+    #output .ason-highlight {
+      min-height: 100%;
+      border-radius: 0.5em;
+      height: auto;
+    }
+
+    /* ── Examples ── */
+    .examples {
+      margin-bottom: 1rem;
+    }
+    .examples-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #565f89;
+      margin-bottom: 0.5rem;
+    }
+    .example-btns { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .ex-btn {
+      padding: 0.2rem 0.6rem;
+      background: #24283b;
+      border: 1px solid #2f3549;
+      border-radius: 4px;
+      color: #9ece6a;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .ex-btn:hover { border-color: #9ece6a; }
+
+    /* ── Token legend ── */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1rem;
+      padding: 0.75rem 1rem;
+      background: #24283b;
+      border-radius: 0.5em;
+      border: 1px solid #2f3549;
+      font-size: 0.75rem;
+    }
+    .legend-item { display: flex; align-items: center; gap: 0.35rem; }
+    .legend-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>ason-format</h1>
+  <p class="subtitle">Syntax highlighter for ASON (Array-Schema Object Notation)</p>
+
+  <!-- Theme selector -->
+  <div class="controls">
+    <label>Theme:</label>
+    <div class="btn-group" id="themes">
+      <button class="btn active" data-theme="">Dark</button>
+      <button class="btn" data-theme="ason-light">Light</button>
+      <button class="btn" data-theme="ason-github">GitHub</button>
+      <button class="btn" data-theme="ason-tokyo">Tokyo Night</button>
+    </div>
+  </div>
+
+  <!-- Example snippets -->
+  <div class="examples">
+    <div class="examples-title">Examples</div>
+    <div class="example-btns" id="example-btns"></div>
+  </div>
+
+  <!-- Editor + output -->
+  <div class="editor-row">
+    <div>
+      <div class="panel-label">ASON source</div>
+      <textarea id="src" spellcheck="false"></textarea>
+    </div>
+    <div>
+      <div class="panel-label">Highlighted output</div>
+      <div id="output"></div>
+    </div>
+  </div>
+
+  <!-- Token legend -->
+  <div class="legend" id="legend"></div>
+</div>
+
+<script type="module">
+  import { highlight } from '../dist/ason-format.js';
+
+  // ── Examples ────────────────────────────────────────────────────────────────
+  const EXAMPLES = [
+    {
+      name: 'Simple',
+      src: `{id:int, name:str, active:bool}:
+(1, "Alice Chen", true),
+(2, "Bob Smith", false),
+(3, "Carol Wu",  true)`,
+    },
+    {
+      name: 'Array schema',
+      src: `[{
+  id:int,
+  name:str,
+  position:str
+}]:(
+  (E001, "Alice Chen", "Software Engineer"),
+  (E002, "Bob Smith",  "Marketing Lead"),
+  (E003, "Carol Wu",   "Product Designer")
+)`,
+    },
+    {
+      name: 'Nested',
+      src: `[{
+  employee:{
+    id:str,
+    name:str,
+    department:{id:str, name:str},
+    projects:[{
+      id:str,
+      title:str,
+      startDate:str,
+      done:bool
+    }]
+  }
+}]:(
+  (
+    (E001, "Alice Chen", (D01, Engineering), [
+      (P001, "Auth Service",    2025-01-10, true),
+      (P002, "Data Pipeline",   2025-03-22, false)
+    ])
+  ),
+  (
+    (E002, "Bob Smith", (D02, Marketing), [
+      (P003, "Campaign Portal", 2025-02-05, true)
+    ])
+  )
+)`,
+    },
+    {
+      name: 'With comments',
+      src: `/* Employee records — exported 2025-06-24 */
+{
+  id:     int,
+  name:   str,
+  salary: float,
+  active: bool
+}:
+(101, "Alice", 95000.00, true),
+(102, "Bob",   82500.50, false),
+/* inactive accounts below */
+(103, "Carol", 78000.00, false)`,
+    },
+    {
+      name: 'Map type',
+      src: `{
+  id:   int,
+  name: str,
+  meta: map[str, str]
+}:
+(1, "alice", {role:admin, region:US}),
+(2, "bob",   {role:viewer, region:EU})`,
+    },
+  ];
+
+  // ── State ────────────────────────────────────────────────────────────────────
+  let currentTheme = '';
+
+  // ── Render ───────────────────────────────────────────────────────────────────
+  function render() {
+    const src = document.getElementById('src').value;
+    const cls = 'ason-highlight' + (currentTheme ? ' ' + currentTheme : '');
+    document.getElementById('output').innerHTML = highlight(src, { tag: 'code', class: cls });
+  }
+
+  // ── Theme buttons ─────────────────────────────────────────────────────────────
+  document.getElementById('themes').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-theme]');
+    if (!btn) return;
+    currentTheme = btn.dataset.theme;
+    document.querySelectorAll('#themes .btn').forEach(b =>
+      b.classList.toggle('active', b === btn));
+    render();
+  });
+
+  // ── Example buttons ───────────────────────────────────────────────────────────
+  const btnsEl = document.getElementById('example-btns');
+  EXAMPLES.forEach((ex, idx) => {
+    const b = document.createElement('button');
+    b.className = 'ex-btn';
+    b.textContent = ex.name;
+    b.addEventListener('click', () => {
+      document.getElementById('src').value = ex.src;
+      render();
+    });
+    btnsEl.appendChild(b);
+    if (idx === 0) {
+      // Set initial example
+      document.getElementById('src').value = ex.src;
+    }
+  });
+
+  // ── Live edit ─────────────────────────────────────────────────────────────────
+  document.getElementById('src').addEventListener('input', render);
+
+  // ── Token legend ──────────────────────────────────────────────────────────────
+  const TOKENS = [
+    { kind: 'field',       label: 'Field name',    color: '#e06c75' },
+    { kind: 'type',        label: 'Type hint',      color: '#56b6c2' },
+    { kind: 'string',      label: 'String',          color: '#98c379' },
+    { kind: 'number',      label: 'Number / Date',   color: '#d19a66' },
+    { kind: 'bool',        label: 'Boolean',         color: '#c678dd' },
+    { kind: 'value',       label: 'Data value',      color: '#abb2bf' },
+    { kind: 'comment',     label: 'Comment',         color: '#5c6370' },
+    { kind: 'schema-open', label: '{ } ( ) [ ]',    color: '#61afef' },
+  ];
+  const legendEl = document.getElementById('legend');
+  TOKENS.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'legend-item';
+    div.innerHTML = `<div class="legend-dot" style="background:${t.color}"></div>
+                     <span class="ason-${t.kind}" style="color:${t.color}">${t.label}</span>`;
+    legendEl.appendChild(div);
+  });
+
+  // Initial render
+  render();
+</script>
+</body>
+</html>

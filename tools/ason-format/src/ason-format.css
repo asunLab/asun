@@ -1,0 +1,129 @@
+/* ======================================================================
+   ason-format.css — default themes for ason-format syntax highlighter
+   ======================================================================
+
+   Usage:
+     <link rel="stylesheet" href="ason-format.css">
+     <pre><code id="output"></code></pre>
+     <script>document.getElementById('output').innerHTML = AsonFormat.highlight(src);</script>
+
+   Dark theme  → class="ason-highlight"
+   Light theme → class="ason-highlight ason-light"
+
+   Override any color with CSS custom properties:
+     .ason-highlight { --ason-field: hotpink; }
+   ====================================================================== */
+
+/* ── Base container ──────────────────────────────────────────────────────── */
+.ason-highlight {
+  display: block;
+  font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Consolas',
+               'SF Mono', 'Menlo', 'Monaco', monospace;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  padding: 1.125em 1.375em;
+  overflow-x: auto;
+  white-space: pre;
+  border-radius: 0.5em;
+  tab-size: 2;
+
+  /* ── Dark theme (default: One Dark-inspired) ─────── */
+  background:              #282c34;
+  color:                   #abb2bf;
+
+  /* Semantic color palette (override any via CSS custom properties) */
+  --ason-field:            #e06c75;   /* field names          → red    */
+  --ason-type:             #56b6c2;   /* int str float bool … → cyan   */
+  --ason-map:              #56b6c2;   /* map keyword          → cyan   */
+  --ason-string:           #98c379;   /* "quoted strings"     → green  */
+  --ason-number:           #d19a66;   /* numbers / dates      → orange */
+  --ason-bool:             #c678dd;   /* true / false         → purple */
+  --ason-value:            #abb2bf;   /* plain data values    → grey   */
+  --ason-comment:          #5c6370;   /* /* comments */      → dim    */
+  --ason-punct:            #61afef;   /* { } ( ) [ ] : ,     → blue   */
+  --ason-punct-dim:        rgba(97, 175, 239, 0.55); /* , separator   */
+}
+
+/* ── Punctuation ─────────────────────────────────────────────────────────── */
+.ason-highlight .ason-schema-open,
+.ason-highlight .ason-schema-close {
+  color: var(--ason-punct);
+  font-weight: 600;
+}
+.ason-highlight .ason-tuple-open,
+.ason-highlight .ason-tuple-close {
+  color: var(--ason-punct);
+}
+.ason-highlight .ason-array-open,
+.ason-highlight .ason-array-close {
+  color: var(--ason-punct);
+}
+.ason-highlight .ason-colon  { color: var(--ason-punct); }
+.ason-highlight .ason-comma  { color: var(--ason-punct-dim); }
+
+/* ── Semantic tokens ─────────────────────────────────────────────────────── */
+.ason-highlight .ason-field   { color: var(--ason-field); }
+.ason-highlight .ason-type    { color: var(--ason-type);   font-style: italic; }
+.ason-highlight .ason-map     { color: var(--ason-map);    font-style: italic; }
+.ason-highlight .ason-string  { color: var(--ason-string); }
+.ason-highlight .ason-number  { color: var(--ason-number); }
+.ason-highlight .ason-bool    { color: var(--ason-bool);   font-weight: 600; }
+.ason-highlight .ason-value   { color: var(--ason-value); }
+.ason-highlight .ason-comment { color: var(--ason-comment); font-style: italic; }
+.ason-highlight .ason-error   {
+  color: #ff5555;
+  text-decoration: underline wavy red;
+}
+
+/* ── Light theme ─────────────────────────────────────────────────────────── */
+/* Apply by adding the class "ason-light" alongside "ason-highlight"         */
+.ason-highlight.ason-light {
+  background:          #fafafa;
+  color:               #383a42;
+
+  --ason-field:        #e45649;
+  --ason-type:         #0184bc;
+  --ason-map:          #0184bc;
+  --ason-string:       #50a14f;
+  --ason-number:       #986801;
+  --ason-bool:         #a626a4;
+  --ason-value:        #383a42;
+  --ason-comment:      #9fa0a5;
+  --ason-punct:        #4078f2;
+  --ason-punct-dim:    rgba(64, 120, 242, 0.55);
+}
+
+/* ── GitHub-style light theme ────────────────────────────────────────────── */
+.ason-highlight.ason-github {
+  background:          #f6f8fa;
+  color:               #24292e;
+  border: 1px solid #d0d7de;
+
+  --ason-field:        #d73a49;
+  --ason-type:         #005cc5;
+  --ason-map:          #005cc5;
+  --ason-string:       #032f62;
+  --ason-number:       #005cc5;
+  --ason-bool:         #6f42c1;
+  --ason-value:        #24292e;
+  --ason-comment:      #6a737d;
+  --ason-punct:        #24292e;
+  --ason-punct-dim:    rgba(36, 41, 46, 0.45);
+}
+
+/* ── Tokyo Night dark theme ──────────────────────────────────────────────── */
+.ason-highlight.ason-tokyo {
+  background:          #1a1b26;
+  color:               #a9b1d6;
+
+  --ason-field:        #f7768e;
+  --ason-type:         #2ac3de;
+  --ason-map:          #2ac3de;
+  --ason-string:       #9ece6a;
+  --ason-number:       #ff9e64;
+  --ason-bool:         #bb9af7;
+  --ason-value:        #a9b1d6;
+  --ason-comment:      #565f89;
+  --ason-punct:        #7dcfff;
+  --ason-punct-dim:    rgba(125, 207, 255, 0.45);
+}
