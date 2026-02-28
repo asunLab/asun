@@ -210,12 +210,12 @@ const Parser = struct {
 
     fn parseField(self: *Parser) error{OutOfMemory}!Node {
         const nameTok = self.cur;
-        if (self.cur.kind != .ident) {
+        if (self.cur.kind != .ident and self.cur.kind != .string) {
             self.diag("expected field name", .{}, self.cur);
             self.eat();
             return self.mkNode(.field, nameTok, self.noChildren());
         }
-        self.eat(); // consume ident
+        self.eat(); // consume ident or quoted string
         _ = self.expect(.colon);
         const ta = try self.parseTypeAnnot();
         self.eatNl();

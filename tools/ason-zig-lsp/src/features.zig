@@ -268,6 +268,7 @@ fn formatInline(n: Node, sb: *ArrayList(u8)) !void {
         },
         .value => try w.writeAll(std.mem.trim(u8, n.token.value, " \t")),
         .map_type => try w.writeAll(n.token.value),
+        .type_annot => try w.writeAll(n.token.value),
         .array_schema => {
             try w.writeAll("[");
             if (n.children.len > 0) try formatInline(n.children[0], sb);
@@ -374,6 +375,7 @@ fn formatNode(n: Node, lvl: usize, sb: *ArrayList(u8)) !void {
         },
         .value => try w.writeAll(std.mem.trim(u8, n.token.value, " \t")),
         .map_type => try w.writeAll(n.token.value),
+        .type_annot => try w.writeAll(n.token.value),
         else => {},
     }
 }
@@ -459,6 +461,7 @@ fn compressNode(n: Node, sb: *ArrayList(u8)) !void {
         },
         .value => try w.writeAll(std.mem.trim(u8, n.token.value, " \t")),
         .map_type => try w.writeAll(n.token.value),
+        .type_annot => try w.writeAll(n.token.value),
         else => {},
     }
 }
@@ -776,12 +779,13 @@ fn jsonFieldToAson(key: []const u8, val: std.json.Value, alloc: std.mem.Allocato
     const sw = s.writer();
     const dw = d.writer();
     switch (val) {
-        .null   => { try sw.print("{s}:str", .{key}); },
-        .bool   => |b| { try sw.print("{s}:bool", .{key}); try dw.writeAll(if (b) "true" else "false"); },
-        .integer => |i| { try sw.print("{s}:int", .{key}); try dw.print("{d}", .{i}); },
-        .float  => |f| { try sw.print("{s}:float", .{key}); try dw.print("{d}", .{f}); },
+        .null   => { try writeFieldName(sw, key); try sw.writeAll(":str"); },
+        .bool   => |b| { try writeFieldName(sw, key); try sw.writeAll(":bool"); try dw.writeAll(if (b) "true" else "false"); },
+        .integer => |i| { try writeFieldName(sw, key); try sw.writeAll(":int"); try dw.print("{d}", .{i}); },
+        .float  => |f| { try writeFieldName(sw, key); try sw.writeAll(":float"); try dw.print("{d}", .{f}); },
         .string => |str| {
-            try sw.print("{s}:str", .{key});
+            try writeFieldName(sw, key);
+            try sw.writeAll(":str");
             if (needsQuote(str)) {
                 try dw.writeByte('"');
                 for (str) |c| {
@@ -806,7 +810,8 @@ fn jsonFieldToAson(key: []const u8, val: std.json.Value, alloc: std.mem.Allocato
                 try inner_s.writer().writeAll(p2.schema);
                 try inner_d.writer().writeAll(p2.data);
             }
-            try sw.print("{s}:{{{s}}}", .{ key, inner_s.items });
+            try writeFieldName(sw, key);
+            try sw.print(":{{{s}}}", .{ inner_s.items });
             try dw.print("({s})", .{inner_d.items});
         },
         .array => |arr| {
@@ -822,7 +827,8 @@ fn jsonFieldToAson(key: []const u8, val: std.json.Value, alloc: std.mem.Allocato
                             if (i > 0) try inner_s.writer().writeAll(",");
                             try inner_s.writer().writeAll(p2.schema);
                         }
-                        try sw.print("{s}:[{{{s}}}]", .{ key, inner_s.items });
+                        try writeFieldName(sw, key);
+                        try sw.print(":[{{{s}}}]", .{ inner_s.items });
                         // data: array of tuples
                         var dat = ArrayList(u8).init(alloc);
                         try dat.writer().writeAll("[");
@@ -851,7 +857,8 @@ fn jsonFieldToAson(key: []const u8, val: std.json.Value, alloc: std.mem.Allocato
             }
             // plain array
             const elem_type = inferArrayType(items);
-            try sw.print("{s}:[{s}]", .{ key, elem_type });
+            try writeFieldName(sw, key);
+            try sw.print(":[{s}]", .{ elem_type });
             var elems = ArrayList(u8).init(alloc);
             try elems.writer().writeAll("[");
             for (items, 0..) |elem, i| {
@@ -861,7 +868,7 @@ fn jsonFieldToAson(key: []const u8, val: std.json.Value, alloc: std.mem.Allocato
             try elems.writer().writeAll("]");
             try dw.writeAll(elems.items);
         },
-        .number_string => |ns| { try sw.print("{s}:str", .{key}); try dw.writeAll(ns); },
+        .number_string => |ns| { try writeFieldName(sw, key); try sw.writeAll(":str"); try dw.writeAll(ns); },
     }
     return FieldPair{ .schema = try s.toOwnedSlice(), .data = try d.toOwnedSlice() };
 }
@@ -993,6 +1000,33 @@ fn needsQuote(s: []const u8) bool {
             c == '\r' or c == '\t' or c == ' ' or c == '/') return true;
     }
     return false;
+}
+
+/// Check if a JSON key needs quoting to be a valid ASON field name.
+/// ASON identifiers only allow [a-zA-Z0-9_].
+fn needsKeyQuote(s: []const u8) bool {
+    if (s.len == 0) return true;
+    for (s) |c| {
+        const ok = (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or
+                   (c >= '0' and c <= '9') or c == '_';
+        if (!ok) return true;
+    }
+    return false;
+}
+
+/// Write a field name to the writer, quoting it if necessary.
+fn writeFieldName(w: anytype, key: []const u8) !void {
+    if (needsKeyQuote(key)) {
+        try w.writeByte('"');
+        for (key) |c| {
+            if (c == '"') { try w.writeAll("\\\""); }
+            else if (c == '\\') { try w.writeAll("\\\\"); }
+            else try w.writeByte(c);
+        }
+        try w.writeByte('"');
+    } else {
+        try w.writeAll(key);
+    }
 }
 
 // ── Find node at position ──────────────────────────────────────────────────────
