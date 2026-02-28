@@ -967,8 +967,9 @@ func jsonObjectToASON(obj map[string]interface{}) string {
 }
 
 func jsonFieldToASON(key string, val interface{}) (schema string, data string) {
+	qk := quoteKey(key)
 	if val == nil {
-		return key + ":str", ""
+		return qk + ":str", ""
 	}
 	switch v := val.(type) {
 	case map[string]interface{}:
@@ -981,7 +982,7 @@ func jsonFieldToASON(key string, val interface{}) (schema string, data string) {
 			innerSchema = append(innerSchema, fs)
 			innerData = append(innerData, fd)
 		}
-		schema = key + ":{" + strings.Join(innerSchema, ",") + "}"
+		schema = qk + ":{" + strings.Join(innerSchema, ",") + "}"
 		data = "(" + strings.Join(innerData, ",") + ")"
 		return
 	case []interface{}:
@@ -995,7 +996,7 @@ func jsonFieldToASON(key string, val interface{}) (schema string, data string) {
 					fs, _ := jsonFieldToASON(ik, firstObj[ik])
 					innerSchema = append(innerSchema, fs)
 				}
-				schema = key + ":[{" + strings.Join(innerSchema, ",") + "}]"
+				schema = qk + ":[{" + strings.Join(innerSchema, ",") + "}]"
 				var tuples []string
 				for _, elem := range v {
 					if eObj, ok2 := elem.(map[string]interface{}); ok2 {
@@ -1013,7 +1014,7 @@ func jsonFieldToASON(key string, val interface{}) (schema string, data string) {
 		}
 		// Plain array
 		elemType := inferArrayType(v)
-		schema = key + ":[" + elemType + "]"
+		schema = qk + ":[" + elemType + "]"
 		var elems []string
 		for _, elem := range v {
 			elems = append(elems, jsonValToASON(elem))
@@ -1022,15 +1023,15 @@ func jsonFieldToASON(key string, val interface{}) (schema string, data string) {
 		return
 	case float64:
 		if v == math.Trunc(v) && !math.IsInf(v, 0) && !math.IsNaN(v) {
-			schema = key + ":int"
+			schema = qk + ":int"
 			data = strconv.FormatInt(int64(v), 10)
 		} else {
-			schema = key + ":float"
+			schema = qk + ":float"
 			data = strconv.FormatFloat(v, 'f', -1, 64)
 		}
 		return
 	case bool:
-		schema = key + ":bool"
+		schema = qk + ":bool"
 		if v {
 			data = "true"
 		} else {
@@ -1038,7 +1039,7 @@ func jsonFieldToASON(key string, val interface{}) (schema string, data string) {
 		}
 		return
 	case string:
-		schema = key + ":str"
+		schema = qk + ":str"
 		if needsQuote(v) {
 			data = strconv.Quote(v)
 		} else {
@@ -1046,7 +1047,7 @@ func jsonFieldToASON(key string, val interface{}) (schema string, data string) {
 		}
 		return
 	default:
-		schema = key + ":str"
+		schema = qk + ":str"
 		data = fmt.Sprintf("%v", v)
 		return
 	}
@@ -1128,6 +1129,30 @@ func needsQuote(s string) bool {
 		}
 	}
 	return false
+}
+
+// needsKeyQuote returns true if a JSON key contains characters that are not
+// valid ASON identifier characters [a-zA-Z0-9_].
+func needsKeyQuote(s string) bool {
+	if s == "" {
+		return true
+	}
+	for _, c := range s {
+		ok := (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+			(c >= '0' && c <= '9') || c == '_'
+		if !ok {
+			return true
+		}
+	}
+	return false
+}
+
+// quoteKey returns the key quoted if necessary for ASON field names.
+func quoteKey(key string) string {
+	if needsKeyQuote(key) {
+		return strconv.Quote(key)
+	}
+	return key
 }
 
 func sortedKeys(m map[string]interface{}) []string {

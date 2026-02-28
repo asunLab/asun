@@ -436,3 +436,50 @@ test "features: asonToJson nested schema object" {
     try std.testing.expect(std.mem.indexOf(u8, json, "\"city\"") != null);
     try std.testing.expect(std.mem.indexOf(u8, json, "\"NYC\"") != null);
 }
+
+test "features: format preserves plain array type annotation" {
+    // Bug fix: faultTypes:[str] must not become faultTypes:[] after formatting
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const src = "{faultTypes:[str],name:str}:([],Alice)";
+    const out = try features.format(src, arena.allocator());
+    // The formatted result must contain [str] and not just []
+    try std.testing.expect(std.mem.indexOf(u8, out, "[str]") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out, "name:str") != null);
+}
+
+test "features: compress preserves plain array type annotation" {
+    // Bug fix: empty arrays [str] must round-trip through compress
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const src =
+        \\{items:[str], tags:[int]}
+        \\([a, b], [1, 2])
+    ;
+    const out = try features.compress(src, arena.allocator());
+    try std.testing.expect(std.mem.indexOf(u8, out, "[str]") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out, "[int]") != null);
+}
+
+test "features: json to ason quotes special chars in keys" {
+    // Bug fix: JSON key "lowPriorityEIR+CIR" must be quoted in ASON schema
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const json_src = "{\"a+b\": \"hello\", \"normal\": 42}";
+    const out = try features.jsonToAson(json_src, arena.allocator());
+    // The key "a+b" must be quoted
+    try std.testing.expect(std.mem.indexOf(u8, out, "\"a+b\"") != null);
+    // The key "normal" must NOT be quoted
+    try std.testing.expect(std.mem.indexOf(u8, out, "normal:int") != null);
+}
+
+test "features: parser accepts quoted field names" {
+    // Quoted field names like "a+b" should parse without errors
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const src = "{\"a+b\":str, name:str}:(hello, world)";
+    var result = try parser.parse(src, arena.allocator());
+    defer result.deinit();
+    // Should not have parse errors
+    try std.testing.expectEqual(@as(usize, 0), result.diags.len);
+}
