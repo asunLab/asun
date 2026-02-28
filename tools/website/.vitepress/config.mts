@@ -9,7 +9,7 @@ const BASE = process.env.VITE_BASE ?? '/'
 
 const asonGrammar = JSON.parse(
   readFileSync(
-    resolve(__dirname, '../../vscode_ason_plugins/syntaxes/ason.tmLanguage.json'),
+    resolve(__dirname, './ason.tmLanguage.json'),
     'utf-8'
   )
 )

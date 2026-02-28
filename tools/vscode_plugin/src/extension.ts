@@ -66,7 +66,10 @@ export async function activate(context: ExtensionContext) {
   };
 
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [{ scheme: "file", language: "ason" }],
+    documentSelector: [
+      { scheme: "file",     language: "ason" },
+      { scheme: "untitled", language: "ason" },
+    ],
     synchronize: {
       fileEvents: workspace.createFileSystemWatcher("**/*.ason"),
     },
@@ -285,6 +288,8 @@ async function jsonToASON() {
         language: "ason",
       });
       await window.showTextDocument(doc, { preview: false });
+      // Format (beautify) immediately so the output is readable
+      await commands.executeCommand("editor.action.formatDocument");
     }
   } catch (err: any) {
     window.showErrorMessage(`Convert to ASON failed: ${err.message || err}`);
