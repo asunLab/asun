@@ -217,10 +217,38 @@ static ason_err_t load_u64_raw(const char** pos, const char* end, uint64_t* out)
 static ason_err_t load_f64_raw(const char** pos, const char* end, double* out) {
     ason_skip_ws(pos, end);
     if (*pos >= end) return ASON_ERR_INVALID_NUMBER;
-    char* endptr = NULL;
-    *out = strtod(*pos, &endptr);
-    if (endptr == *pos) return ASON_ERR_INVALID_NUMBER;
-    *pos = endptr;
+    const char* p = *pos;
+    bool neg = false;
+    if (*p == '-') { neg = true; p++; }
+    if (p >= end || (*p < '0' && *p != '.')) return ASON_ERR_INVALID_NUMBER;
+    /* Fast path: hand-rolled integer + fractional parsing */
+    uint64_t intpart = 0;
+    int digits = 0;
+    while (p < end && *p >= '0' && *p <= '9') {
+        intpart = intpart * 10 + (*p - '0');
+        p++; digits++;
+    }
+    if (p < end && *p == '.') {
+        p++;
+        double frac = 0.0, scale = 0.1;
+        while (p < end && *p >= '0' && *p <= '9') {
+            frac += (*p - '0') * scale;
+            scale *= 0.1;
+            p++; digits++;
+        }
+        *out = neg ? -(intpart + frac) : (intpart + frac);
+    } else {
+        *out = neg ? -(double)intpart : (double)intpart;
+    }
+    if (digits == 0) return ASON_ERR_INVALID_NUMBER;
+    /* Handle exponent if present */
+    if (p < end && (*p == 'e' || *p == 'E')) {
+        char* endptr = NULL;
+        *out = strtod(*pos, &endptr);
+        if (endptr == *pos) return ASON_ERR_INVALID_NUMBER;
+        p = endptr;
+    }
+    *pos = p;
     return ASON_OK;
 }
 

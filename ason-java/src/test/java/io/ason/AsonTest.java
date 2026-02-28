@@ -598,4 +598,87 @@ public class AsonTest {
         Score decoded = Ason.decodeBinary(bin, Score.class);
         assertEquals(s, decoded);
     }
+
+    // ─── Typed primitive list fields ────────────────────────────────────
+
+    public static class WithBoolList {
+        public String name;
+        public List<Boolean> flags;
+        public WithBoolList() { flags = new ArrayList<>(); }
+    }
+
+    public static class WithIntList {
+        public String name;
+        public List<Long> nums;
+        public WithIntList() { nums = new ArrayList<>(); }
+    }
+
+    public static class WithStrList {
+        public String name;
+        public List<String> tags;
+        public WithStrList() { tags = new ArrayList<>(); }
+    }
+
+    @Test void testEncodeTypedBoolListField() {
+        WithBoolList v = new WithBoolList();
+        v.name = "test";
+        v.flags = List.of(true, false, true);
+        String out = Ason.encodeTyped(v);
+        assertTrue(out.contains("flags:[bool]"), "got: " + out);
+    }
+
+    @Test void testEncodeTypedIntListField() {
+        WithIntList v = new WithIntList();
+        v.name = "test";
+        v.nums = List.of(1L, 2L, 3L);
+        String out = Ason.encodeTyped(v);
+        assertTrue(out.contains("nums:[int]"), "got: " + out);
+    }
+
+    @Test void testEncodeTypedStrListField() {
+        WithStrList v = new WithStrList();
+        v.name = "test";
+        v.tags = List.of("a", "b");
+        String out = Ason.encodeTyped(v);
+        assertTrue(out.contains("tags:[str]"), "got: " + out);
+    }
+
+    @Test void testEncodeTypedEmptyBoolList() {
+        WithBoolList v = new WithBoolList();
+        v.name = "test";
+        v.flags = new ArrayList<>();
+        String out = Ason.encodeTyped(v);
+        // Empty list should still get type annotation from generic reflection
+        assertTrue(out.contains("flags:[bool]"), "got: " + out);
+    }
+
+    @Test void testEncodePrettyTypedBoolListField() {
+        WithBoolList v = new WithBoolList();
+        v.name = "test";
+        v.flags = List.of(true, false);
+        String out = Ason.encodePrettyTyped(v);
+        assertTrue(out.contains("[bool]"), "got: " + out);
+    }
+
+    @Test void testEncodeEmptyTopLevelList() {
+        List<Row> empty = new ArrayList<>();
+        String out = Ason.encode(empty);
+        assertEquals("[]", out);
+    }
+
+    @Test void testEncodeTypedEmptyTopLevelList() {
+        List<Row> empty = new ArrayList<>();
+        String out = Ason.encodeTyped(empty);
+        assertEquals("[]", out);
+    }
+
+    // ─── Field names with +/- in decode ─────────────────────────────────
+
+    @Test void testDecodeFieldNameWithPlusMinus() {
+        // +/- in field names should not break the parser — unmatched fields are just ignored
+        String input = "{lowPriorityEIR+CIR:int,name:str}:(42,Alice)";
+        User decoded = Ason.decode(input, User.class);
+        // "name" matches, "lowPriorityEIR+CIR" does not match any User field → ignored
+        assertEquals("Alice", decoded.name);
+    }
 }

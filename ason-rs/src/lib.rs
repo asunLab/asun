@@ -613,4 +613,98 @@ mod tests {
         let decoded: Vec<User> = decode(&p).unwrap();
         assert_eq!(decoded, users);
     }
+
+    // ─── Typed primitive Vec fields ───────────────────────────────────────
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct WithBoolVec {
+        name: String,
+        flags: Vec<bool>,
+    }
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct WithIntVec {
+        name: String,
+        nums: Vec<i64>,
+    }
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct WithStrVec {
+        name: String,
+        tags: Vec<String>,
+    }
+
+    #[test]
+    fn test_encode_typed_vec_bool_field() {
+        let v = WithBoolVec { name: "test".into(), flags: vec![true, false, true] };
+        let out = encode_typed(&v).unwrap();
+        assert!(out.contains("flags:[bool]"), "got: {}", out);
+        let decoded: WithBoolVec = decode(&out).unwrap();
+        assert_eq!(decoded, v);
+    }
+
+    #[test]
+    fn test_encode_typed_vec_int_field() {
+        let v = WithIntVec { name: "test".into(), nums: vec![1, 2, 3] };
+        let out = encode_typed(&v).unwrap();
+        assert!(out.contains("nums:[int]"), "got: {}", out);
+        let decoded: WithIntVec = decode(&out).unwrap();
+        assert_eq!(decoded, v);
+    }
+
+    #[test]
+    fn test_encode_typed_vec_str_field() {
+        let v = WithStrVec { name: "test".into(), tags: vec!["a".into(), "b".into()] };
+        let out = encode_typed(&v).unwrap();
+        assert!(out.contains("tags:[str]"), "got: {}", out);
+        let decoded: WithStrVec = decode(&out).unwrap();
+        assert_eq!(decoded, v);
+    }
+
+    #[test]
+    fn test_encode_typed_empty_vec_bool() {
+        let v = WithBoolVec { name: "test".into(), flags: vec![] };
+        let out = encode_typed(&v).unwrap();
+        // Empty vec has no type info available in serde, field name only
+        assert!(out.contains("name:str"), "got: {}", out);
+        let decoded: WithBoolVec = decode(&out).unwrap();
+        assert_eq!(decoded, v);
+    }
+
+    #[test]
+    fn test_encode_pretty_typed_vec_bool_field() {
+        let v = WithBoolVec { name: "test".into(), flags: vec![true, false] };
+        let out = encode_pretty_typed(&v).unwrap();
+        assert!(out.contains("[bool]"), "got: {}", out);
+        let decoded: WithBoolVec = decode(&out).unwrap();
+        assert_eq!(decoded, v);
+    }
+
+    // ─── Field names with +/- in decode ──────────────────────────────────
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct PlusMinusFields {
+        #[serde(rename = "lowPriorityEIR+CIR")]
+        low_priority: i64,
+        #[serde(rename = "a-b")]
+        a_b: String,
+        name: String,
+    }
+
+    #[test]
+    fn test_decode_field_names_with_plus_minus() {
+        let input = "{lowPriorityEIR+CIR:int,a-b:str,name:str}:(42,hello,Alice)";
+        let v: PlusMinusFields = decode(input).unwrap();
+        assert_eq!(v.low_priority, 42);
+        assert_eq!(v.a_b, "hello");
+        assert_eq!(v.name, "Alice");
+    }
+
+    #[test]
+    fn test_decode_field_names_plus_minus_untyped() {
+        let input = "{lowPriorityEIR+CIR,a-b,name}:(42,hello,Alice)";
+        let v: PlusMinusFields = decode(input).unwrap();
+        assert_eq!(v.low_priority, 42);
+        assert_eq!(v.a_b, "hello");
+    }
 }

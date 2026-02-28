@@ -928,3 +928,131 @@ func TestPrettyRoundtripLargeSlice(t *testing.T) {
 		t.Fatalf("mismatch len=%d last=%+v", len(rows2), rows2[49])
 	}
 }
+
+// ─── Typed primitive slice fields ────────────────────────────────────────────
+
+type WithBoolSlice struct {
+	Name  string `ason:"name"`
+	Flags []bool `ason:"flags"`
+}
+
+type WithIntSlice struct {
+	Name string  `ason:"name"`
+	Nums []int64 `ason:"nums"`
+}
+
+type WithStrSlice struct {
+	Name string   `ason:"name"`
+	Tags []string `ason:"tags"`
+}
+
+func TestEncodeTypedBoolSliceField(t *testing.T) {
+	v := WithBoolSlice{Name: "test", Flags: []bool{true, false, true}}
+	out, err := EncodeTyped(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(out)
+	if !contains(s, "flags:[bool]") {
+		t.Fatalf("expected flags:[bool], got %s", s)
+	}
+	var decoded WithBoolSlice
+	if err := Decode(out, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(decoded.Flags, v.Flags) {
+		t.Fatalf("flags mismatch: %v vs %v", decoded.Flags, v.Flags)
+	}
+}
+
+func TestEncodeTypedIntSliceField(t *testing.T) {
+	v := WithIntSlice{Name: "test", Nums: []int64{1, 2, 3}}
+	out, err := EncodeTyped(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(out)
+	if !contains(s, "nums:[int]") {
+		t.Fatalf("expected nums:[int], got %s", s)
+	}
+	var decoded WithIntSlice
+	if err := Decode(out, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(decoded.Nums, v.Nums) {
+		t.Fatalf("nums mismatch: %v vs %v", decoded.Nums, v.Nums)
+	}
+}
+
+func TestEncodeTypedStrSliceField(t *testing.T) {
+	v := WithStrSlice{Name: "test", Tags: []string{"a", "b"}}
+	out, err := EncodeTyped(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(out)
+	if !contains(s, "tags:[str]") {
+		t.Fatalf("expected tags:[str], got %s", s)
+	}
+}
+
+func TestEncodeTypedEmptyBoolSlice(t *testing.T) {
+	v := WithBoolSlice{Name: "test", Flags: []bool{}}
+	out, err := EncodeTyped(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(out)
+	// Empty bool slice should still have type annotation from reflection
+	if !contains(s, "flags:[bool]") {
+		t.Fatalf("expected flags:[bool] for empty slice, got %s", s)
+	}
+}
+
+func TestEncodePrettyTypedBoolSliceField(t *testing.T) {
+	v := WithBoolSlice{Name: "test", Flags: []bool{true, false}}
+	out, err := EncodePrettyTyped(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(out)
+	if !contains(s, "[bool]") {
+		t.Fatalf("expected [bool] in pretty typed, got %s", s)
+	}
+}
+
+// ─── Field names with +/- in decode ─────────────────────────────────────────
+
+type PlusMinusFields struct {
+	LowPriority string `ason:"lowPriorityEIR+CIR"`
+	AB          string `ason:"a-b"`
+	Name        string `ason:"name"`
+}
+
+func TestDecodeFieldNamesWithPlusMinus(t *testing.T) {
+	input := []byte("{lowPriorityEIR+CIR:str,a-b:str,name:str}:(42,hello,Alice)")
+	var v PlusMinusFields
+	if err := Decode(input, &v); err != nil {
+		t.Fatal(err)
+	}
+	if v.LowPriority != "42" {
+		t.Fatalf("LowPriority = %q, want 42", v.LowPriority)
+	}
+	if v.AB != "hello" {
+		t.Fatalf("AB = %q, want hello", v.AB)
+	}
+	if v.Name != "Alice" {
+		t.Fatalf("Name = %q, want Alice", v.Name)
+	}
+}
+
+func TestDecodeFieldNamesPlusMinusUntyped(t *testing.T) {
+	input := []byte("{lowPriorityEIR+CIR,a-b,name}:(42,hello,Alice)")
+	var v PlusMinusFields
+	if err := Decode(input, &v); err != nil {
+		t.Fatal(err)
+	}
+	if v.LowPriority != "42" {
+		t.Fatalf("LowPriority = %q, want 42", v.LowPriority)
+	}
+}

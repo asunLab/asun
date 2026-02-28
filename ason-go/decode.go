@@ -273,12 +273,10 @@ func (d *decoder) skipBalanced(open, close byte) error {
 func buildFieldMap(si *structInfo, schemaFields []string) []int {
 	m := make([]int, len(schemaFields))
 	for i, name := range schemaFields {
-		m[i] = -1
-		for j, fi := range si.fields {
-			if fi.name == name {
-				m[i] = j
-				break
-			}
+		if idx, ok := si.nameIndex[name]; ok {
+			m[i] = idx
+		} else {
+			m[i] = -1
 		}
 	}
 	return m
@@ -552,20 +550,70 @@ func (d *decoder) parseUint64() (uint64, error) {
 func (d *decoder) parseFloat64() (float64, error) {
 	d.skipWhitespaceAndComments()
 	start := d.pos
+	neg := false
 	if d.pos < len(d.data) && d.data[d.pos] == '-' {
+		neg = true
 		d.pos++
 	}
+	intStart := d.pos
 	for d.pos < len(d.data) && d.data[d.pos] >= '0' && d.data[d.pos] <= '9' {
 		d.pos++
 	}
-	if d.pos < len(d.data) && d.data[d.pos] == '.' {
+	if d.pos == intStart && neg {
+		return 0, d.errorf("invalid number")
+	}
+	hasDot := d.pos < len(d.data) && d.data[d.pos] == '.'
+	if hasDot {
 		d.pos++
 		for d.pos < len(d.data) && d.data[d.pos] >= '0' && d.data[d.pos] <= '9' {
 			d.pos++
 		}
 	}
-	if d.pos == start || (d.pos == start+1 && d.data[start] == '-') {
+	if d.pos == start || (d.pos == start+1 && neg) {
 		return 0, d.errorf("invalid number")
+	}
+	// Fast path: simple decimal without exponent
+	hasExp := d.pos < len(d.data) && (d.data[d.pos] == 'e' || d.data[d.pos] == 'E')
+	if !hasExp && d.pos-start <= 18 {
+		var intPart uint64
+		p := start
+		if neg {
+			p++
+		}
+		for p < d.pos && d.data[p] != '.' {
+			intPart = intPart*10 + uint64(d.data[p]-'0')
+			p++
+		}
+		if !hasDot {
+			v := float64(intPart)
+			if neg {
+				v = -v
+			}
+			return v, nil
+		}
+		p++ // skip '.'
+		var frac float64
+		scale := 0.1
+		for p < d.pos {
+			frac += float64(d.data[p]-'0') * scale
+			scale *= 0.1
+			p++
+		}
+		v := float64(intPart) + frac
+		if neg {
+			v = -v
+		}
+		return v, nil
+	}
+	// Fallback: handle exponent / very long numbers
+	if hasExp {
+		d.pos++
+		if d.pos < len(d.data) && (d.data[d.pos] == '+' || d.data[d.pos] == '-') {
+			d.pos++
+		}
+		for d.pos < len(d.data) && d.data[d.pos] >= '0' && d.data[d.pos] <= '9' {
+			d.pos++
+		}
 	}
 	s := unsafeString(d.data[start:d.pos])
 	v, err := strconv.ParseFloat(s, 64)

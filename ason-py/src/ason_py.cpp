@@ -13,6 +13,7 @@
 #include <pybind11/stl.h>
 
 #include <cmath>
+#include <charconv>
 #include <cstdint>
 #include <cstring>
 #include <cstdio>
@@ -104,11 +105,12 @@ static CachedSchema parse_schema(const std::string& s) {
         else if (tname == "str")   ft = opt ? FieldType::StrOpt   : FieldType::Str;
         else ason_throw("unknown type '" + tname + "' for field '" + name + "'");
 
-        // Intern the key: Python's interning table holds the reference; no DECREF needed
+        // Intern the key for fast dict lookups; keep our strong reference alive
         PyObject* key = PyUnicode_FromStringAndSize(name.data(), (Py_ssize_t)name.size());
         if (!key) throw std::bad_alloc();
         PyUnicode_InternInPlace(&key);
-        Py_DECREF(key);  // release our ref; interning table still holds it
+        // Note: do NOT Py_DECREF(key) here — our CachedSchema must keep the
+        // reference alive so that decode_tuple's PyDict_SetItem uses a valid key.
 
         sc.fields.push_back({std::move(name), ft, key});
 
@@ -174,12 +176,21 @@ static void append_float(std::string& out, double v) {
         out.append(buf, len);
         return;
     }
-    int len = std::snprintf(buf, sizeof(buf), "%.17g", v);
-    std::string_view sv(buf, len);
-    if (sv.find('.') == std::string_view::npos && sv.find('e') == std::string_view::npos)
-        out.append(buf, len), out += ".0";
-    else
-        out.append(buf, len);
+    // Use std::to_chars for max performance on the general path
+    auto [ptr, ec] = std::to_chars(buf, buf + sizeof(buf), v);
+    if (ec == std::errc()) {
+        std::string_view sv(buf, ptr - buf);
+        out.append(sv.data(), sv.size());
+        if (sv.find('.') == std::string_view::npos && sv.find('e') == std::string_view::npos)
+            out += ".0";
+    } else {
+        int len = std::snprintf(buf, sizeof(buf), "%.17g", v);
+        std::string_view sv(buf, len);
+        if (sv.find('.') == std::string_view::npos && sv.find('e') == std::string_view::npos)
+            out.append(buf, len), out += ".0";
+        else
+            out.append(buf, len);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -199,15 +210,19 @@ static bool needs_quoting(const char* s, size_t n) noexcept {
     }
     if (all_num && n > ni) return true;
     if (n == 4 && s[0]=='t'&&s[1]=='r'&&s[2]=='u'&&s[3]=='e') return true;
-    if (n == 5 && s[0]=='f'&&s[1]=='a'&&s[2]=='l'&&s[3]=='s') return true;
+    if (n == 5 && s[0]=='f'&&s[1]=='a'&&s[2]=='l'&&s[3]=='s'&&s[4]=='e') return true;
     return false;
 }
 
 static void append_escaped(std::string& out, const char* s, size_t n) {
     if (!needs_quoting(s, n)) { out.append(s, n); return; }
     out += '"';
-    for (size_t i = 0; i < n; ++i) {
-        char c = s[i];
+    size_t i = 0;
+    while (i < n) {
+        size_t run = i;
+        while (run < n && s[run] != '"' && s[run] != '\\' && s[run] != '\n' && s[run] != '\t') ++run;
+        if (run > i) { out.append(s + i, run - i); i = run; continue; }
+        char c = s[i++];
         if      (c == '"')  out += "\\\"";
         else if (c == '\\') out += "\\\\";
         else if (c == '\n') out += "\\n";
@@ -256,6 +271,66 @@ static inline uint64_t read_le64(const uint8_t*& p, const uint8_t* end) {
 // ---------------------------------------------------------------------------
 // Text encode — raw CPython API (no pybind11 wrappers in hot path)
 // ---------------------------------------------------------------------------
+// Fast digit-pair table for integer formatting
+static const char DEC_PAIR[] =
+    "00010203040506070809"
+    "10111213141516171819"
+    "20212223242526272829"
+    "30313233343536373839"
+    "40414243444546474849"
+    "50515253545556575859"
+    "60616263646566676869"
+    "70717273747576777879"
+    "80818283848586878889"
+    "90919293949596979899";
+
+static void append_i64(std::string& out, long long v) {
+    if (v < 0) {
+        out += '-';
+        if (v == std::numeric_limits<long long>::min()) {
+            out += "9223372036854775808";
+            return;
+        }
+        v = -v;
+    }
+    auto uv = static_cast<unsigned long long>(v);
+    char tmp[20];
+    int i = 20;
+    while (uv >= 100) {
+        auto idx = (uv % 100) * 2;
+        uv /= 100;
+        tmp[--i] = DEC_PAIR[idx + 1];
+        tmp[--i] = DEC_PAIR[idx];
+    }
+    if (uv >= 10) {
+        auto idx = uv * 2;
+        tmp[--i] = DEC_PAIR[idx + 1];
+        tmp[--i] = DEC_PAIR[idx];
+    } else {
+        tmp[--i] = '0' + (char)uv;
+    }
+    out.append(tmp + i, 20 - i);
+}
+
+static void append_u64(std::string& out, unsigned long long uv) {
+    char tmp[20];
+    int i = 20;
+    while (uv >= 100) {
+        auto idx = (uv % 100) * 2;
+        uv /= 100;
+        tmp[--i] = DEC_PAIR[idx + 1];
+        tmp[--i] = DEC_PAIR[idx];
+    }
+    if (uv >= 10) {
+        auto idx = uv * 2;
+        tmp[--i] = DEC_PAIR[idx + 1];
+        tmp[--i] = DEC_PAIR[idx];
+    } else {
+        tmp[--i] = '0' + (char)uv;
+    }
+    out.append(tmp + i, 20 - i);
+}
+
 static void encode_value(std::string& out, PyObject* val, FieldType ft) {
     if (is_optional(ft)) {
         if (val == Py_None) return;
@@ -263,9 +338,11 @@ static void encode_value(std::string& out, PyObject* val, FieldType ft) {
     }
     switch (ft) {
         case FieldType::Int:
-            out += std::to_string(PyLong_AsLongLong(val)); break;
+            append_i64(out, PyLong_AsLongLong(val));
+            break;
         case FieldType::Uint:
-            out += std::to_string(PyLong_AsUnsignedLongLong(val)); break;
+            append_u64(out, PyLong_AsUnsignedLongLong(val));
+            break;
         case FieldType::Float_:
             append_float(out, PyFloat_AsDouble(val)); break;
         case FieldType::Bool:
@@ -426,7 +503,7 @@ static PyObject* decode_value(const char*& p, const char* end, FieldType ft, std
         }
         case FieldType::Bool:
             if (end-p>=4&&p[0]=='t'&&p[1]=='r'&&p[2]=='u'&&p[3]=='e')  { p+=4; Py_INCREF(Py_True);  return Py_True;  }
-            if (end-p>=5&&p[0]=='f'&&p[1]=='a'&&p[2]=='l'&&p[3]=='s')  { p+=5; Py_INCREF(Py_False); return Py_False; }
+            if (end-p>=5&&p[0]=='f'&&p[1]=='a'&&p[2]=='l'&&p[3]=='s'&&p[4]=='e')  { p+=5; Py_INCREF(Py_False); return Py_False; }
             ason_throw("expected bool");
         case FieldType::Str: {
             if (p < end && *p == '"') {
@@ -439,8 +516,13 @@ static PyObject* decode_value(const char*& p, const char* end, FieldType ft, std
                             case 'n': tmp+='\n'; break; case 't': tmp+='\t'; break;
                             default:  tmp+=*p;
                         }
-                    } else tmp += *p;
-                    ++p;
+                        ++p;
+                    } else {
+                        const char* run = p;
+                        while (run < end && *run != '"' && *run != '\\') ++run;
+                        tmp.append(p, run - p);
+                        p = run;
+                    }
                 }
                 if (p >= end) ason_throw("unterminated string");
                 ++p;
@@ -506,15 +588,18 @@ static py::object ason_decode(const std::string& text) {
     std::string tmp;  // buffer for string unescaping
 
     if (schema.is_slice) {
-        PyObject* lst = PyList_New(0);
-        if (!lst) throw std::bad_alloc();
+        std::vector<PyObject*> rows;
+        rows.reserve(64);
         while (true) {
             while (p < end && ((unsigned char)*p <= ' ' || *p == ',')) ++p;
             if (p >= end || *p != '(') break;
             PyObject* rec = decode_tuple(p, end, schema, tmp);
-            PyList_Append(lst, rec);
-            Py_DECREF(rec);
+            rows.push_back(rec);
         }
+        PyObject* lst = PyList_New((Py_ssize_t)rows.size());
+        if (!lst) { for (auto* r : rows) Py_DECREF(r); throw std::bad_alloc(); }
+        for (size_t i = 0; i < rows.size(); ++i)
+            PyList_SET_ITEM(lst, (Py_ssize_t)i, rows[i]);
         return py::reinterpret_steal<py::object>(lst);
     } else {
         skip_ws(p, end);

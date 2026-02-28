@@ -73,7 +73,8 @@ public final class Ason {
     private static String encodeList(List<?> list, boolean typed) {
         ByteBuffer buf = new ByteBuffer();
         if (list.isEmpty()) {
-            buf.appendBytes(EMPTY_SCHEMA, 0, 5);
+            buf.append('[');
+            buf.append(']');
             return buf.toStringUtf8AndClose();
         }
         Object first = list.getFirst();

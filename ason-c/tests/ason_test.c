@@ -112,6 +112,15 @@ ASON_FIELDS(TNestedVec, 1, ASON_FIELD(TNestedVec, matrix, "matrix", vec_vec_i64)
 typedef struct { ason_string_t val; } TStringOnly;
 ASON_FIELDS(TStringOnly, 1, ASON_FIELD(TStringOnly, val, "val", str))
 
+typedef struct { ason_vec_bool flags; } TWithBoolVec;
+ASON_FIELDS(TWithBoolVec, 1, ASON_FIELD(TWithBoolVec, flags, "flags", vec_bool))
+
+typedef struct { ason_vec_i64 nums; } TWithIntVec;
+ASON_FIELDS(TWithIntVec, 1, ASON_FIELD(TWithIntVec, nums, "nums", vec_i64))
+
+typedef struct { ason_vec_str tags; } TWithStrVec;
+ASON_FIELDS(TWithStrVec, 1, ASON_FIELD(TWithStrVec, tags, "tags", vec_str))
+
 /* ===========================================================================
  * Tests
  * =========================================================================== */
@@ -883,6 +892,101 @@ void test_binary_vec_roundtrip(void) {
 }
 
 /* ===========================================================================
+ * Typed encoding: primitive vec fields
+ * =========================================================================== */
+
+void test_encode_typed_bool_vec_field(void) {
+    TEST(encode_typed_bool_vec_field);
+    TWithBoolVec w = {0};
+    ason_vec_bool_push(&w.flags, true);
+    ason_vec_bool_push(&w.flags, false);
+    ason_vec_bool_push(&w.flags, true);
+    ason_buf_t buf = ason_encode_typed_TWithBoolVec(&w);
+    ASSERT_TRUE(strstr(buf.data, "flags:[bool]") != NULL);
+    TWithBoolVec w2 = {0};
+    ason_err_t err = ason_decode_TWithBoolVec(buf.data, buf.len, &w2);
+    ASSERT_TRUE(err == ASON_OK);
+    ASSERT_EQ_U(w2.flags.len, 3u);
+    ASSERT_TRUE(w2.flags.data[0]);
+    ASSERT_FALSE(w2.flags.data[1]);
+    ASSERT_TRUE(w2.flags.data[2]);
+    ason_buf_free(&buf);
+    ason_vec_bool_free(&w.flags);
+    ason_vec_bool_free(&w2.flags);
+    PASS();
+}
+
+void test_encode_typed_int_vec_field(void) {
+    TEST(encode_typed_int_vec_field);
+    TWithIntVec w = {0};
+    ason_vec_i64_push(&w.nums, 10);
+    ason_vec_i64_push(&w.nums, 20);
+    ason_vec_i64_push(&w.nums, 30);
+    ason_buf_t buf = ason_encode_typed_TWithIntVec(&w);
+    ASSERT_TRUE(strstr(buf.data, "nums:[int]") != NULL);
+    TWithIntVec w2 = {0};
+    ason_err_t err = ason_decode_TWithIntVec(buf.data, buf.len, &w2);
+    ASSERT_TRUE(err == ASON_OK);
+    ASSERT_EQ_U(w2.nums.len, 3u);
+    ASSERT_EQ_I(w2.nums.data[0], 10);
+    ASSERT_EQ_I(w2.nums.data[2], 30);
+    ason_buf_free(&buf);
+    ason_vec_i64_free(&w.nums);
+    ason_vec_i64_free(&w2.nums);
+    PASS();
+}
+
+void test_encode_typed_str_vec_field(void) {
+    TEST(encode_typed_str_vec_field);
+    TWithStrVec w = {0};
+    ason_vec_str_push(&w.tags, ason_string_from("a"));
+    ason_vec_str_push(&w.tags, ason_string_from("b"));
+    ason_buf_t buf = ason_encode_typed_TWithStrVec(&w);
+    ASSERT_TRUE(strstr(buf.data, "tags:[str]") != NULL);
+    TWithStrVec w2 = {0};
+    ason_err_t err = ason_decode_TWithStrVec(buf.data, buf.len, &w2);
+    ASSERT_TRUE(err == ASON_OK);
+    ASSERT_EQ_U(w2.tags.len, 2u);
+    ASSERT_EQ_S(w2.tags.data[0].data, "a");
+    ASSERT_EQ_S(w2.tags.data[1].data, "b");
+    ason_buf_free(&buf);
+    for (size_t i = 0; i < w.tags.len; i++) ason_string_free(&w.tags.data[i]);
+    ason_vec_str_free(&w.tags);
+    for (size_t i = 0; i < w2.tags.len; i++) ason_string_free(&w2.tags.data[i]);
+    ason_vec_str_free(&w2.tags);
+    PASS();
+}
+
+void test_encode_typed_empty_bool_vec(void) {
+    TEST(encode_typed_empty_bool_vec);
+    TWithBoolVec w = {0};
+    ason_buf_t buf = ason_encode_typed_TWithBoolVec(&w);
+    ASSERT_TRUE(strstr(buf.data, "flags:[bool]") != NULL);
+    ASSERT_TRUE(strstr(buf.data, "[]") != NULL);
+    ason_buf_free(&buf);
+    PASS();
+}
+
+void test_encode_pretty_typed_bool_vec_field(void) {
+    TEST(encode_pretty_typed_bool_vec_field);
+    TWithBoolVec w = {0};
+    ason_vec_bool_push(&w.flags, true);
+    ason_vec_bool_push(&w.flags, false);
+    ason_buf_t buf = ason_encode_pretty_typed_TWithBoolVec(&w);
+    ASSERT_TRUE(strstr(buf.data, "bool") != NULL);
+    TWithBoolVec w2 = {0};
+    ason_err_t err = ason_decode_TWithBoolVec(buf.data, buf.len, &w2);
+    ASSERT_TRUE(err == ASON_OK);
+    ASSERT_EQ_U(w2.flags.len, 2u);
+    ASSERT_TRUE(w2.flags.data[0]);
+    ASSERT_FALSE(w2.flags.data[1]);
+    ason_buf_free(&buf);
+    ason_vec_bool_free(&w.flags);
+    ason_vec_bool_free(&w2.flags);
+    PASS();
+}
+
+/* ===========================================================================
  * Main
  * =========================================================================== */
 
@@ -958,6 +1062,13 @@ int main(void) {
     printf("\n--- Binary roundtrips ---\n");
     test_binary_single_roundtrip();
     test_binary_vec_roundtrip();
+
+    printf("\n--- Typed encoding: primitive vec fields ---\n");
+    test_encode_typed_bool_vec_field();
+    test_encode_typed_int_vec_field();
+    test_encode_typed_str_vec_field();
+    test_encode_typed_empty_bool_vec();
+    test_encode_pretty_typed_bool_vec_field();
 
     printf("\n=== Results: %d passed, %d failed ===\n", tests_passed, tests_failed);
     return tests_failed > 0 ? 1 : 0;

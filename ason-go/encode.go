@@ -3,6 +3,7 @@ package ason
 import (
 	"math"
 	"reflect"
+	"strconv"
 	"sync"
 	"unsafe"
 )
@@ -109,6 +110,9 @@ func appendU64(buf []byte, v uint64) []byte {
 func appendI64(buf []byte, v int64) []byte {
 	if v < 0 {
 		buf = append(buf, '-')
+		if v == math.MinInt64 {
+			return append(buf, "9223372036854775808"...)
+		}
 		return appendU64(buf, uint64(-v))
 	}
 	return appendU64(buf, uint64(v))
@@ -168,34 +172,21 @@ func appendFloat64(buf []byte, v float64) []byte {
 }
 
 func appendFloatGeneral(buf []byte, v float64) []byte {
-	// Manual float formatting to avoid importing strconv/fmt in hot path
-	// Use the same approach as strconv.AppendFloat
-	// For simplicity and correctness, use a small inline implementation
-	if v < 0 {
-		buf = append(buf, '-')
-		v = -v
-	}
-	// Extract integer and fractional parts
-	intPart := uint64(v)
-	frac := v - float64(intPart)
-	buf = appendU64(buf, intPart)
-	if frac == 0 {
-		return buf
-	}
-	buf = append(buf, '.')
-	// Up to 15 significant fractional digits
-	for i := 0; i < 15; i++ {
-		frac *= 10
-		digit := int(frac)
-		buf = append(buf, byte('0'+digit))
-		frac -= float64(digit)
-		if frac < 1e-14 {
+	// Use strconv for full correctness on edge cases
+	buf = strconv.AppendFloat(buf, v, 'f', -1, 64)
+	// Ensure decimal point for float identity
+	hasDecimal := false
+	for i := len(buf) - 1; i >= 0; i-- {
+		if buf[i] == '.' {
+			hasDecimal = true
+			break
+		}
+		if buf[i] == '-' || buf[i] < '0' || buf[i] > '9' {
 			break
 		}
 	}
-	// Trim trailing zeros
-	for len(buf) > 0 && buf[len(buf)-1] == '0' {
-		buf = buf[:len(buf)-1]
+	if !hasDecimal {
+		buf = append(buf, '.', '0')
 	}
 	return buf
 }
@@ -271,7 +262,8 @@ type fieldInfo struct {
 
 type structInfo struct {
 	fields     []fieldInfo
-	structType reflect.Type // the struct type these fields belong to
+	structType reflect.Type   // the struct type these fields belong to
+	nameIndex  map[string]int // field name → index in fields slice
 }
 
 var structCache sync.Map // map[reflect.Type]*structInfo
@@ -341,7 +333,12 @@ func buildStructInfo(t reflect.Type) *structInfo {
 
 		fields = append(fields, fi)
 	}
-	return &structInfo{fields: fields, structType: t}
+	si := &structInfo{fields: fields, structType: t}
+	si.nameIndex = make(map[string]int, len(fields))
+	for i, fi := range fields {
+		si.nameIndex[fi.name] = i
+	}
+	return si
 }
 
 func indexOf(s string, c byte) int {

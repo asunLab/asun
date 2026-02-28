@@ -1110,6 +1110,13 @@ ason_buf_t ason_pretty_format(const char* src, size_t len);
         ason_buf_free(&compact); \
         return pretty; \
     } \
+    /* encode_pretty_typed_vec: pretty-formatted typed array */ \
+    static inline ason_buf_t ason_encode_pretty_typed_vec_##StructType(const StructType* arr, size_t count) { \
+        ason_buf_t compact = ason_encode_typed_vec_##StructType(arr, count); \
+        ason_buf_t pretty = ason_pretty_format(compact.data, compact.len); \
+        ason_buf_free(&compact); \
+        return pretty; \
+    } \
     /* decode_vec: [{schema}]:(row1),(row2),... */ \
     static inline ason_err_t ason_decode_vec_##StructType(const char* input, size_t len, \
                                                          StructType** out, size_t* out_count) { \

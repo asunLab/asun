@@ -218,12 +218,51 @@ final class AsonBinary {
             return (T) map;
         }
 
-        // Struct: read fields in order using ClassMeta
+        // Struct: read fields in order using ClassMeta with typed dispatch
         ClassMeta meta = ClassMeta.of(type);
         Object obj = meta.newInstance();
         for (FieldMeta fm : meta.fields) {
-            Object val = readObject(data, pos, fm.type, fm.genericType);
-            fm.set(obj, val);
+            switch (fm.typeTag) {
+                case FieldMeta.T_BOOLEAN -> {
+                    boolean v = data[pos[0]++] != 0;
+                    if (fm.isPrimitive) fm.setBoolean(obj, v); else fm.set(obj, v);
+                }
+                case FieldMeta.T_INT -> {
+                    int v = readI32(data, pos);
+                    if (fm.isPrimitive) fm.setInt(obj, v); else fm.set(obj, v);
+                }
+                case FieldMeta.T_LONG -> {
+                    long v = (long) readU64(data, pos);
+                    if (fm.isPrimitive) fm.setLong(obj, v); else fm.set(obj, v);
+                }
+                case FieldMeta.T_SHORT -> {
+                    short v = readI16(data, pos);
+                    if (fm.isPrimitive) fm.setShort(obj, v); else fm.set(obj, v);
+                }
+                case FieldMeta.T_BYTE -> {
+                    byte v = data[pos[0]++];
+                    if (fm.isPrimitive) fm.setByte(obj, v); else fm.set(obj, v);
+                }
+                case FieldMeta.T_FLOAT -> {
+                    float v = Float.intBitsToFloat(readI32(data, pos));
+                    if (fm.isPrimitive) fm.setFloat(obj, v); else fm.set(obj, v);
+                }
+                case FieldMeta.T_DOUBLE -> {
+                    double v = Double.longBitsToDouble(readU64(data, pos));
+                    if (fm.isPrimitive) fm.setDouble(obj, v); else fm.set(obj, v);
+                }
+                case FieldMeta.T_STRING -> {
+                    int len = readU32(data, pos);
+                    int p = pos[0];
+                    String s = new String(data, p, len, java.nio.charset.StandardCharsets.UTF_8);
+                    pos[0] = p + len;
+                    fm.set(obj, s);
+                }
+                default -> {
+                    Object val = readObject(data, pos, fm.type, fm.genericType);
+                    fm.set(obj, val);
+                }
+            }
         }
         return (T) obj;
     }

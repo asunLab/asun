@@ -579,7 +579,7 @@ impl<'a> ser::SerializeSeq for SeqEncoder<'a> {
                 self.ser.buf.extend_from_slice(b"}]:");
                 self.ser.buf.extend_from_slice(&data);
             } else {
-                // Non-struct elements: wrap in [...]
+                // Non-struct elements (primitive Vec): wrap in [...]
                 let data = self.ser.buf.split_off(self.ser.top_seq_data_start);
                 self.ser.buf.push(b'[');
                 self.ser.buf.extend_from_slice(&data);
@@ -595,6 +595,15 @@ impl<'a> ser::SerializeSeq for SeqEncoder<'a> {
                 wrapped.extend_from_slice(&schema);
                 wrapped.push(b']');
                 self.ser.nested_schema = Some(wrapped);
+            } else if self.ser.typed {
+                // Bubble up type hint for primitive vec fields (e.g. Vec<bool> → [bool])
+                if let Some(hint) = self.ser.current_type_hint.take() {
+                    let mut wrapped = Vec::with_capacity(hint.len() + 2);
+                    wrapped.push(b'[');
+                    wrapped.extend_from_slice(hint.as_bytes());
+                    wrapped.push(b']');
+                    self.ser.nested_schema = Some(wrapped);
+                }
             }
         }
         self.ser.first = false;

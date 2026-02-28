@@ -350,3 +350,44 @@ class TestFormatValidation:
         text = ason.encode(rows, "[{id:int, name:str}]")
         out = ason.decode(text)
         assert out == rows
+
+
+# ---------------------------------------------------------------------------
+# Field names with special characters (+, -, _)
+# ---------------------------------------------------------------------------
+
+class TestFieldNamesSpecialChars:
+    def test_decode_field_names_with_plus_minus(self):
+        text = "{a+b:int, c-d:str}:(42,hello)"
+        out = ason.decode(text)
+        assert out["a+b"] == 42
+        assert out["c-d"] == "hello"
+
+    def test_decode_field_names_with_underscore(self):
+        text = "{user_name:str, is_active:bool}:(Alice,true)"
+        out = ason.decode(text)
+        assert out["user_name"] == "Alice"
+        assert out["is_active"] == True
+
+    def test_encode_decode_roundtrip_with_underscore(self):
+        obj = {"user_name": "Alice", "is_active": True}
+        text = ason.encode(obj, "{user_name:str, is_active:bool}")
+        assert "user_name" in text
+        assert "is_active" in text
+        out = ason.decode(text)
+        assert out == obj
+
+    def test_encode_decode_roundtrip_with_plus_minus(self):
+        obj = {"a+b": 42, "c-d": "hello"}
+        text = ason.encode(obj, "{a+b:int, c-d:str}")
+        assert "a+b" in text
+        assert "c-d" in text
+        out = ason.decode(text)
+        assert out == obj
+
+    def test_array_roundtrip_with_special_field_names(self):
+        rows = [{"x+y": 1, "a-b": "one"}, {"x+y": 2, "a-b": "two"}]
+        text = ason.encode(rows, "[{x+y:int, a-b:str}]")
+        assert "x+y" in text
+        out = ason.decode(text)
+        assert out == rows

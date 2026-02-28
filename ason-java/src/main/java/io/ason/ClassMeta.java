@@ -22,6 +22,7 @@ final class ClassMeta {
     final MethodHandle constructor;     // adapted: () -> Object
     final byte[] schemaBytes;           // pre-encoded "{field1,field2}"
     final byte[] schemaBytesVec;        // pre-encoded "[{field1,field2}]"
+    final Map<String, FieldMeta> fieldsByName; // cached name -> FieldMeta lookup
     private volatile boolean nestedResolved;  // lazy init flag for nested metas
 
     private ClassMeta(Class<?> clazz) {
@@ -73,6 +74,11 @@ final class ClassMeta {
         }
         sb.append("}]");
         this.schemaBytesVec = sb.toString().getBytes(StandardCharsets.UTF_8);
+
+        // Build name -> FieldMeta map for fast schema-based lookup
+        Map<String, FieldMeta> nameMap = new HashMap<>(fields.length * 2);
+        for (FieldMeta fm : fields) nameMap.put(fm.name, fm);
+        this.fieldsByName = nameMap;
     }
 
     Object newInstance() {

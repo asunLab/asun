@@ -209,9 +209,8 @@ final class AsonDecoder {
         FieldMeta[] fields = meta.fields;
         final byte[] inp = this.input;
 
-        // Build name->FieldMeta map for the target class
-        Map<String, FieldMeta> fieldMap = new HashMap<>();
-        for (FieldMeta fm : fields) fieldMap.put(fm.name, fm);
+        // Use cached name->FieldMeta map from ClassMeta
+        Map<String, FieldMeta> fieldMap = meta.fieldsByName;
 
         for (int si = 0; si < schema.length; si++) {
             if (si > 0) {
