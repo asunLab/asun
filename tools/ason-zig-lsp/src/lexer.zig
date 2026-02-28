@@ -162,7 +162,7 @@ pub const Lexer = struct {
 
     fn isIdentChar(c: u8) bool {
         return (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or
-               (c >= '0' and c <= '9') or c == '_';
+               (c >= '0' and c <= '9') or c == '_' or c == '+' or c == '-';
     }
 
     fn lexSchemaWord(self: *Lexer, start: u32, sl: u32, sc: u32) Token {

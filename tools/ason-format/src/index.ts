@@ -60,7 +60,7 @@ const IS_DELIM = (c: string) =>
   c === ' ' || c === '\t' || c === '\r' || c === '\n';
 
 /** Whether character can appear in an identifier / field name. */
-const IS_IDENT = (c: string) => /[a-zA-Z0-9_]/.test(c);
+const IS_IDENT = (c: string) => /[a-zA-Z0-9_+\-]/.test(c);
 
 /** Whether character can start an identifier. */
 const IS_IDENT_START = (c: string) => /[a-zA-Z_]/.test(c);

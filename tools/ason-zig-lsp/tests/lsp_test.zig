@@ -461,25 +461,73 @@ test "features: compress preserves plain array type annotation" {
     try std.testing.expect(std.mem.indexOf(u8, out, "[int]") != null);
 }
 
-test "features: json to ason quotes special chars in keys" {
-    // Bug fix: JSON key "lowPriorityEIR+CIR" must be quoted in ASON schema
+test "features: json to ason field names with +/- do not need quoting" {
+    // +, -, _ are now valid ASON identifier characters
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
-    const json_src = "{\"a+b\": \"hello\", \"normal\": 42}";
+    const json_src = "{\"a+b\": \"hello\", \"lowPriorityEIR+CIR\": 42}";
     const out = try features.jsonToAson(json_src, arena.allocator());
-    // The key "a+b" must be quoted
-    try std.testing.expect(std.mem.indexOf(u8, out, "\"a+b\"") != null);
-    // The key "normal" must NOT be quoted
-    try std.testing.expect(std.mem.indexOf(u8, out, "normal:int") != null);
+    // Keys with + should NOT be quoted (they are valid identifiers now)
+    try std.testing.expect(std.mem.indexOf(u8, out, "a+b:str") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out, "lowPriorityEIR+CIR:int") != null);
 }
 
-test "features: parser accepts quoted field names" {
-    // Quoted field names like "a+b" should parse without errors
+test "features: json to ason quotes truly special chars in keys" {
+    // Characters other than [a-zA-Z0-9_+-] must still be quoted
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
-    const src = "{\"a+b\":str, name:str}:(hello, world)";
+    const json_src = "{\"a.b\": \"hello\", \"has space\": 42}";
+    const out = try features.jsonToAson(json_src, arena.allocator());
+    try std.testing.expect(std.mem.indexOf(u8, out, "\"a.b\"") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out, "\"has space\"") != null);
+}
+
+test "features: json to ason empty top-level array gets type annotation" {
+    // Bug fix: JSON empty array [] should become [str] in ASON, not []
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const json_src = "[]";
+    const out = try features.jsonToAson(json_src, arena.allocator());
+    try std.testing.expectEqualStrings("[str]", out);
+}
+
+test "features: json to ason empty nested array inside object gets type annotation" {
+    // Bug fix: {"items": []} should produce items:[str], not items:[]
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const json_src = "{\"name\": \"test\", \"tags\": []}";
+    const out = try features.jsonToAson(json_src, arena.allocator());
+    try std.testing.expect(std.mem.indexOf(u8, out, "tags:[str]") != null or
+                           std.mem.indexOf(u8, out, "tags: [str]") != null);
+}
+
+test "features: parser accepts field names with plus and minus" {
+    // Field names like a+b and x-y should parse without errors
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const src = "{a+b:str, x-y:int}:(hello, 42)";
     var result = try parser.parse(src, arena.allocator());
     defer result.deinit();
     // Should not have parse errors
     try std.testing.expectEqual(@as(usize, 0), result.diags.len);
+}
+
+test "features: parser still accepts quoted field names" {
+    // Quoted field names like "a.b" should still parse without errors
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const src = "{\"a.b\":str, name:str}:(hello, world)";
+    var result = try parser.parse(src, arena.allocator());
+    defer result.deinit();
+    try std.testing.expectEqual(@as(usize, 0), result.diags.len);
+}
+
+test "lexer: identifiers with plus and minus" {
+    // + and - should be valid identifier characters in schema context
+    var lex = lexer.Lexer.init("{lowPriorityEIR+CIR:str}");
+    // skip '{'
+    _ = lex.next();
+    const tok = lex.next();
+    try std.testing.expectEqual(lexer.TokKind.ident, tok.kind);
+    try std.testing.expectEqualStrings("lowPriorityEIR+CIR", tok.value);
 }

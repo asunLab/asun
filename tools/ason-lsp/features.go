@@ -1055,7 +1055,7 @@ func jsonFieldToASON(key string, val interface{}) (schema string, data string) {
 
 func jsonArrayToASON(arr []interface{}) string {
 	if len(arr) == 0 {
-		return "[]"
+		return "[str]"
 	}
 	// Check if array of objects with same schema
 	if firstObj, ok := arr[0].(map[string]interface{}); ok {
@@ -1132,14 +1132,14 @@ func needsQuote(s string) bool {
 }
 
 // needsKeyQuote returns true if a JSON key contains characters that are not
-// valid ASON identifier characters [a-zA-Z0-9_].
+// valid ASON identifier characters [a-zA-Z0-9_+-].
 func needsKeyQuote(s string) bool {
 	if s == "" {
 		return true
 	}
 	for _, c := range s {
 		ok := (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-			(c >= '0' && c <= '9') || c == '_'
+			(c >= '0' && c <= '9') || c == '_' || c == '+' || c == '-'
 		if !ok {
 			return true
 		}

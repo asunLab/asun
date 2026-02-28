@@ -1252,6 +1252,103 @@ func TestRoundTrip_ObjectArray(t *testing.T) {
 	}
 }
 
+func TestJSONToASON_EmptyTopLevelArray(t *testing.T) {
+	src := `[]`
+	result, err := JSONToASON(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != "[str]" {
+		t.Errorf("result = %q, want %q", result, "[str]")
+	}
+}
+
+func TestJSONToASON_EmptyNestedArray(t *testing.T) {
+	src := `{"name": "test", "tags": []}`
+	result, err := JSONToASON(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, "tags:[str]") {
+		t.Errorf("result = %q, want tags:[str]", result)
+	}
+}
+
+func TestJSONToASON_PlusMinus_NoQuoting(t *testing.T) {
+	src := `{"lowPriorityEIR+CIR": 42, "a-b": "hello"}`
+	result, err := JSONToASON(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// +/- are now valid identifier chars, should NOT be quoted
+	if !strings.Contains(result, "lowPriorityEIR+CIR:int") {
+		t.Errorf("result = %q, key with + should not be quoted", result)
+	}
+	if !strings.Contains(result, "a-b:str") {
+		t.Errorf("result = %q, key with - should not be quoted", result)
+	}
+}
+
+func TestJSONToASON_DotAndSpace_NeedQuoting(t *testing.T) {
+	src := `{"a.b": "hello", "has space": 42}`
+	result, err := JSONToASON(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, `"a.b"`) {
+		t.Errorf("result = %q, key with . should be quoted", result)
+	}
+	if !strings.Contains(result, `"has space"`) {
+		t.Errorf("result = %q, key with space should be quoted", result)
+	}
+}
+
+func TestNeedsKeyQuote(t *testing.T) {
+	tests := []struct {
+		key  string
+		want bool
+	}{
+		{"name", false},
+		{"a+b", false},
+		{"a-b", false},
+		{"a_b", false},
+		{"lowPriorityEIR+CIR", false},
+		{"a.b", true},
+		{"has space", true},
+		{"", true},
+		{"a@b", true},
+	}
+	for _, tt := range tests {
+		got := needsKeyQuote(tt.key)
+		if got != tt.want {
+			t.Errorf("needsKeyQuote(%q) = %v, want %v", tt.key, got, tt.want)
+		}
+	}
+}
+
+func TestLexer_PlusMinusInIdentifier(t *testing.T) {
+	src := `{lowPriorityEIR+CIR:int, a-b:str}:(42, hello)`
+	lex := NewLexer(src)
+	tokens := lex.All()
+	// Find ident tokens
+	var idents []string
+	for _, tok := range tokens {
+		if tok.Type == TokenIdent {
+			idents = append(idents, tok.Value)
+		}
+	}
+	found := false
+	for _, id := range idents {
+		if id == "lowPriorityEIR+CIR" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected identifier 'lowPriorityEIR+CIR', got idents: %v", idents)
+	}
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════════════════════

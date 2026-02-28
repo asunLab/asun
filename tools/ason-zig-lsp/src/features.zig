@@ -875,7 +875,7 @@ fn jsonFieldToAson(key: []const u8, val: std.json.Value, alloc: std.mem.Allocato
 
 fn jsonArrayToAson(items: []std.json.Value, sb: *ArrayList(u8), alloc: std.mem.Allocator) error{OutOfMemory}!void {
     const w = sb.writer();
-    if (items.len == 0) { try w.writeAll("[]"); return; }
+    if (items.len == 0) { try w.writeAll("[str]"); return; }
     // Array of objects → object-array format
     if (items[0] == .object) {
         const first_obj = items[0].object;
@@ -1003,12 +1003,12 @@ fn needsQuote(s: []const u8) bool {
 }
 
 /// Check if a JSON key needs quoting to be a valid ASON field name.
-/// ASON identifiers only allow [a-zA-Z0-9_].
+/// ASON identifiers allow [a-zA-Z0-9_+-].
 fn needsKeyQuote(s: []const u8) bool {
     if (s.len == 0) return true;
     for (s) |c| {
         const ok = (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or
-                   (c >= '0' and c <= '9') or c == '_';
+                   (c >= '0' and c <= '9') or c == '_' or c == '+' or c == '-';
         if (!ok) return true;
     }
     return false;
