@@ -183,30 +183,39 @@ record Employee(string Name, Dept Dept) : IAsonSchema { /* ... */ }
 
 Benchmarked on .NET 10.0, Release mode, comparing against `System.Text.Json`:
 
-### Serialization (ASON is 1.2–8x faster)
+### Serialization (ASON is 1.2–9x faster)
 
 | Scenario            | JSON      | ASON     | Speedup   | BIN encode | BIN vs JSON |
 | ------------------- | --------- | -------- | --------- | ---------- | ----------- |
-| Flat struct × 100   | 9.6 ms    | 7.9 ms   | **1.21x** | 2.8 ms     | **3.4x**    |
-| Flat struct × 500   | 47.1 ms   | 35.5 ms  | **1.32x** | 11.3 ms    | **4.2x**    |
-| Flat struct × 1000  | 116.9 ms  | 76.8 ms  | **1.52x** | 48.7 ms    | **2.4x**    |
-| Flat struct × 5000  | 455.8 ms  | 52.0 ms  | **8.76x** | 28.7 ms    | **15.9x**   |
-| 5-level deep × 10   | 17.6 ms   | 12.9 ms  | **1.37x** | 4.4 ms     | **4.0x**    |
-| 5-level deep × 50   | 105.3 ms  | 63.0 ms  | **1.67x** | 18.7 ms    | **5.6x**    |
-| 5-level deep × 100  | 195.0 ms  | 53.4 ms  | **3.65x** | 13.5 ms    | **14.5x**   |
-| Large payload (10k) | 45.0 ms   | 13.1 ms  | **3.42x** | 5.3 ms     | **8.5x**    |
+| Flat struct × 100   | 8.8 ms    | 7.2 ms   | **1.23x** | 2.6 ms     | **3.5x**    |
+| Flat struct × 500   | 42.8 ms   | 33.4 ms  | **1.28x** | 9.7 ms     | **4.4x**    |
+| Flat struct × 1000  | 86.5 ms   | 71.6 ms  | **1.21x** | 23.9 ms    | **3.6x**    |
+| Flat struct × 5000  | 507.8 ms  | 60.8 ms  | **8.36x** | 28.0 ms    | **18.1x**   |
+| 5-level deep × 10   | 17.9 ms   | 13.8 ms  | **1.30x** | 3.5 ms     | **5.2x**    |
+| 5-level deep × 50   | 150.6 ms  | 99.4 ms  | **1.52x** | 30.2 ms    | **5.0x**    |
+| 5-level deep × 100  | 433.6 ms  | 105.6 ms | **4.11x** | 34.0 ms    | **12.8x**   |
+| Large payload (10k) | 104.4 ms  | 31.9 ms  | **3.27x** | 13.2 ms    | **7.9x**    |
 
-### Deserialization (ASON is 1.1–2.7x faster)
+### Deserialization (ASON is 1.1–2.4x faster)
 
 | Scenario            | JSON      | ASON     | Speedup   |
 | ------------------- | --------- | -------- | --------- |
-| Flat struct × 100   | 19.0 ms   | 16.4 ms  | **1.16x** |
-| Flat struct × 500   | 106.3 ms  | 98.5 ms  | **1.08x** |
-| Flat struct × 1000  | 209.2 ms  | 88.7 ms  | **2.36x** |
-| Flat struct × 5000  | 409.1 ms  | 255.6 ms | **1.60x** |
-| 5-level deep × 50   | 196.8 ms  | 73.9 ms  | **2.66x** |
-| 5-level deep × 100  | 382.5 ms  | 173.4 ms | **2.21x** |
-| Large payload (10k) | 142.8 ms  | 108.6 ms | **1.31x** |
+| Flat struct × 100   | 19.8 ms   | 15.8 ms  | **1.25x** |
+| Flat struct × 500   | 94.6 ms   | 74.6 ms  | **1.27x** |
+| Flat struct × 1000  | 221.5 ms  | 207.1 ms | **1.07x** |
+| Flat struct × 5000  | 462.5 ms  | 267.7 ms | **1.73x** |
+| 5-level deep × 50   | 354.4 ms  | 147.9 ms | **2.40x** |
+| 5-level deep × 100  | 957.6 ms  | 637.0 ms | **1.50x** |
+| Large payload (10k) | 342.9 ms  | 203.6 ms | **1.68x** |
+
+### Single Struct Roundtrip (10000x)
+
+| Metric    | JSON      | ASON     | Speedup   |
+| --------- | --------- | -------- | --------- |
+| Encode    | 25.9 ms   | 24.7 ms  | **1.05x** |
+| Decode    | 21.5 ms   | 14.4 ms  | **1.50x** |
+| Roundtrip | 30.8 ms   | 19.2 ms  | **1.60x** |
+| BIN enc   | —         | 1.8 ms   | **17.2x** |
 
 ### Size Savings
 
@@ -223,10 +232,16 @@ Benchmarked on .NET 10.0, Release mode, comparing against `System.Text.Json`:
 3. **Minimal allocation** — All rows share one schema reference. `ArrayPool`, `stackalloc`, `ReadOnlySpan<char>` everywhere.
 4. **SIMD acceleration** — `SearchValues<char>` auto-selects SSE2/AVX2/AdvSimd for character scanning.
 5. **Zero-copy decode** — Parsing operates directly on `ReadOnlySpan<char>`, no intermediate string allocation.
+6. **Schema caching** — Encoder caches schema header strings per type; decoder caches parsed field name arrays.
+7. **Zero-boxing `WriteValues`** — Direct typed field writes bypass `object?[]` allocation entirely.
 
 ### C# Performance Techniques Used
 
 - `ArrayPool<char>` / `ArrayPool<byte>` for writer buffers — zero GC pressure
+- `ThreadLocal` writer reuse for single-struct encode — no rent/return overhead
+- Schema header caching via `ConcurrentDictionary<Type, string>`
+- Decoded schema caching via `ConcurrentDictionary<int, string[]>`
+- Zero-boxing `WriteValues` / `WriteBinaryValues` interface methods
 - `stackalloc` for integer/float formatting
 - `ReadOnlySpan<char>` for all parsing — no string copies
 - `BinaryPrimitives` for little-endian binary I/O — direct memory operations

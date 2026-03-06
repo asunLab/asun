@@ -12,12 +12,19 @@ public struct AsonWriter : IDisposable
     private char[] _buf;
     private int _pos;
 
+    /// <summary>True if no buffer has been allocated yet.</summary>
+    public readonly bool IsEmpty => _buf == null;
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public AsonWriter(int initialCapacity = 256)
     {
         _buf = ArrayPool<char>.Shared.Rent(initialCapacity);
         _pos = 0;
     }
+
+    /// <summary>Reset position to reuse buffer without rent/return.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void Reset() => _pos = 0;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void EnsureCapacity(int extra)
