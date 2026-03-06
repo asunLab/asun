@@ -1,30 +1,32 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 
 namespace Ason;
 
 /// <summary>
-/// High-performance ASON text decoder. Zero-copy where possible — uses ReadOnlySpan&lt;char&gt;
-/// slicing to avoid string allocations for field names and simple values.
+/// High-performance ASON text decoder with schema caching.
 /// </summary>
 public static class Decoder
 {
+    // Cache parsed schema field names to avoid re-parsing identical schema headers
+    private static readonly ConcurrentDictionary<int, string[]> _schemaCache = new();
+
     /// <summary>Decode ASON text into a Map (Dictionary&lt;string, object?&gt;).</summary>
     public static Dictionary<string, object?> Decode(ReadOnlySpan<char> input)
     {
-        var d = new AsonDecoder(input);
-        d.SkipWsAndComments();
+        var d = new AsonDecoder(input, _schemaCache);
+        d.SkipWs();
         var result = d.ParseSingleStruct();
-        d.SkipWsAndComments();
+        d.SkipWs();
         if (d.Pos < d.Len)
         {
-            bool allWs = true;
             for (int i = d.Pos; i < d.Len; i++)
             {
                 char c = input[i];
-                if (c != ' ' && c != '\t' && c != '\n' && c != '\r') { allWs = false; break; }
+                if (c != ' ' && c != '\t' && c != '\n' && c != '\r')
+                    throw AsonException.TrailingCharacters;
             }
-            if (!allWs) throw AsonException.TrailingCharacters;
         }
         return result;
     }
@@ -38,16 +40,16 @@ public static class Decoder
     /// <summary>Decode ASON text into a list of maps.</summary>
     public static List<Dictionary<string, object?>> DecodeList(ReadOnlySpan<char> input)
     {
-        var d = new AsonDecoder(input);
-        d.SkipWsAndComments();
+        var d = new AsonDecoder(input, _schemaCache);
+        d.SkipWs();
         return d.ParseVecStruct();
     }
 
     /// <summary>Decode ASON text into a list of typed objects.</summary>
     public static List<T> DecodeListWith<T>(ReadOnlySpan<char> input, Func<Dictionary<string, object?>, T> factory)
     {
-        var d = new AsonDecoder(input);
-        d.SkipWsAndComments();
+        var d = new AsonDecoder(input, _schemaCache);
+        d.SkipWs();
         return d.ParseVecStructWith(factory);
     }
 }
@@ -56,12 +58,14 @@ public static class Decoder
 internal ref struct AsonDecoder
 {
     private readonly ReadOnlySpan<char> _input;
+    private readonly ConcurrentDictionary<int, string[]>? _schemaCache;
     internal readonly int Len;
     internal int Pos;
 
-    public AsonDecoder(ReadOnlySpan<char> input)
+    public AsonDecoder(ReadOnlySpan<char> input, ConcurrentDictionary<int, string[]>? schemaCache = null)
     {
         _input = input;
+        _schemaCache = schemaCache;
         Len = input.Length;
         Pos = 0;
     }
@@ -105,11 +109,35 @@ internal ref struct AsonDecoder
         }
     }
 
-    // Schema parsing - returns field names
+    // Schema parsing with caching
     internal string[] ParseSchema()
     {
+        int schemaStart = Pos;
         if (Next() != '{') throw AsonException.ExpectedOpenBrace;
-        // Pre-count fields for array sizing
+
+        // Try cache lookup: find end of schema header first
+        int braceDepth = 1;
+        int scanPos = Pos;
+        while (scanPos < Len && braceDepth > 0)
+        {
+            char c = _input[scanPos];
+            if (c == '{') braceDepth++;
+            else if (c == '}') braceDepth--;
+            scanPos++;
+        }
+        // scanPos now points right after the closing '}'
+        int schemaEnd = scanPos;
+        int hash = string.GetHashCode(_input[schemaStart..schemaEnd]);
+
+        if (_schemaCache != null && _schemaCache.TryGetValue(hash, out var cached))
+        {
+            // Skip past the schema we already parsed
+            Pos = schemaEnd;
+            return cached;
+        }
+
+        // Parse schema fields normally
+        Pos = schemaStart + 1; // back to after '{'
         var fields = new List<string>(8);
         for (;;)
         {
@@ -151,7 +179,9 @@ internal ref struct AsonDecoder
             }
             fields.Add(name);
         }
-        return fields.ToArray();
+        var result = fields.ToArray();
+        _schemaCache?.TryAdd(hash, result);
+        return result;
     }
 
     private void SkipBalanced(char open, char close)

@@ -68,13 +68,32 @@ Console.WriteLine("└───────────────────�
     var asonStr = Encoder.Encode(user);
     var jsonStr = JsonSerializer.Serialize(user);
 
-    for (int w = 0; w < 100; w++)
+    for (int w = 0; w < 200; w++)
     {
         Encoder.Encode(user); Decoder.DecodeWith(asonStr, BUser.FromMap);
         JsonSerializer.Serialize(user); JsonSerializer.Deserialize<BUser>(jsonStr);
     }
 
+    // Encode only
     var sw = Stopwatch.StartNew();
+    for (int i = 0; i < 10000; i++) Encoder.Encode(user);
+    var asonEncMs = sw.Elapsed.TotalMilliseconds;
+
+    sw.Restart();
+    for (int i = 0; i < 10000; i++) JsonSerializer.Serialize(user);
+    var jsonEncMs = sw.Elapsed.TotalMilliseconds;
+
+    // Decode only
+    sw.Restart();
+    for (int i = 0; i < 10000; i++) Decoder.DecodeWith(asonStr, BUser.FromMap);
+    var asonDecMs = sw.Elapsed.TotalMilliseconds;
+
+    sw.Restart();
+    for (int i = 0; i < 10000; i++) JsonSerializer.Deserialize<BUser>(jsonStr);
+    var jsonDecMs = sw.Elapsed.TotalMilliseconds;
+
+    // Roundtrip combined
+    sw.Restart();
     for (int i = 0; i < 10000; i++) { var s = Encoder.Encode(user); Decoder.DecodeWith(s, BUser.FromMap); }
     var asonMs = sw.Elapsed.TotalMilliseconds;
 
@@ -86,8 +105,10 @@ Console.WriteLine("└───────────────────�
     for (int i = 0; i < 10000; i++) BinaryCodec.EncodeBinary(user);
     var binMs = sw.Elapsed.TotalMilliseconds;
 
-    Console.WriteLine($"  Text:  ASON {asonMs,8:F2}ms | JSON {jsonMs,8:F2}ms | ratio {jsonMs / asonMs:F2}x");
-    Console.WriteLine($"  BIN:   ASON {binMs,8:F2}ms | ratio {jsonMs / binMs:F2}x vs JSON roundtrip");
+    Console.WriteLine($"  Encode:    ASON {asonEncMs,8:F2}ms | JSON {jsonEncMs,8:F2}ms | ratio {jsonEncMs / asonEncMs:F2}x");
+    Console.WriteLine($"  Decode:    ASON {asonDecMs,8:F2}ms | JSON {jsonDecMs,8:F2}ms | ratio {jsonDecMs / asonDecMs:F2}x");
+    Console.WriteLine($"  Roundtrip: ASON {asonMs,8:F2}ms | JSON {jsonMs,8:F2}ms | ratio {jsonMs / asonMs:F2}x");
+    Console.WriteLine($"  BIN enc:   ASON {binMs,8:F2}ms | ratio {jsonMs / binMs:F2}x vs JSON roundtrip");
 }
 
 // Section 5: Size comparison
