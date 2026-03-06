@@ -26,7 +26,7 @@ ASON (~35 tokens, 65% saving):
 | Human readable      | Yes          | Yes ✓            |
 | Nested structs      | ✓            | ✓                |
 | Type annotations    | No           | Optional ✓       |
-| Serialization speed | 1x           | **~1.7x faster** ✓ |
+| Serialization speed | 1x           | **~1.7–2.6x faster** ✓ |
 | Data size           | 100%         | **40–55%** ✓     |
 
 ## Quick Start
@@ -222,21 +222,29 @@ Annotations are **purely decorative metadata** — they do not affect parsing or
 
 Benchmarked on Linux, Dart VM, comparing ASON against `dart:convert` JSON:
 
-### Serialization (ASON is 1.6–2.1x faster)
+### Serialization (ASON is 1.6–2.6x faster)
 
-| Scenario            | JSON      | ASON     | Speedup   |
-| ------------------- | --------- | -------- | --------- |
-| Flat struct × 1000  | 103.03 ms | 60.55 ms | **1.70x** |
-| 5-level deep × 100  | 419.77 ms | 197.67 ms | **2.12x** |
-| Large payload (10k) | 106.09 ms | 62.67 ms | **1.69x** |
+| Scenario            | JSON      | ASON     | Speedup   | BIN encode | BIN vs JSON |
+| ------------------- | --------- | -------- | --------- | ---------- | ----------- |
+| Flat struct × 100   | 21.6 ms   | 8.2 ms   | **2.64x** | 13.2 ms    | **1.6x**    |
+| Flat struct × 500   | 60.5 ms   | 35.7 ms  | **1.69x** | 9.3 ms     | **6.5x**    |
+| Flat struct × 1000  | 111.5 ms  | 70.5 ms  | **1.58x** | 19.1 ms    | **5.8x**    |
+| Flat struct × 5000  | 616.4 ms  | 369.5 ms | **1.67x** | 137.8 ms   | **4.5x**    |
+| 5-level deep × 10   | 45.5 ms   | 26.3 ms  | **1.73x** | 10.7 ms    | **4.3x**    |
+| 5-level deep × 50   | 226.0 ms  | 116.0 ms | **1.95x** | 28.9 ms    | **7.8x**    |
+| 5-level deep × 100  | 481.4 ms  | 232.6 ms | **2.07x** | 88.0 ms    | **5.5x**    |
+| Large payload (10k) | 134.6 ms  | 73.7 ms  | **1.83x** | 30.0 ms    | **4.5x**    |
 
-### Deserialization (ASON is 1.1–2.5x faster)
+### Deserialization (ASON is 1.1–3.2x faster)
 
-| Scenario            | JSON      | ASON     | Speedup   |
-| ------------------- | --------- | -------- | --------- |
-| Flat struct × 1000  | 74.24 ms  | 65.97 ms | **1.13x** |
-| 5-level deep × 100  | 336.29 ms | 137.31 ms | **2.45x** |
-| Large payload (10k) | 84.78 ms  | 68.83 ms | **1.23x** |
+| Scenario            | JSON      | ASON     | Speedup   | BIN decode | BIN vs JSON |
+| ------------------- | --------- | -------- | --------- | ---------- | ----------- |
+| Flat struct × 500   | 40.5 ms   | 40.2 ms  | **1.01x** | 35.5 ms    | **1.1x**    |
+| Flat struct × 1000  | 87.7 ms   | 78.3 ms  | **1.12x** | 70.2 ms    | **1.3x**    |
+| 5-level deep × 10   | 36.4 ms   | 15.0 ms  | **2.42x** | —          | —           |
+| 5-level deep × 50   | 181.8 ms  | 57.3 ms  | **3.17x** | —          | —           |
+| 5-level deep × 100  | 376.5 ms  | 136.8 ms | **2.75x** | —          | —           |
+| Large payload (10k) | 103.7 ms  | 81.5 ms  | **1.27x** | 76.6 ms    | **1.4x**    |
 
 ### Size Savings
 
@@ -249,8 +257,10 @@ Benchmarked on Linux, Dart VM, comparing ASON against `dart:convert` JSON:
 ### Why is ASON Faster?
 
 1. **Zero key-hashing** — Schema is parsed once; data fields are mapped by position index `O(1)`, no per-row key string hashing.
-2. **Schema-driven parsing** — The decoder knows the expected type of each field from the schema, enabling direct parsing instead of runtime type inference. CPU branch prediction hits ~100%.
-3. **Minimal memory allocation** — All data rows share one schema reference. No repeated key string allocation.
+2. **Schema caching** — Parsed schema field names are cached globally, avoiding re-parsing identical headers.
+3. **Schema-driven parsing** — The decoder knows the expected type of each field from the schema, enabling direct parsing. CPU branch prediction hits ~100%.
+4. **Optimized branch order** — Numbers checked first (most common data type), inline bool comparison without substring allocation.
+5. **Minimal memory allocation** — All data rows share one schema reference. No repeated key string allocation.
 
 Run the benchmark yourself:
 

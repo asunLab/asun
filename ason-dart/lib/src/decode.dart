@@ -1,40 +1,32 @@
 import 'error.dart';
 
 // ---------------------------------------------------------------------------
+// Schema cache — avoid re-parsing identical schema headers
+// ---------------------------------------------------------------------------
+final Map<int, List<String>> _schemaCache = {};
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 /// Decode an ASON text string into a structured Dart value.
-///
-/// Generic map-based decoding: returns nested Map/List/String/int/double/bool/null.
-/// Supports both annotated and unannotated schemas.
-///
-/// For typed decoding into specific classes, use [decodeWith] with a factory.
 dynamic decode(String input) {
   final d = _Decoder(input);
   d._skipWsAndComments();
   final result = d._parseTop();
   d._skipWsAndComments();
   if (d._pos < d._len) {
-    // Check if only whitespace remains
-    bool allWs = true;
     for (int i = d._pos; i < d._len; i++) {
-      final c = d._input.codeUnitAt(i);
+      final c = input.codeUnitAt(i);
       if (c != 0x20 && c != 0x09 && c != 0x0A && c != 0x0D) {
-        allWs = false;
-        break;
+        throw AsonError.trailingCharacters;
       }
     }
-    if (!allWs) throw AsonError.trailingCharacters;
   }
   return result;
 }
 
 /// Decode ASON text into a typed object using a factory function.
-///
-/// [factory] receives a Map<String, dynamic> and returns T.
-/// Supports single struct: `{schema}:(values)` and
-/// vec of structs: `[{schema}]:(v1),(v2),...`
 T decodeWith<T>(String input, T Function(Map<String, dynamic>) factory) {
   final raw = decode(input);
   if (raw is Map<String, dynamic>) {
@@ -46,7 +38,23 @@ T decodeWith<T>(String input, T Function(Map<String, dynamic>) factory) {
 /// Decode ASON text into a list of typed objects.
 List<T> decodeListWith<T>(
     String input, T Function(Map<String, dynamic>) factory) {
-  final raw = decode(input);
+  final d = _Decoder(input);
+  d._skipWsAndComments();
+  if (d._pos >= d._len) throw AsonError('empty input');
+
+  // Fast path: detect vec struct pattern [{...}]:
+  final c = d._peek();
+  if (c == 0x5B && d._pos + 1 < d._len && input.codeUnitAt(d._pos + 1) == 0x7B) {
+    final maps = d._parseVecStruct();
+    final result = <T>[];
+    for (final m in maps) {
+      result.add(factory(m as Map<String, dynamic>));
+    }
+    return result;
+  }
+
+  // Fallback
+  final raw = d._parseTop();
   if (raw is List) {
     return raw.map((e) => factory(e as Map<String, dynamic>)).toList();
   }
@@ -54,7 +62,7 @@ List<T> decodeListWith<T>(
 }
 
 // ---------------------------------------------------------------------------
-// Internal decoder — zero-copy where possible, direct byte scanning
+// Internal decoder — optimized for small-dataset hot loops
 // ---------------------------------------------------------------------------
 
 class _Decoder {
@@ -76,7 +84,7 @@ class _Decoder {
     return _input.codeUnitAt(_pos++);
   }
 
-  // -- Whitespace / comments ------------------------------------------------
+  // -- Whitespace -----------------------------------------------------------
 
   void _skipWs() {
     while (_pos < _len) {
@@ -93,9 +101,8 @@ class _Decoder {
     for (;;) {
       _skipWs();
       if (_pos + 1 < _len &&
-          _input.codeUnitAt(_pos) == 0x2F && // /
+          _input.codeUnitAt(_pos) == 0x2F &&
           _input.codeUnitAt(_pos + 1) == 0x2A) {
-        // *
         _pos += 2;
         while (_pos + 1 < _len) {
           if (_input.codeUnitAt(_pos) == 0x2A &&
@@ -114,7 +121,7 @@ class _Decoder {
   // -- Top-level parse ------------------------------------------------------
 
   dynamic _parseTop() {
-    _skipWsAndComments();
+    _skipWs();
     if (_pos >= _len) return null;
 
     final c = _peek();
@@ -127,23 +134,42 @@ class _Decoder {
       return _parseSingleStruct();
     }
     // Plain value
-    return _parseAnyValue();
+    return _parseValueFast();
   }
 
-  // -- Schema parsing -------------------------------------------------------
+  // -- Schema parsing with caching ------------------------------------------
 
   List<String> _parseSchema() {
-    if (_next() != 0x7B) throw AsonError.expectedOpenBrace; // {
+    final schemaStart = _pos;
+    if (_next() != 0x7B) throw AsonError.expectedOpenBrace;
+
+    // Find end of schema to compute cache key
+    int braceDepth = 1;
+    int scanPos = _pos;
+    while (scanPos < _len && braceDepth > 0) {
+      final c = _input.codeUnitAt(scanPos);
+      if (c == 0x7B) braceDepth++;
+      else if (c == 0x7D) braceDepth--;
+      scanPos++;
+    }
+    final hash = _input.substring(schemaStart, scanPos).hashCode;
+    final cached = _schemaCache[hash];
+    if (cached != null) {
+      _pos = scanPos;
+      return cached;
+    }
+
+    // Parse schema fields normally
+    _pos = schemaStart + 1; // back to after '{'
     final fields = <String>[];
     for (;;) {
       _skipWs();
       if (_peek() == 0x7D) {
-        // }
         _pos++;
         break;
       }
       if (fields.isNotEmpty) {
-        if (_next() != 0x2C) throw AsonError.expectedComma; // ,
+        if (_next() != 0x2C) throw AsonError.expectedComma;
         _skipWs();
       }
       final start = _pos;
@@ -159,16 +185,13 @@ class _Decoder {
 
       // Skip optional type annotation
       if (_pos < _len && _input.codeUnitAt(_pos) == 0x3A) {
-        // :
         _pos++;
         _skipWs();
         if (_pos < _len) {
           final tc = _input.codeUnitAt(_pos);
           if (tc == 0x7B) {
-            // { — nested struct schema
             _skipBalanced(0x7B, 0x7D);
           } else if (tc == 0x5B) {
-            // [ — array type
             _skipBalanced(0x5B, 0x5D);
           } else if (_pos + 3 <= _len &&
               _input.substring(_pos, _pos + 3) == 'map') {
@@ -177,7 +200,6 @@ class _Decoder {
               _skipBalanced(0x5B, 0x5D);
             }
           } else {
-            // Simple type name
             while (_pos < _len) {
               final c = _input.codeUnitAt(_pos);
               if (c == 0x2C || c == 0x7D || c == 0x20 || c == 0x09) break;
@@ -188,6 +210,7 @@ class _Decoder {
       }
       fields.add(name);
     }
+    _schemaCache[hash] = fields;
     return fields;
   }
 
@@ -211,48 +234,49 @@ class _Decoder {
   Map<String, dynamic> _parseSingleStruct() {
     final fields = _parseSchema();
     _skipWsAndComments();
-    if (_next() != 0x3A) throw AsonError.expectedColon; // :
-    _skipWsAndComments();
+    if (_next() != 0x3A) throw AsonError.expectedColon;
+    _skipWs();
     return _parseTupleAsMap(fields);
   }
 
   List<dynamic> _parseVecStruct() {
     _pos++; // skip [
     final fields = _parseSchema();
-    _skipWsAndComments();
-    if (_next() != 0x5D) throw AsonError.expectedCloseBracket; // ]
-    _skipWsAndComments();
-    if (_next() != 0x3A) throw AsonError.expectedColon; // :
+    _skipWs();
+    if (_next() != 0x5D) throw AsonError.expectedCloseBracket;
+    _skipWs();
+    if (_next() != 0x3A) throw AsonError.expectedColon;
 
     final result = <Map<String, dynamic>>[];
+    // Reuse a single map and copy into new maps to reduce allocation
     for (;;) {
-      _skipWsAndComments();
+      _skipWs();
       if (_pos >= _len) break;
       final c = _peek();
       if (c == 0x2C) {
-        // ,
         _pos++;
-        _skipWsAndComments();
+        _skipWs();
         if (_pos >= _len || _peek() != 0x28) break;
       }
-      if (_peek() != 0x28) break; // (
+      if (_peek() != 0x28) break;
       result.add(_parseTupleAsMap(fields));
     }
     return result;
   }
 
   Map<String, dynamic> _parseTupleAsMap(List<String> fields) {
-    if (_next() != 0x28) throw AsonError.expectedOpenParen; // (
+    if (_next() != 0x28) throw AsonError.expectedOpenParen;
     final map = <String, dynamic>{};
-    for (int i = 0; i < fields.length; i++) {
-      _skipWsAndComments();
-      if (_peek() == 0x29) break; // )
+    final fieldCount = fields.length;
+    for (int i = 0; i < fieldCount; i++) {
+      _skipWs();
+      final c = _input.codeUnitAt(_pos);
+      if (c == 0x29) break;
       if (i > 0) {
-        if (_pos < _len && _input.codeUnitAt(_pos) == 0x2C) {
+        if (c == 0x2C) {
           _pos++;
-          _skipWsAndComments();
-          if (_peek() == 0x29) {
-            // trailing comma or empty remaining
+          _skipWs();
+          if (_input.codeUnitAt(_pos) == 0x29) {
             map[fields[i]] = null;
             continue;
           }
@@ -260,40 +284,38 @@ class _Decoder {
           break;
         }
       }
-      map[fields[i]] = _parseAnyValue();
+      map[fields[i]] = _parseValueFast();
     }
-    // Skip remaining values in tuple
     _skipRemainingTuple();
-    _skipWsAndComments();
+    _skipWs();
     if (_pos < _len && _input.codeUnitAt(_pos) == 0x29) _pos++;
     return map;
   }
 
   void _skipRemainingTuple() {
-    _skipWsAndComments();
+    _skipWs();
     while (_pos < _len && _input.codeUnitAt(_pos) != 0x29) {
       if (_input.codeUnitAt(_pos) == 0x2C) {
         _pos++;
-        _skipWsAndComments();
+        _skipWs();
         if (_pos < _len && _input.codeUnitAt(_pos) == 0x29) break;
       }
       if (_pos < _len && _input.codeUnitAt(_pos) != 0x29) {
         _skipValue();
-        _skipWsAndComments();
+        _skipWs();
       }
     }
   }
 
   void _skipValue() {
-    _skipWsAndComments();
     if (_pos >= _len) return;
     final c = _input.codeUnitAt(_pos);
     switch (c) {
-      case 0x28: // (
+      case 0x28:
         _skipBalanced(0x28, 0x29);
-      case 0x5B: // [
+      case 0x5B:
         _skipBalanced(0x5B, 0x5D);
-      case 0x22: // "
+      case 0x22:
         _pos++;
         while (_pos < _len) {
           final ch = _input.codeUnitAt(_pos);
@@ -316,51 +338,38 @@ class _Decoder {
     }
   }
 
-  // -- Value parsing --------------------------------------------------------
+  // -- Value parsing — optimized branch order for typical ASON data ----------
 
-  dynamic _parseAnyValue() {
-    _skipWsAndComments();
+  dynamic _parseValueFast() {
     if (_pos >= _len) return null;
 
-    final c = _peek();
+    final c = _input.codeUnitAt(_pos);
 
     // Null — at delimiter
     if (c == 0x2C || c == 0x29 || c == 0x5D) return null;
 
+    // Number first (most common in ASON structured data)
+    if ((c >= 0x30 && c <= 0x39) || c == 0x2D) return _parseNumber();
+
     // Quoted string
     if (c == 0x22) return _parseQuotedString();
 
-    // Nested tuple — may be a struct or map entry
-    if (c == 0x28) return _parseTupleValue();
-
-    // Array
-    if (c == 0x5B) {
-      // Could be [{schema}]: vec struct or plain array
-      if (_pos + 1 < _len && _input.codeUnitAt(_pos + 1) == 0x7B) {
-        // Try to detect [{schema}] pattern — but inside a value context
-        // this is actually a nested array of struct tuples: [(v1,v2),(v3,v4)]
-      }
-      return _parseArray();
-    }
-
-    // Schema-prefixed nested struct: {schema}:(values)
-    if (c == 0x7B) {
-      return _parseSingleStruct();
-    }
-
-    // Bool
-    if (c == 0x74) {
-      // t
-      if (_pos + 4 <= _len && _input.substring(_pos, _pos + 4) == 'true') {
+    // Bool — inline char checks, no substring
+    if (c == 0x74 && _pos + 3 < _len) {
+      if (_input.codeUnitAt(_pos + 1) == 0x72 &&
+          _input.codeUnitAt(_pos + 2) == 0x75 &&
+          _input.codeUnitAt(_pos + 3) == 0x65) {
         if (_pos + 4 >= _len || _isDelimiter(_input.codeUnitAt(_pos + 4))) {
           _pos += 4;
           return true;
         }
       }
     }
-    if (c == 0x66) {
-      // f
-      if (_pos + 5 <= _len && _input.substring(_pos, _pos + 5) == 'false') {
+    if (c == 0x66 && _pos + 4 < _len) {
+      if (_input.codeUnitAt(_pos + 1) == 0x61 &&
+          _input.codeUnitAt(_pos + 2) == 0x6C &&
+          _input.codeUnitAt(_pos + 3) == 0x73 &&
+          _input.codeUnitAt(_pos + 4) == 0x65) {
         if (_pos + 5 >= _len || _isDelimiter(_input.codeUnitAt(_pos + 5))) {
           _pos += 5;
           return false;
@@ -368,14 +377,21 @@ class _Decoder {
       }
     }
 
-    // Number
-    if (_isDigitOrMinus(c)) {
-      return _parseNumber();
-    }
+    // Nested tuple
+    if (c == 0x28) return _parseTupleValue();
+
+    // Array
+    if (c == 0x5B) return _parseArray();
+
+    // Schema-prefixed nested struct
+    if (c == 0x7B) return _parseSingleStruct();
 
     // Plain string value
     return _parsePlainValue();
   }
+
+  // Legacy entry point
+  dynamic _parseAnyValue() => _parseValueFast();
 
   bool _isDelimiter(int c) =>
       c == 0x2C ||
@@ -386,14 +402,12 @@ class _Decoder {
       c == 0x0A ||
       c == 0x0D;
 
-  bool _isDigitOrMinus(int c) => (c >= 0x30 && c <= 0x39) || c == 0x2D;
-
   // -- Number parsing — direct, no intermediate string ----------------------
 
   dynamic _parseNumber() {
     final start = _pos;
     bool negative = false;
-    if (_pos < _len && _input.codeUnitAt(_pos) == 0x2D) {
+    if (_input.codeUnitAt(_pos) == 0x2D) {
       negative = true;
       _pos++;
     }
@@ -409,18 +423,14 @@ class _Decoder {
     }
     if (digits == 0) throw AsonError.invalidNumber;
 
-    // Check for decimal point → float
     if (_pos < _len && _input.codeUnitAt(_pos) == 0x2E) {
-      // Parse as float
       _pos = start;
       return _parseFloat();
     }
 
-    // Check for scientific notation
     if (_pos < _len) {
       final e = _input.codeUnitAt(_pos);
       if (e == 0x65 || e == 0x45) {
-        // e or E
         _pos = start;
         return _parseFloat();
       }
@@ -432,16 +442,19 @@ class _Decoder {
   double _parseFloat() {
     final start = _pos;
     if (_pos < _len && _input.codeUnitAt(_pos) == 0x2D) _pos++;
-    while (_pos < _len && _input.codeUnitAt(_pos) >= 0x30 && _input.codeUnitAt(_pos) <= 0x39) {
+    while (_pos < _len &&
+        _input.codeUnitAt(_pos) >= 0x30 &&
+        _input.codeUnitAt(_pos) <= 0x39) {
       _pos++;
     }
     if (_pos < _len && _input.codeUnitAt(_pos) == 0x2E) {
       _pos++;
-      while (_pos < _len && _input.codeUnitAt(_pos) >= 0x30 && _input.codeUnitAt(_pos) <= 0x39) {
+      while (_pos < _len &&
+          _input.codeUnitAt(_pos) >= 0x30 &&
+          _input.codeUnitAt(_pos) <= 0x39) {
         _pos++;
       }
     }
-    // Scientific notation
     if (_pos < _len) {
       final e = _input.codeUnitAt(_pos);
       if (e == 0x65 || e == 0x45) {
@@ -450,7 +463,9 @@ class _Decoder {
           final s = _input.codeUnitAt(_pos);
           if (s == 0x2B || s == 0x2D) _pos++;
         }
-        while (_pos < _len && _input.codeUnitAt(_pos) >= 0x30 && _input.codeUnitAt(_pos) <= 0x39) {
+        while (_pos < _len &&
+            _input.codeUnitAt(_pos) >= 0x30 &&
+            _input.codeUnitAt(_pos) <= 0x39) {
           _pos++;
         }
       }
@@ -489,12 +504,10 @@ class _Decoder {
     while (_pos < _len) {
       final c = _input.codeUnitAt(_pos);
       if (c == 0x22) {
-        // "
         _pos++;
         return buf.toString();
       }
       if (c == 0x5C) {
-        // \
         _pos++;
         if (_pos >= _len) throw AsonError.unclosedString;
         final esc = _input.codeUnitAt(_pos);
@@ -562,7 +575,6 @@ class _Decoder {
     int i = 0;
     while (i < units.length) {
       if (units[i] == 0x5C) {
-        // \
         i++;
         if (i >= units.length) throw AsonError.eof;
         switch (units[i]) {
@@ -607,25 +619,16 @@ class _Decoder {
 
   dynamic _parseArray() {
     _pos++; // skip [
-    _skipWsAndComments();
+    _skipWs();
     if (_pos < _len && _input.codeUnitAt(_pos) == 0x5D) {
       _pos++;
       return <dynamic>[];
     }
 
-    // Check for map entries: [(k,v),(k,v)]
-    if (_peek() == 0x28) {
-      // Could be map entries or tuple array
-      final saved = _pos;
-      // Peek inside: if first tuple has exactly 2 elements separated by comma,
-      // and there's no schema, treat as map entries
-      // For simplicity: parse as list of tuples, caller interprets
-    }
-
     final items = <dynamic>[];
     bool first = true;
     while (_pos < _len) {
-      _skipWsAndComments();
+      _skipWs();
       if (_peek() == 0x5D) {
         _pos++;
         return items;
@@ -633,7 +636,7 @@ class _Decoder {
       if (!first) {
         if (_input.codeUnitAt(_pos) == 0x2C) {
           _pos++;
-          _skipWsAndComments();
+          _skipWs();
           if (_pos < _len && _input.codeUnitAt(_pos) == 0x5D) {
             _pos++;
             return items;
@@ -643,22 +646,21 @@ class _Decoder {
         }
       }
       first = false;
-      items.add(_parseAnyValue());
+      items.add(_parseValueFast());
     }
-    // Try to consume ]
-    _skipWsAndComments();
+    _skipWs();
     if (_pos < _len && _input.codeUnitAt(_pos) == 0x5D) _pos++;
     return items;
   }
 
-  // -- Tuple value (nested struct or plain tuple) ---------------------------
+  // -- Tuple value ----------------------------------------------------------
 
   dynamic _parseTupleValue() {
     _pos++; // skip (
     final items = <dynamic>[];
     bool first = true;
     while (_pos < _len) {
-      _skipWsAndComments();
+      _skipWs();
       if (_peek() == 0x29) {
         _pos++;
         break;
@@ -666,7 +668,7 @@ class _Decoder {
       if (!first) {
         if (_input.codeUnitAt(_pos) == 0x2C) {
           _pos++;
-          _skipWsAndComments();
+          _skipWs();
           if (_peek() == 0x29) {
             _pos++;
             break;
@@ -676,9 +678,8 @@ class _Decoder {
         }
       }
       first = false;
-      items.add(_parseAnyValue());
+      items.add(_parseValueFast());
     }
-    // Return as list (tuple)
     return items;
   }
 }
