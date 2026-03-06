@@ -24,6 +24,12 @@ class User implements AsonSchema {
   @override List<String?> get fieldTypes => ['int', 'str', 'str', 'int', 'float', 'bool', 'str', 'str'];
   @override List<dynamic> get fieldValues => [id, name, email, age, score, active, role, city];
 
+  static const _binFields = ['id', 'name', 'email', 'age', 'score', 'active', 'role', 'city'];
+  static const _binTypes = [
+    FieldType.int_, FieldType.string_, FieldType.string_, FieldType.int_,
+    FieldType.double_, FieldType.bool_, FieldType.string_, FieldType.string_,
+  ];
+
   factory User.fromMap(Map<String, dynamic> m) => User(
     id: m['id'] as int, name: m['name'] as String, email: m['email'] as String,
     age: m['age'] as int, score: (m['score'] as num).toDouble(),
@@ -201,12 +207,14 @@ class BenchResult {
     if (binSerMs != null && binBytes != null) {
       final binSerRatio = jsonSerMs / binSerMs!;
       final binSaving = (1.0 - binBytes! / jsonBytes) * 100.0;
+      final binParts = <String>[];
+      binParts.add('BIN Ser: ${binSerMs!.toStringAsFixed(2).padLeft(8)}ms (${binSerRatio.toStringAsFixed(1)}x)');
       if (binDeMs != null) {
         final binDeRatio = jsonDeMs / binDeMs!;
-        print('    BIN Ser: ${binSerMs!.toStringAsFixed(2).padLeft(8)}ms (${binSerRatio.toStringAsFixed(1)}x) | BIN De: ${binDeMs!.toStringAsFixed(2).padLeft(8)}ms (${binDeRatio.toStringAsFixed(1)}x) | BIN: ${binBytes!.toString().padLeft(8)} B (${binSaving.toStringAsFixed(0)}%)');
-      } else {
-        print('    BIN Ser: ${binSerMs!.toStringAsFixed(2).padLeft(8)}ms (${binSerRatio.toStringAsFixed(1)}x) | BIN: ${binBytes!.toString().padLeft(8)} B (${binSaving.toStringAsFixed(0)}%)');
+        binParts.add('BIN De: ${binDeMs!.toStringAsFixed(2).padLeft(8)}ms (${binDeRatio.toStringAsFixed(1)}x)');
       }
+      binParts.add('BIN: ${binBytes!.toString().padLeft(8)} B (${binSaving.toStringAsFixed(0)}%)');
+      print('    ${binParts.join(' | ')}');
     }
   }
 }
@@ -224,6 +232,14 @@ String _formatBytes(int b) {
 BenchResult benchFlat(int count, int iterations) {
   final users = generateUsers(count);
   final jsonList = users.map((u) => u.toJson()).toList();
+
+  // Warmup
+  for (int w = 0; w < 5; w++) {
+    encode(users);
+    jsonEncode(jsonList);
+    decode(encode(users));
+    jsonDecode(jsonEncode(jsonList));
+  }
 
   // JSON serialize
   String jsonStr = '';
@@ -251,17 +267,24 @@ BenchResult benchFlat(int count, int iterations) {
   // ASON deserialize
   final sw4 = Stopwatch()..start();
   for (int i = 0; i < iterations; i++) {
-    decode(asonStr);
+    decodeListWith(asonStr, User.fromMap);
   }
   sw4.stop();
 
-  // BIN
+  // BIN encode
   Uint8List binBuf = Uint8List(0);
   final sw5 = Stopwatch()..start();
   for (int i = 0; i < iterations; i++) {
     binBuf = encodeBinary(users);
   }
   sw5.stop();
+
+  // BIN decode
+  final sw6 = Stopwatch()..start();
+  for (int i = 0; i < iterations; i++) {
+    decodeBinaryListWith(binBuf, User._binFields, User._binTypes, User.fromMap);
+  }
+  sw6.stop();
 
   return BenchResult(
     name: 'Flat struct × $count (8 fields)',
@@ -272,6 +295,7 @@ BenchResult benchFlat(int count, int iterations) {
     jsonBytes: jsonStr.length,
     asonBytes: asonStr.length,
     binSerMs: sw5.elapsedMicroseconds / 1000,
+    binDeMs: sw6.elapsedMicroseconds / 1000,
     binBytes: binBuf.length,
   );
 }
@@ -279,6 +303,12 @@ BenchResult benchFlat(int count, int iterations) {
 BenchResult benchDeep(int count, int iterations) {
   final companies = generateCompanies(count);
   final jsonList = companies.map((c) => c.toJson()).toList();
+
+  // Warmup
+  for (int w = 0; w < 5; w++) {
+    encode(companies);
+    jsonEncode(jsonList);
+  }
 
   String jsonStr = '';
   final sw1 = Stopwatch()..start();
@@ -381,10 +411,16 @@ void main() {
     age: 30, score: 95.5, active: true, role: 'engineer', city: 'NYC',
   );
 
+  // Warmup
+  for (int w = 0; w < 200; w++) {
+    encode(user); decodeWith(encode(user), User.fromMap);
+    jsonEncode(user.toJson()); jsonDecode(jsonEncode(user.toJson()));
+  }
+
   final sw1 = Stopwatch()..start();
   for (int i = 0; i < 10000; i++) {
     final s = encode(user);
-    decode(s);
+    decodeWith(s, User.fromMap);
   }
   sw1.stop();
 
@@ -395,9 +431,17 @@ void main() {
   }
   sw2.stop();
 
+  final sw3 = Stopwatch()..start();
+  for (int i = 0; i < 10000; i++) {
+    encodeBinary(user);
+  }
+  sw3.stop();
+
   final asonMs = sw1.elapsedMicroseconds / 1000;
   final jsonMs = sw2.elapsedMicroseconds / 1000;
-  print('  Flat:  ASON ${asonMs.toStringAsFixed(2).padLeft(8)}ms | JSON ${jsonMs.toStringAsFixed(2).padLeft(8)}ms | ratio ${(jsonMs / asonMs).toStringAsFixed(2)}x');
+  final binMs = sw3.elapsedMicroseconds / 1000;
+  print('  Text:  ASON ${asonMs.toStringAsFixed(2).padLeft(8)}ms | JSON ${jsonMs.toStringAsFixed(2).padLeft(8)}ms | ratio ${(jsonMs / asonMs).toStringAsFixed(2)}x');
+  print('  BIN:   ASON ${binMs.toStringAsFixed(2).padLeft(8)}ms | ratio ${(jsonMs / binMs).toStringAsFixed(2)}x vs JSON roundtrip');
 
   // Section 5: Size summary
   print('\n┌──────────────────────────────────────────────┐');
