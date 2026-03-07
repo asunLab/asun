@@ -4,7 +4,7 @@
 [![Documentation](https://docs.rs/ason/badge.svg)](https://docs.rs/ason)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-高性能 [serde](https://serde.rs/) 序列化/反序列化库，用于 [ASON](https://github.com/athxx/ason)（Array-Schema Object Notation）—— 一种面向 LLM 交互和大规模数据传输的高效序列化格式。
+高性能 [serde](https://serde.rs/) 序列化/反序列化库，用于 [ASON](https://github.com/ason-lab/ason)（Array-Schema Object Notation）—— 一种面向 LLM 交互和大规模数据传输的高效序列化格式。
 
 [English](README.md)
 
@@ -305,7 +305,7 @@ cargo run --release --example bench
 
 ## ASON 格式规范
 
-完整的 [ASON 规范](https://github.com/athxx/ason/blob/main/docs/ASON_SPEC_CN.md) 包含语法规则、BNF 文法、转义规则、类型系统及 LLM 集成最佳实践。
+完整的 [ASON 规范](https://github.com/ason-lab/ason/blob/main/docs/ASON_SPEC_CN.md) 包含语法规则、BNF 文法、转义规则、类型系统及 LLM 集成最佳实践。
 
 ### 语法速查表
 

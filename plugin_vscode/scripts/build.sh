@@ -2,10 +2,10 @@
 # ──────────────────────────────────────────────────────────────────────────────
 # ASON VS Code 插件 — 跨平台构建脚本
 #
-# 用法:
-#   ./scripts/build.sh              # 构建所有平台
-#   ./scripts/build.sh current      # 仅构建当前平台
-#   ./scripts/build.sh darwin-arm64  # 构建指定平台
+# Usage:
+#   ./scripts/build.sh              # Build all platforms
+#   ./scripts/build.sh current      # Build current platform only
+#   ./scripts/build.sh darwin-arm64  # Build specified platform
 # ──────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -14,8 +14,8 @@ PLUGIN_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 LSP_DIR="$(cd "$PLUGIN_DIR/../ason-zig-lsp" && pwd)"
 SERVER_DIR="$PLUGIN_DIR/server"
 
-# ── 平台定义 ──────────────────────────────────────────────────────────────────
-# 格式: "vscode-target:zig-target:binary-suffix"
+# ── Platform definitions ─────────────────────────────────────────────────────────
+# Format: "vscode-target:zig-target:binary-suffix"
 ALL_TARGETS=(
     "darwin-arm64:aarch64-macos:"
     "darwin-x64:x86_64-macos:"
@@ -25,7 +25,7 @@ ALL_TARGETS=(
     "win32-arm64:aarch64-windows:.exe"
 )
 
-# ── 辅助函数 ──────────────────────────────────────────────────────────────────
+# ── Helper functions ─────────────────────────────────────────────────────────────
 
 log() { echo -e "\033[1;34m→\033[0m $*"; }
 ok()  { echo -e "\033[1;32m✓\033[0m $*"; }
@@ -51,7 +51,7 @@ detect_current_target() {
     echo "${os}-${arch}"
 }
 
-# ── 编译 ason-zig-lsp ────────────────────────────────────────────────────────
+# ── compile ason-zig-lsp ────────────────────────────────────────────────────────
 
 build_lsp() {
     local zig_target="$1" suffix="$2"
@@ -72,7 +72,7 @@ build_lsp() {
     ok "Built: $output ($(du -h "$output" | awk '{print $1}'))"
 }
 
-# ── 打包 vsix ─────────────────────────────────────────────────────────────────
+# ── package vsix ─────────────────────────────────────────────────────────────────
 
 package_vsix() {
     local target="$1"
@@ -85,7 +85,7 @@ package_vsix() {
     ok "Packaged: ${target}"
 }
 
-# ── 编译 TypeScript ──────────────────────────────────────────────────────────
+# ── compile TypeScript ──────────────────────────────────────────────────────────
 
 compile_ts() {
     log "Installing npm dependencies ..."
@@ -95,13 +95,13 @@ compile_ts() {
     ok "TypeScript compiled."
 }
 
-# ── 清理 ──────────────────────────────────────────────────────────────────────
+# ── clean ──────────────────────────────────────────────────────────────────────
 
 clean_server() {
     rm -rf "$SERVER_DIR"
 }
 
-# ── 主流程 ────────────────────────────────────────────────────────────────────
+# ── main ───────────────────────────────────────────────────────────────────────
 
 main() {
     local mode="${1:-all}"
@@ -113,11 +113,11 @@ main() {
     echo "╚═══════════════════════════════════════════════════╝"
     echo ""
 
-    # 编译 TypeScript（只需一次）
+    # Compile TypeScript (only once)
     compile_ts
 
     if [[ "$mode" == "current" ]]; then
-        # 仅构建当前平台
+        # Build for current platform only
         local current
         current="$(detect_current_target)"
         log "Building for current platform: ${current}"
@@ -139,7 +139,7 @@ main() {
         fi
 
     elif [[ "$mode" == "all" ]]; then
-        # 构建所有平台
+        # Build for all platforms
         for entry in "${ALL_TARGETS[@]}"; do
             IFS=':' read -r target zig_target suffix <<< "$entry"
             clean_server
@@ -149,7 +149,7 @@ main() {
         done
 
     else
-        # 构建指定平台
+        # Build for specified platform
         for entry in "${ALL_TARGETS[@]}"; do
             IFS=':' read -r target zig_target suffix <<< "$entry"
             if [[ "$target" == "$mode" ]]; then
@@ -172,7 +172,7 @@ main() {
         fi
     fi
 
-    # 清理最后一次的 server/ 目录
+    # clean the last server/ directory
     clean_server
 
     echo ""

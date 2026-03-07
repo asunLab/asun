@@ -55,7 +55,7 @@ See the full [Rust guide](/languages/rust).
 ### Installation
 
 ```bash
-go get github.com/your-org/ason/go
+go get github.com/ason-lab/ason/go
 ```
 
 ### Quickstart
@@ -65,7 +65,7 @@ package main
 
 import (
     "fmt"
-    "github.com/your-org/ason/go"
+    "github.com/ason-lab/ason/go"
 )
 
 type User struct {

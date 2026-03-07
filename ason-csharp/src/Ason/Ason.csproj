@@ -8,7 +8,7 @@
     <PackageId>Ason</PackageId>
     <Version>0.1.0</Version>
     <Description>High-performance ASON (Array-Schema Object Notation) encoder/decoder for .NET. Zero-copy binary, schema-driven text format.</Description>
-    <RepositoryUrl>https://github.com/athxx/ason</RepositoryUrl>
+    <RepositoryUrl>https://github.com/ason-lab/ason</RepositoryUrl>
     <License>MIT</License>
   </PropertyGroup>
 </Project>

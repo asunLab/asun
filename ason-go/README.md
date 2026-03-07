@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/go-1.24+-00ADD8.svg)](https://go.dev)
 
-A high-performance Marshal/Unmarshal library for [ASON](https://github.com/athxx/ason) (Array-Schema Object Notation) in Go — a token-efficient, schema-driven data format designed for LLM interactions and large-scale data transmission.
+A high-performance Marshal/Unmarshal library for [ASON](https://github.com/ason-lab/ason) (Array-Schema Object Notation) in Go — a token-efficient, schema-driven data format designed for LLM interactions and large-scale data transmission.
 
 **Zerocopy design, zero dependencies (stdlib only), extreme performance.**
 
@@ -357,7 +357,7 @@ go run examples/bench/main.go
 
 ## ASON Format Specification
 
-See the full [ASON Spec](https://github.com/athxx/ason/blob/main/docs/ASON_SPEC_CN.md) for syntax rules, BNF grammar, escape rules, type system, and LLM integration best practices.
+See the full [ASON Spec](https://github.com/ason-lab/ason/blob/main/docs/ASON_SPEC_CN.md) for syntax rules, BNF grammar, escape rules, type system, and LLM integration best practices.
 
 ### Syntax Quick Reference
 

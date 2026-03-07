@@ -13,7 +13,7 @@ cp /path/to/ason/python/ason.py ./ason.py
 或从仓库安装：
 
 ```bash
-pip install git+https://github.com/your-org/ason.git#subdirectory=python
+pip install git+https://github.com/ason-lab/ason.git#subdirectory=python
 ```
 
 ## 编码

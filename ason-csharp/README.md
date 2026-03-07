@@ -3,7 +3,7 @@
 [![NuGet](https://img.shields.io/nuget/v/Ason.svg)](https://www.nuget.org/packages/Ason)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A high-performance [ASON](https://github.com/athxx/ason) (Array-Schema Object Notation) serialization/deserialization library for .NET — zero-copy, SIMD-accelerated, schema-driven data format designed for LLM interactions and large-scale data transmission.
+A high-performance [ASON](https://github.com/ason-lab/ason) (Array-Schema Object Notation) serialization/deserialization library for .NET — zero-copy, SIMD-accelerated, schema-driven data format designed for LLM interactions and large-scale data transmission.
 
 [中文文档](README_CN.md)
 
@@ -270,7 +270,7 @@ dotnet run --project examples/Bench -c Release
 
 ## ASON Format Specification
 
-See the full [ASON Spec](https://github.com/athxx/ason/blob/main/docs/ASON_SPEC_CN.md) for syntax rules, BNF grammar, escape rules, type system, and LLM integration best practices.
+See the full [ASON Spec](https://github.com/ason-lab/ason/blob/main/docs/ASON_SPEC_CN.md) for syntax rules, BNF grammar, escape rules, type system, and LLM integration best practices.
 
 ### Syntax Quick Reference
 

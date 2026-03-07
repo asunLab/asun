@@ -181,7 +181,7 @@ export default defineConfig({
         nav: enNav,
         sidebar: enSidebar,
         editLink: {
-          pattern: 'https://github.com/your-org/ason/edit/main/tools/website/:path',
+          pattern: 'https://github.com/ason-lab/ason/edit/main/tools/website/:path',
           text: 'Edit this page on GitHub',
         },
         footer: {
@@ -200,7 +200,7 @@ export default defineConfig({
         nav: zhNav,
         sidebar: zhSidebar,
         editLink: {
-          pattern: 'https://github.com/your-org/ason/edit/main/tools/website/:path',
+          pattern: 'https://github.com/ason-lab/ason/edit/main/tools/website/:path',
           text: '在 GitHub 上编辑此页',
         },
         footer: {
@@ -229,7 +229,7 @@ export default defineConfig({
     siteTitle: 'ASON',
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/your-org/ason' },
+      { icon: 'github', link: 'https://github.com/ason-lab/ason' },
     ],
 
     search: {

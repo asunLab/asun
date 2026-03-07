@@ -5,7 +5,7 @@ The Go ASON library provides idiomatic, reflection-based encoding and decoding f
 ## Installation
 
 ```bash
-go get github.com/your-org/ason/go
+go get github.com/ason-lab/ason/go
 ```
 
 ## Text Format
@@ -15,7 +15,7 @@ package main
 
 import (
     "fmt"
-    "github.com/your-org/ason/go"
+    "github.com/ason-lab/ason/go"
 )
 
 type User struct {

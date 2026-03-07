@@ -3,7 +3,7 @@
 [![NuGet](https://img.shields.io/nuget/v/Ason.svg)](https://www.nuget.org/packages/Ason)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-高性能 [ASON](https://github.com/athxx/ason)（Array-Schema Object Notation）.NET 序列化/反序列化库 — 零拷贝、SIMD 加速、模式驱动的数据格式，专为 LLM 交互和大规模数据传输设计。
+高性能 [ASON](https://github.com/ason-lab/ason)（Array-Schema Object Notation）.NET 序列化/反序列化库 — 零拷贝、SIMD 加速、模式驱动的数据格式，专为 LLM 交互和大规模数据传输设计。
 
 [English](README.md)
 
@@ -270,7 +270,7 @@ dotnet run --project examples/Bench -c Release
 
 ## ASON 格式规范
 
-请参阅完整的 [ASON 规范](https://github.com/athxx/ason/blob/main/docs/ASON_SPEC_CN.md)，了解语法规则、BNF 文法、转义规则、类型系统和 LLM 集成最佳实践。
+请参阅完整的 [ASON 规范](https://github.com/ason-lab/ason/blob/main/docs/ASON_SPEC_CN.md)，了解语法规则、BNF 文法、转义规则、类型系统和 LLM 集成最佳实践。
 
 ### 语法快速参考
 

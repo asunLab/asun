@@ -9,7 +9,7 @@ Add to `build.zig.zon`:
 ```zig
 .dependencies = .{
     .ason = .{
-        .url = "https://github.com/your-org/ason/archive/refs/heads/main.tar.gz",
+        .url = "https://github.com/ason-lab/ason/archive/refs/heads/main.tar.gz",
     },
 },
 ```

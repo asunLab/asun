@@ -5,7 +5,7 @@ Go ASON 库通过反射提供惯用的编解码 API，支持 ASON Text 和 ASON-
 ## 安装
 
 ```bash
-go get github.com/your-org/ason/go
+go get github.com/ason-lab/ason/go
 ```
 
 ## 文本格式
@@ -15,7 +15,7 @@ package main
 
 import (
     "fmt"
-    "github.com/your-org/ason/go"
+    "github.com/ason-lab/ason/go"
 )
 
 type User struct {

@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/go-1.24+-00ADD8.svg)](https://go.dev)
 
-高性能 [ASON](https://github.com/athxx/ason)（Array-Schema Object Notation）Go 序列化/反序列化库 —— 面向 LLM 交互和大规模数据传输的高效序列化格式。
+高性能 [ASON](https://github.com/ason-lab/ason)（Array-Schema Object Notation）Go 序列化/反序列化库 —— 面向 LLM 交互和大规模数据传输的高效序列化格式。
 
 **零拷贝设计，零外部依赖（仅标准库），极致性能。**
 
@@ -355,7 +355,7 @@ go run examples/bench/main.go
 
 ## ASON 格式规范
 
-完整的 [ASON 规范](https://github.com/athxx/ason/blob/main/docs/ASON_SPEC_CN.md) 包含语法规则、BNF 文法、转义规则、类型系统及 LLM 集成最佳实践。
+完整的 [ASON 规范](https://github.com/ason-lab/ason/blob/main/docs/ASON_SPEC_CN.md) 包含语法规则、BNF 文法、转义规则、类型系统及 LLM 集成最佳实践。
 
 ### 语法速查表
 

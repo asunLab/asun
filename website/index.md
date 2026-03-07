@@ -17,7 +17,7 @@ hero:
       link: /guide/why-ason
     - theme: alt
       text: View on GitHub
-      link: https://github.com/your-org/ason
+      link: https://github.com/ason-lab/ason
 
 features:
   - icon: 🚀
@@ -94,7 +94,7 @@ serde = { version = "1", features = ["derive"] }
 ```
 
 ```bash [Go]
-go get github.com/your-org/ason/go
+go get github.com/ason-lab/ason/go
 ```
 
 ```bash [Python]

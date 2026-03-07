@@ -55,7 +55,7 @@ fn main() -> Result<()> {
 ### 安装
 
 ```bash
-go get github.com/your-org/ason/go
+go get github.com/ason-lab/ason/go
 ```
 
 ### 快速示例
@@ -65,7 +65,7 @@ package main
 
 import (
     "fmt"
-    "github.com/your-org/ason/go"
+    "github.com/ason-lab/ason/go"
 )
 
 type User struct {
