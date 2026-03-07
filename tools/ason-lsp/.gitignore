@@ -1,7 +1,0 @@
-# Binary
-ason-lsp
-main
-
-# Test binaries
-*.test
-*.out
