@@ -1,0 +1,42 @@
+[submodule "ason-c"]
+	path = ason-c
+	url = https://athxx@github.com/ason-lab/ason-c.git
+[submodule "ason-cpp"]
+	path = ason-cpp
+	url = https://athxx@github.com/ason-lab/ason-cpp.git
+[submodule "ason-cs"]
+	path = ason-cs
+	url = https://athxx@github.com/ason-lab/ason-cs.git
+[submodule "ason-dart"]
+	path = ason-dart
+	url = https://athxx@github.com/ason-lab/ason-dart.git
+[submodule "ason-go"]
+	path = ason-go
+	url = https://athxx@github.com/ason-lab/ason-go.git
+[submodule "ason-java"]
+	path = ason-java
+	url = https://athxx@github.com/ason-lab/ason-java.git
+[submodule "ason-js"]
+	path = ason-js
+	url = https://athxx@github.com/ason-lab/ason-js.git
+[submodule "ason-py"]
+	path = ason-py
+	url = https://athxx@github.com/ason-lab/ason-py.git
+[submodule "ason-rs"]
+	path = ason-rs
+	url = https://athxx@github.com/ason-lab/ason-rs.git
+[submodule "ason-zig"]
+	path = ason-zig
+	url = https://athxx@github.com/ason-lab/ason-zig.git
+[submodule "js-format"]
+	path = js-format
+	url = https://athxx@github.com/ason-lab/js-format.git
+[submodule "lsp-ason"]
+	path = lsp-ason
+	url = https://athxx@github.com/ason-lab/lsp-ason.git
+[submodule "plugin_vscode"]
+	path = plugin_vscode
+	url = https://athxx@github.com/ason-lab/plugin_vscode.git
+[submodule "website"]
+	path = website
+	url = https://athxx@github.com/ason-lab/website.git
