@@ -1,8 +1,0 @@
-.vscode-test
-src/**
-scripts/**
-**/*.ts
-!**/*.d.ts
-tsconfig.json
-.gitignore
-*.vsix
