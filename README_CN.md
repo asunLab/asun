@@ -1,299 +1,171 @@
 # ASON — Array-Schema Object Notation
 
-> _"The efficiency of arrays, the structure of objects."_
-> _"数组的效率，对象的结构。"_
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-ASON 是一种为大规模数据传输与 LLM（大语言模型）交互专门设计的高性能序列化格式。
-通过 **Schema 与数据分离** 的设计，ASON 彻底消除了 JSON 中冗余的 Key 重复，
-引入类 Markdown 的行导向语法，在极致压缩 Token 的同时保持优秀的人类可读性。
+**ASON** 是一种紧凑的、Schema 驱动的数据格式，专为 **LLM 交互**与**高性能数据传输**而设计。它将 Schema 与数据分离 —— Key 只声明一次，数据行仅保留纯值。
+
+[English](README.md)
 
 ---
 
 ## 为什么选择 ASON？
 
-### Token 效率
+标准 JSON 在每条记录中都重复所有字段名。向 LLM 发送结构化数据集或在网络上传输时，这种冗余会大量消耗 Token 和带宽：
 
 ```json
-// JSON — 100 tokens
-{
-  "users": [
-    { "id": 1, "name": "Alice", "active": true },
-    { "id": 2, "name": "Bob", "active": false }
-  ]
-}
+[
+  {"id": 1, "name": "Alice", "active": true},
+  {"id": 2, "name": "Bob",   "active": false},
+  {"id": 3, "name": "Carol", "active": true}
+]
 ```
 
-```ason
-// ASON — ~35 tokens（节省 65%）
-[{id:int, name:str, active:bool}]:
-  (1, Alice, true),
-  (2, Bob,   false)
+ASON 只声明 **一次** Schema，数据以紧凑元组方式流式传输：
+
+```
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false),(3,Carol,true)
 ```
 
-### 性能对比 JSON
-
-| 指标         | ASON 文本       | ASON-BIN 二进制 |
-| ------------ | --------------- | --------------- |
-| 序列化速度   | **快 2–4×**     | **快 7–10×**    |
-| 反序列化速度 | **快 1.2–2.5×** | **快 2–2.5×**   |
-| 数据大小     | **小 53–61%**   | **小 38–49%**   |
+**减少约 65% 的 Token，信息量不变，Schema 机器可读。**
 
 ---
 
-## 安装
+## ASON vs JSON
 
-在 `Cargo.toml` 中添加：
+| 方面               | JSON              | ASON                      |
+| ------------------ | ----------------- | ------------------------- |
+| Token 效率         | 100%（基准）      | **30–70%** ✓              |
+| Key 重复           | 每个对象都有      | 声明一次 ✓                |
+| 类型注解           | 无                | 可选 ✓                    |
+| 人类可读           | 是                | 是 ✓                      |
+| 嵌套结构           | ✓                 | ✓                         |
+| 序列化速度         | 1×                | **~1.7–2.4× 更快** ✓     |
+| 反序列化速度       | 1×                | **~1.9–2.9× 更快** ✓     |
+| 数据体积           | 100%（基准）      | **40–60%** ✓              |
+| 二进制编解码       | ✗                 | ✓                         |
+| 结构体反射         | ✗                 | 编译期 ✓                  |
 
-```toml
-[dependencies]
-ason = { path = "rust" }   # 本地引用
-serde = { version = "1", features = ["derive"] }
+### Token 节省 —— 具体示例
+
 ```
+JSON（100 tokens）：
+{"users":[{"id":1,"name":"Alice","active":true},{"id":2,"name":"Bob","active":false}]}
+
+ASON（~35 tokens，节省 65%）：
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
+```
+
+Schema 头部同时充当 LLM 的内联提示 —— 字段名和可选类型一目了然，无需扫描每一行。
 
 ---
 
-## 文本格式 API
+## ASON vs TOON
 
-### 数据类型
+[TOON（Token-Oriented Object Notation）](https://toonformat.dev) 是另一种旨在减少 LLM Prompt 中 Token 的格式。ASON 和 TOON 都以消除对象数组中 Key 重复为核心理念，但在设计目标和适用范围上有显著不同。
 
-| 类型         | 示例            | 说明                       |
-| ------------ | --------------- | -------------------------- |
-| 整数         | `42`, `-100`    | i64 范围                   |
-| 浮点         | `3.14`, `-0.5`  | IEEE 754 双精度            |
-| 布尔         | `true`, `false` | 必须小写                   |
-| 空值         | _(空白)_        | 逗号间无内容 = null        |
-| 无引号字符串 | `Alice Smith`   | 自动 trim，需转义 `,()[]\` |
-| 有引号字符串 | `" 空格 "`      | 保留原样（含空格）         |
-| 数组         | `[a, b, c]`     | 嵌套列表                   |
-| 嵌套结构体   | `{...}:(...)`   | 递归 Schema                |
+### 语法对比
 
-### `StructSchema` trait
-
-ASON 使用编译期 Schema trait 让序列化器知道字段名和类型：
-
-```rust
-use ason::{Result, StructSchema, from_str, from_str_vec, to_string, to_string_vec};
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-struct User {
-    id: i64,
-    name: String,
-    active: bool,
-}
-
-impl StructSchema for User {
-    fn field_names() -> &'static [&'static str] { &["id", "name", "active"] }
-    fn field_types() -> &'static [&'static str] { &["int", "str", "bool"] }
-    fn serialize_fields(&self, ser: &mut ason::serialize::Serializer) -> Result<()> {
-        use serde::Serialize;
-        self.id.serialize(&mut *ser)?;
-        self.name.serialize(&mut *ser)?;
-        self.active.serialize(&mut *ser)?;
-        Ok(())
-    }
-}
+**TOON** —— 基于缩进，YAML 风格：
+```
+users[2]{id,name,active}:
+  1,Alice,true
+  2,Bob,false
 ```
 
-### 序列化
-
-```rust
-// 单结构体  →  "{id,name,active}:(1,Alice,true)"
-let s = to_string(&user)?;
-
-// Vec<T>  →  "{id,name,active}:\n  (1,Alice,true),\n  (2,Bob,false)"
-let s = to_string_vec(&users)?;
-
-// 带类型注解
-let s = to_string_typed(&user)?;       // "{id:int,name:str,active:bool}:..."
-let s = to_string_vec_typed(&users)?;
+**ASON** —— 基于元组，Schema 显式：
+```
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
-### 反序列化
+### 对比表
 
-```rust
-// 单结构体（接受带注解和不带注解的格式）
-let user: User = from_str("{id,name,active}:(1,Alice,true)")?;
+| 方面               | TOON                                     | ASON                                                           |
+| ------------------ | ---------------------------------------- | -------------------------------------------------------------- |
+| Schema 声明        | 编码时自动检测                           | 显式声明，可复用，语言级别 ✓                                   |
+| 类型注解           | 无（仅 JSON 数据模型）                   | 丰富可选类型（`int`、`str`、`bool`、`f64`、`opt_*`、`vec_*`、`map_*`）✓ |
+| 语法风格           | YAML 风格缩进                            | 紧凑元组行                                                     |
+| 数组长度标记       | `[N]` —— 有助于检测截断                  | Schema 头部定义结构 ✓                                          |
+| 嵌套结构           | 退化为冗长的列表格式                     | 原生高效，递归支持 ✓                                           |
+| 适用场景           | 仅 LLM 输入（只读转换层）                | LLM + 序列化 + 数据传输 ✓                                      |
+| 序列化性能         | 未测试（仅 JS）                          | SIMD 加速，约 1.7–2.9× vs JSON ✓                               |
+| 反序列化性能       | 未测试（仅 JS）                          | 零拷贝解析 ✓                                                   |
+| 二进制编解码       | ✗                                        | ✓                                                              |
+| 语言实现           | 仅 TypeScript / JavaScript               | **C、C++、C#、Go、Java、JS、Python、Rust、Zig、Dart** ✓        |
+| 结构体反射         | 动态（仅运行时）                         | 编译期（`ASON_FIELDS` 宏）✓                                    |
+| 深层嵌套数据       | Token 开销显著增加                       | 任意嵌套层级均高效 ✓                                           |
+| 往返保真度         | JSON 数据模型（无类型信息）              | 完整类型保真 ✓                                                 |
 
-// Vec<T>
-let users: Vec<User> = from_str_vec(&s)?;
-```
+### 何时选择 ASON
+
+- 需要在编译型语言（C、C++、Rust、Go……）中实现**高性能序列化**
+- 数据具有**丰富类型** —— 可选字段、类型化向量、Map、嵌套结构体
+- 除文本格式外还需要**二进制编码**
+- 跨**多种语言**工作，或需要与语言无关的线路格式
+- 希望 Schema 作为面向 LLM Prompt 的**自文档化 API 契约**
+
+### TOON 足够用的场景
+
+- 仅使用 **TypeScript / JavaScript**
+- 流程**仅为 LLM Prompt 输入**（不需要将结果解析回结构体）
+- 数据是无类型约束的简单平表
 
 ---
 
-## 二进制格式（ASON-BIN）
+## 格式概览
 
-ASON-BIN 是对任意 `serde` 兼容类型的紧凑二进制编码。它提供最大幅度的性能提升，
-非常适合内部服务通信、缓存和存储场景。
+### 单个对象
 
-### API
-
-```rust
-use ason::{to_bin, to_bin_vec, from_bin, from_bin_vec};
+```
+{id:int, name:str, active:bool}:(42,Alice,true)
 ```
 
-| 函数           | 签名                                  | 说明                               |
-| -------------- | ------------------------------------- | ---------------------------------- |
-| `to_bin`       | `(value: &T) -> Result<Vec<u8>>`      | 将任意 `T: Serialize` 序列化为字节 |
-| `from_bin`     | `(data: &'de [u8]) -> Result<T>`      | 零拷贝反序列化（字符串直接切片）   |
-| `to_bin_vec`   | `(values: &[T]) -> Result<Vec<u8>>`   | 将 slice 序列化为字节              |
-| `from_bin_vec` | `(data: &'de [u8]) -> Result<Vec<T>>` | 从字节反序列化序列                 |
+### 对象数组（Schema 驱动）
 
-### 使用示例
+Schema 声明一次，每条数据为元组：
 
-```rust
-use ason::{from_bin, from_bin_vec, to_bin, to_bin_vec};
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-struct User {
-    id: i64,
-    name: String,
-    active: bool,
-}
-
-fn main() -> ason::Result<()> {
-    // 单值
-    let user = User { id: 1, name: "Alice".into(), active: true };
-    let bytes = to_bin(&user)?;
-    let restored: User = from_bin(&bytes)?;
-    assert_eq!(user, restored);
-
-    // Vec
-    let users = vec![
-        User { id: 1, name: "Alice".into(), active: true },
-        User { id: 2, name: "Bob".into(),   active: false },
-    ];
-    let bytes = to_bin_vec(&users)?;
-    let restored: Vec<User> = from_bin_vec(&bytes)?;
-    assert_eq!(users, restored);
-
-    Ok(())
-}
+```
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false),(3,Carol,true)
 ```
 
-### 零拷贝反序列化
+### 嵌套结构体
 
-当结构体字段使用 `'de` 生命周期时，`from_bin` 直接返回指向输入缓冲区的字符串切片——
-无需为字符串字段分配堆内存：
-
-```rust
-#[derive(Debug, Deserialize)]
-struct BorrowedUser<'a> {
-    id: i64,
-    name: &'a str,   // 零拷贝 — 直接指向输入字节
-    active: bool,
-}
-
-let bytes = to_bin(&User { id: 1, name: "Alice".into(), active: true })?;
-let u: BorrowedUser = from_bin(&bytes)?;
-// u.name 是指向 `bytes` 的 &str 切片，无 String 分配
+```
+{name:str, dept}:(Alice,(Engineering))
 ```
 
-### 二进制格式规范
+### 可选字段
 
-所有整数均为**小端序（LE）**。字符串使用长度前缀（u32 LE + UTF-8 字节）。
+```
+{id:int, label:opt_str}:(1,hello),(2,)
+```
+*（空值 = `None` / `null`）*
 
-| 类型             | 编码格式                           |
-| ---------------- | ---------------------------------- |
-| `bool`           | 1 字节（0/1）                      |
-| `i8` / `u8`      | 1 字节                             |
-| `i16` / `u16`    | 2 字节 LE                          |
-| `i32` / `u32`    | 4 字节 LE                          |
-| `i64` / `u64`    | 8 字节 LE                          |
-| `f32`            | 4 字节 IEEE 754 LE                 |
-| `f64`            | 8 字节 IEEE 754 LE                 |
-| `char`           | 4 字节（u32 码点 LE）              |
-| `str` / `String` | `[u32 长度][UTF-8 字节]`           |
-| `Option<T>`      | `[u8 标记: 0=None / 1=Some][载荷]` |
-| `Vec<T>` / 序列  | `[u32 元素数][元素...]`            |
-| `HashMap` / 映射 | `[u32 对数][键 值 对...]`          |
-| `struct`         | 字段按声明顺序，无前缀             |
-| `tuple`          | 元素按顺序，无前缀                 |
-| `enum`           | `[u32 变体索引][载荷]`             |
-| `unit`           | 0 字节                             |
+### 类型化向量与 Map
 
-### 性能测试数据（Apple M 系列芯片，release 构建）
-
-**扁平结构体（8 字段）**
-
-| 测试            | JSON      | ASON 文本 | ASON-BIN     | BIN vs JSON |
-| --------------- | --------- | --------- | ------------ | ----------- |
-| 序列化 × 1000   | 2.19 ms   | 1.07 ms   | **0.28 ms**  | **快 7.7×** |
-| 反序列化 × 1000 | 6.05 ms   | 5.10 ms   | **2.96 ms**  | **快 2.0×** |
-| 数据大小 × 1000 | 121,675 B | 56,716 B  | **74,454 B** | 小 39%      |
-
-**深层嵌套结构体（5 层嵌套，× 100）**
-
-| 测试           | JSON      | ASON 文本 | ASON-BIN      | BIN vs JSON |
-| -------------- | --------- | --------- | ------------- | ----------- |
-| 序列化 × 100   | 4.19 ms   | 2.67 ms   | **0.50 ms**   | **快 8.4×** |
-| 反序列化 × 100 | 9.37 ms   | 8.55 ms   | **3.72 ms**   | **快 2.5×** |
-| 数据大小 × 100 | 438,112 B | 174,611 B | **225,434 B** | 小 49%      |
-
-**单次往返（User 结构体，× 100,000）**
-
-| 格式      | 每次耗时 | vs JSON     |
-| --------- | -------- | ----------- |
-| ASON-BIN  | ~182 ns  | **快 2.1×** |
-| JSON      | ~375 ns  | —           |
-| ASON 文本 | ~552 ns  | 慢 0.7×     |
-
-### SIMD 加速
-
-`to_bin` 使用平台 SIMD 指令（ARM 上的 NEON，x86-64 上的 SSE2），在 `simd_bulk_extend`
-函数中以 16 字节块批量复制 ≥ 32 字节的字符串载荷，避免标量逐字节循环。
-
----
-
-## 运行示例
-
-```bash
-# 基础用法
-cargo run --release --example basic
-
-# 二进制格式（零拷贝演示、格式解析、性能测试）
-cargo run --release --example binary
-
-# 综合性能测试套件（共 9 个测试节）
-cargo run --release --example bench
-
-# 复杂嵌套结构
-cargo run --release --example complex
+```
+{name:str, tags:vec_str, attrs:map_si}:(Alice,[rust,go,python],[(age,30),(score,95)])
 ```
 
 ---
 
-## ASON 文本格式语法
+## 各语言实现
 
-```ason
-// 单结构体
-{id, name, active}:(1, Alice, true)
-
-// 结构体数组（Schema 只声明一次，必须使用方括号包裹）
-[{id:int, name:str, active:bool}]:
-  (1, Alice, true),
-  (2, Bob,   false),
-  (3, Carol, true)
-
-// 嵌套结构体
-[{id:int, address:{city:str, zip:str}}]:
-  (1, (Berlin, 10115)),
-  (2, (Paris,  75001))
-
-// 嵌套数组
-[{id:int, tags:[str]}]:
-  (1, [rust, go]),
-  (2, [python])
-
-// 枚举值
-Role::Admin
-
-// Option（空槽 = None）
-[{id, name, score}]:
-  (1, Alice, 9.5),
-  (2, Bob,      )   ← score 为 None
-```
+| 语言       | 仓库                    | 备注                                 |
+| ---------- | ----------------------- | ------------------------------------ |
+| C          | [ason-c](ason-c/)       | C11, SIMD（NEON/SSE2）零拷贝  |
+| C++        | [ason-cpp](ason-cpp/)   | C++17,Header-only, SIMD       |
+| C#         | [ason-cs](ason-cs/)     | .NET, SIMD                    |
+| Go         | [ason-go](ason-go/)     |                               |
+| Java       | [ason-java](ason-java/) |                               |
+| JavaScript | [ason-js](ason-js/)     |                               |
+| Python     | [ason-py](ason-py/)     |                               |
+| Rust       | [ason-rs](ason-rs/)     |                               |
+| Zig        | [ason-zig](ason-zig/)   |                               |
+| Dart       | [ason-dart](ason-dart/) |                               |
+| Swift      | [ason-swift](ason-swift/) |   TODO                      |
+| PHP       | [ason-php](ason-php/) |      TODO                        |
+| Kotlin       | [ason-dart](ason-kt/) |    TODO                       |
+| TypeScript  | [ason-dart](ason-ts/) |    TODO                        |
 
 ---
 
