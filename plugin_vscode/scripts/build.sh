@@ -11,8 +11,16 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-LSP_DIR="$(cd "$PLUGIN_DIR/../ason-zig-lsp" && pwd)"
+LSP_DIR="$(cd "$PLUGIN_DIR/../lsp-ason" && pwd)"
 SERVER_DIR="$PLUGIN_DIR/server"
+
+if [[ ! -d "$LSP_DIR" ]]; then
+    git clone --depth 1 https://github.com/ason-lab/lsp-ason.git "$LSP_DIR"
+    if [[ ! -d "$LSP_DIR" ]]; then
+        echo "Error: LSP directory not found at $LSP_DIR" >&2
+        exit 1
+    fi
+fi
 
 # ── Platform definitions ─────────────────────────────────────────────────────────
 # Format: "vscode-target:zig-target:binary-suffix"
@@ -51,14 +59,14 @@ detect_current_target() {
     echo "${os}-${arch}"
 }
 
-# ── compile ason-zig-lsp ────────────────────────────────────────────────────────
+# ── compile lsp-ason ────────────────────────────────────────────────────────
 
 build_lsp() {
     local zig_target="$1" suffix="$2"
-    local output="$SERVER_DIR/ason-zig-lsp${suffix}"
+    local output="$SERVER_DIR/lsp-ason${suffix}"
     local prefix="$LSP_DIR/zig-out-${zig_target}"
 
-    log "Compiling ason-zig-lsp for ${zig_target} ..."
+    log "Compiling lsp-ason for ${zig_target} ..."
     mkdir -p "$SERVER_DIR"
 
     (
@@ -66,7 +74,7 @@ build_lsp() {
         zig build -Dtarget="${zig_target}" --release=safe -p "$prefix"
     )
 
-    cp "$prefix/bin/ason-zig-lsp${suffix}" "$output"
+    cp "$prefix/bin/lsp-ason${suffix}" "$output"
     rm -rf "$prefix"
 
     ok "Built: $output ($(du -h "$output" | awk '{print $1}'))"

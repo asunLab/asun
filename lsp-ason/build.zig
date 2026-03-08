@@ -12,7 +12,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const exe = b.addExecutable(.{
-        .name = "ason-zig-lsp",
+        .name = "lsp-ason",
         .root_module = src_mod,
     });
     b.installArtifact(exe);

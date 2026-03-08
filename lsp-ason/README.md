@@ -1,6 +1,6 @@
-# ason-zig-lsp
+# lsp-ason
 
-`ason-zig-lsp` is the Zig-based language server for ASON. It also acts as the shared runtime for editor-facing utilities such as formatting, compression, and ASON/JSON conversion.
+`lsp-ason` is the Zig-based language server for ASON. It also acts as the shared runtime for editor-facing utilities such as formatting, compression, and ASON/JSON conversion.
 
 ## What It Does
 
@@ -42,14 +42,14 @@ The minimum Zig version comes from `build.zig.zon`.
 Build the native binary for your current platform:
 
 ```bash
-cd lsp
+cd lsp-ason
 zig build
 ```
 
 Output:
 
 ```text
-zig-out/bin/ason-zig-lsp
+zig-out/bin/lsp-ason
 ```
 
 Build an optimized release binary:
@@ -70,19 +70,19 @@ zig build -Dtarget=aarch64-macos --release=safe
 If no transform flag is provided, the binary starts the LSP server over stdio.
 
 ```bash
-./zig-out/bin/ason-zig-lsp
+./zig-out/bin/lsp-ason
 ```
 
 You can also pass the compatibility flag explicitly:
 
 ```bash
-./zig-out/bin/ason-zig-lsp --stdio
+./zig-out/bin/lsp-ason --stdio
 ```
 
 Check the version:
 
 ```bash
-./zig-out/bin/ason-zig-lsp --version
+./zig-out/bin/lsp-ason --version
 ```
 
 ## CLI Utilities
@@ -92,25 +92,25 @@ The same binary can be used as a filter that reads from stdin and writes to stdo
 Format:
 
 ```bash
-printf '%s\n' '{name:str,age:int}:(Alice,30)' | ./zig-out/bin/ason-zig-lsp --format
+printf '%s\n' '{name:str,age:int}:(Alice,30)' | ./zig-out/bin/lsp-ason --format
 ```
 
 Compress:
 
 ```bash
-printf '%s\n' '{name:str, age:int}:\n  (Alice, 30)' | ./zig-out/bin/ason-zig-lsp --compress
+printf '%s\n' '{name:str, age:int}:\n  (Alice, 30)' | ./zig-out/bin/lsp-ason --compress
 ```
 
 ASON to JSON:
 
 ```bash
-printf '%s\n' '{name:str,age:int}:(Alice,30)' | ./zig-out/bin/ason-zig-lsp --to-json
+printf '%s\n' '{name:str,age:int}:(Alice,30)' | ./zig-out/bin/lsp-ason --to-json
 ```
 
 JSON to ASON:
 
 ```bash
-printf '%s\n' '{"name":"Alice","age":30}' | ./zig-out/bin/ason-zig-lsp --from-json
+printf '%s\n' '{"name":"Alice","age":30}' | ./zig-out/bin/lsp-ason --from-json
 ```
 
 ## Test
@@ -118,7 +118,7 @@ printf '%s\n' '{"name":"Alice","age":30}' | ./zig-out/bin/ason-zig-lsp --from-js
 Run the unit and integration-style tests:
 
 ```bash
-cd lsp
+cd lsp-ason
 zig build test
 ```
 
@@ -127,7 +127,7 @@ zig build test
 Build the WebAssembly artifact:
 
 ```bash
-cd lsp
+cd lsp-ason
 zig build wasm
 ```
 
@@ -136,6 +136,8 @@ Expected output:
 ```text
 zig-out/wasm/ason-lsp.wasm
 ```
+
+The native executable is named `lsp-ason`, while the current WASM artifact is still named `ason-lsp.wasm`.
 
 The WASM target exposes helpers for:
 
@@ -150,7 +152,7 @@ The WASM target exposes helpers for:
 
 The extension under `../plugin_vscode` launches this binary over stdio. In practice, packaging usually works like this:
 
-1. Build `ason-zig-lsp`
+1. Build `lsp-ason`
 2. Copy the binary into `plugin_vscode/server/`
 3. Start it from the extension host with `-stdio`
 
@@ -163,7 +165,7 @@ The extension also uses `workspace/executeCommand` to call:
 ## Project Layout
 
 ```text
-lsp/
+lsp-ason/
 ├── build.zig
 ├── build.zig.zon
 ├── src/
@@ -182,4 +184,5 @@ lsp/
 
 - The default transport is stdio.
 - Diagnostics include both parse errors and semantic checks.
-- This directory is the canonical place for the Zig LSP implementation; editor packaging should treat it as the source of the `ason-zig-lsp` binary.
+- This directory is the canonical place for the Zig LSP implementation; editor packaging should treat it as the source of the `lsp-ason` binary.
+- The current WASM output filename is `ason-lsp.wasm`, which differs from the native executable name.

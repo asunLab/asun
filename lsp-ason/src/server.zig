@@ -9,13 +9,13 @@ const features = @import("features.zig");
 // ── SemanticToken types / modifiers ───────────────────────────────────────────
 // Types: keyword=0, type=1, variable=2, string=3, number=4, comment=5, operator=6, parameter=7
 
-const SEM_KEYWORD   = 0;
-const SEM_TYPE      = 1;
-const SEM_VARIABLE  = 2;
-const SEM_STRING    = 3;
-const SEM_NUMBER    = 4;
-const SEM_COMMENT   = 5;
-const SEM_OPERATOR  = 6;
+const SEM_KEYWORD = 0;
+const SEM_TYPE = 1;
+const SEM_VARIABLE = 2;
+const SEM_STRING = 3;
+const SEM_NUMBER = 4;
+const SEM_COMMENT = 5;
+const SEM_OPERATOR = 6;
 const SEM_PARAMETER = 7;
 
 // ── JSON helpers ───────────────────────────────────────────────────────────────
@@ -44,9 +44,9 @@ pub const Server = struct {
     pub fn init(alloc: std.mem.Allocator) Server {
         return .{
             .alloc = alloc,
-            .docs  = std.StringHashMap(Document).init(alloc),
-            .in    = std.fs.File.stdin(),
-            .out   = std.fs.File.stdout(),
+            .docs = std.StringHashMap(Document).init(alloc),
+            .in = std.fs.File.stdin(),
+            .out = std.fs.File.stdout(),
         };
     }
 
@@ -218,7 +218,7 @@ pub const Server = struct {
         var result = std.json.ObjectMap.init(a);
         try result.put("capabilities", .{ .object = caps });
         var server_info = std.json.ObjectMap.init(a);
-        try server_info.put("name", .{ .string = "ason-zig-lsp" });
+        try server_info.put("name", .{ .string = "lsp-ason" });
         try server_info.put("version", .{ .string = "0.1.0" });
         try result.put("serverInfo", .{ .object = server_info });
 
@@ -243,7 +243,7 @@ pub const Server = struct {
         const text = if (text_v == .string) text_v.string else "";
 
         const doc = Document{
-            .uri  = try self.alloc.dupe(u8, uri),
+            .uri = try self.alloc.dupe(u8, uri),
             .text = try self.alloc.dupe(u8, text),
         };
         const result = try self.docs.getOrPut(doc.uri);
@@ -261,21 +261,21 @@ pub const Server = struct {
         const td = params.object.get("textDocument") orelse return;
         if (td != .object) return;
         const uri_v = td.object.get("uri") orelse return;
-        const uri   = if (uri_v == .string) uri_v.string else return;
+        const uri = if (uri_v == .string) uri_v.string else return;
         const changes = params.object.get("contentChanges") orelse return;
         if (changes != .array) return;
         if (changes.array.items.len == 0) return;
         const last = changes.array.items[changes.array.items.len - 1];
         if (last != .object) return;
         const text_v = last.object.get("text") orelse std.json.Value{ .string = "" };
-        const text   = if (text_v == .string) text_v.string else "";
+        const text = if (text_v == .string) text_v.string else "";
 
         if (self.docs.getPtr(uri)) |doc| {
             self.alloc.free(doc.text);
             doc.text = try self.alloc.dupe(u8, text);
         } else {
             const doc = Document{
-                .uri  = try self.alloc.dupe(u8, uri),
+                .uri = try self.alloc.dupe(u8, uri),
                 .text = try self.alloc.dupe(u8, text),
             };
             try self.docs.put(doc.uri, doc);
@@ -293,14 +293,20 @@ pub const Server = struct {
 
     fn handleHover(self: *Server, id: std.json.Value, params: std.json.Value, a: std.mem.Allocator) !void {
         const uri = getUri(params);
-        const doc = self.docs.get(uri) orelse { try self.sendResult(id, .null, a); return; };
+        const doc = self.docs.get(uri) orelse {
+            try self.sendResult(id, .null, a);
+            return;
+        };
         const pos = getPosition(params);
 
         var presult = try parser.parse(doc.text, a);
         defer presult.deinit();
 
         const text = try features.hoverInfo(presult.root, pos.line, pos.col, a);
-        if (text.len == 0) { try self.sendResult(id, .null, a); return; }
+        if (text.len == 0) {
+            try self.sendResult(id, .null, a);
+            return;
+        }
 
         var contents = std.json.ObjectMap.init(a);
         try contents.put("kind", .{ .string = "markdown" });
@@ -313,7 +319,10 @@ pub const Server = struct {
 
     fn handleCompletion(self: *Server, id: std.json.Value, params: std.json.Value, a: std.mem.Allocator) !void {
         const uri = getUri(params);
-        const doc = self.docs.get(uri) orelse { try self.sendResult(id, .{ .array = std.json.Array.init(a) }, a); return; };
+        const doc = self.docs.get(uri) orelse {
+            try self.sendResult(id, .{ .array = std.json.Array.init(a) }, a);
+            return;
+        };
         const pos = getPosition(params);
 
         var presult = try parser.parse(doc.text, a);
@@ -334,9 +343,15 @@ pub const Server = struct {
 
     fn handleFormatting(self: *Server, id: std.json.Value, params: std.json.Value, a: std.mem.Allocator) !void {
         const uri = getUri(params);
-        const doc = self.docs.get(uri) orelse { try self.sendResult(id, .null, a); return; };
+        const doc = self.docs.get(uri) orelse {
+            try self.sendResult(id, .null, a);
+            return;
+        };
 
-        const formatted = features.format(doc.text, a) catch { try self.sendResult(id, .null, a); return; };
+        const formatted = features.format(doc.text, a) catch {
+            try self.sendResult(id, .null, a);
+            return;
+        };
 
         // Return as a single "replace everything" text edit
         var edit = std.json.ObjectMap.init(a);
@@ -360,7 +375,10 @@ pub const Server = struct {
 
     fn handleSemanticTokens(self: *Server, id: std.json.Value, params: std.json.Value, a: std.mem.Allocator) !void {
         const uri = getUri(params);
-        const doc = self.docs.get(uri) orelse { try self.sendResult(id, .null, a); return; };
+        const doc = self.docs.get(uri) orelse {
+            try self.sendResult(id, .null, a);
+            return;
+        };
 
         var lexer = @import("lexer.zig").Lexer.init(doc.text);
         const toks = try lexer.all(a);
@@ -368,19 +386,19 @@ pub const Server = struct {
         // Encode as LSP relative semantic token data [deltaLine, deltaStart, len, tokenType, tokenMods]
         var data = ArrayList(i64).init(a);
         var prev_line: u32 = 0;
-        var prev_col:  u32 = 0;
+        var prev_col: u32 = 0;
 
         for (toks) |tok| {
             const tok_type: ?u32 = switch (tok.kind) {
                 .type_hint => SEM_TYPE,
-                .map_kw    => SEM_KEYWORD,
-                .ident     => SEM_VARIABLE,
-                .string    => SEM_STRING,
-                .number    => SEM_NUMBER,
-                .bool_val  => SEM_PARAMETER,
-                .comment   => SEM_COMMENT,
+                .map_kw => SEM_KEYWORD,
+                .ident => SEM_VARIABLE,
+                .string => SEM_STRING,
+                .number => SEM_NUMBER,
+                .bool_val => SEM_PARAMETER,
+                .comment => SEM_COMMENT,
                 .colon, .comma => SEM_OPERATOR,
-                else       => null,
+                else => null,
             };
             if (tok_type == null) continue;
 
@@ -393,7 +411,7 @@ pub const Server = struct {
             try data.append(@intCast(tok_type.?));
             try data.append(0); // no modifiers
             prev_line = tok.line;
-            prev_col  = tok.col;
+            prev_col = tok.col;
         }
 
         var arr = std.json.Array.init(a);
@@ -405,7 +423,10 @@ pub const Server = struct {
 
     fn handleInlayHint(self: *Server, id: std.json.Value, params: std.json.Value, a: std.mem.Allocator) !void {
         const uri = getUri(params);
-        const doc = self.docs.get(uri) orelse { try self.sendResult(id, .{ .array = std.json.Array.init(a) }, a); return; };
+        const doc = self.docs.get(uri) orelse {
+            try self.sendResult(id, .{ .array = std.json.Array.init(a) }, a);
+            return;
+        };
 
         var presult = try parser.parse(doc.text, a);
         defer presult.deinit();
@@ -426,10 +447,19 @@ pub const Server = struct {
     }
 
     fn handleExecuteCommand(self: *Server, id: std.json.Value, params: std.json.Value, a: std.mem.Allocator) !void {
-        if (params != .object) { try self.sendResult(id, .null, a); return; }
-        const cmd_v = params.object.get("command") orelse { try self.sendResult(id, .null, a); return; };
-        const cmd   = if (cmd_v == .string) cmd_v.string else { try self.sendResult(id, .null, a); return; };
-        const args  = params.object.get("arguments") orelse .null;
+        if (params != .object) {
+            try self.sendResult(id, .null, a);
+            return;
+        }
+        const cmd_v = params.object.get("command") orelse {
+            try self.sendResult(id, .null, a);
+            return;
+        };
+        const cmd = if (cmd_v == .string) cmd_v.string else {
+            try self.sendResult(id, .null, a);
+            return;
+        };
+        const args = params.object.get("arguments") orelse .null;
 
         // Extract first argument as a plain string (URI or raw text).
         // The extension sends arguments[0] as a plain string for all three commands.
@@ -449,18 +479,36 @@ pub const Server = struct {
 
         if (std.mem.eql(u8, cmd, "ason.compress")) {
             // arg0 = URI of an open ASON document
-            const doc = self.docs.get(arg0) orelse { try self.sendResult(id, .null, a); return; };
-            const out = features.compress(doc.text, a) catch { try self.sendResult(id, .null, a); return; };
+            const doc = self.docs.get(arg0) orelse {
+                try self.sendResult(id, .null, a);
+                return;
+            };
+            const out = features.compress(doc.text, a) catch {
+                try self.sendResult(id, .null, a);
+                return;
+            };
             try self.sendResult(id, .{ .string = out }, a);
         } else if (std.mem.eql(u8, cmd, "ason.toJSON")) {
             // arg0 = URI of an open ASON document
-            const doc = self.docs.get(arg0) orelse { try self.sendResult(id, .null, a); return; };
-            const out = features.asonToJson(doc.text, a) catch { try self.sendResult(id, .null, a); return; };
+            const doc = self.docs.get(arg0) orelse {
+                try self.sendResult(id, .null, a);
+                return;
+            };
+            const out = features.asonToJson(doc.text, a) catch {
+                try self.sendResult(id, .null, a);
+                return;
+            };
             try self.sendResult(id, .{ .string = out }, a);
         } else if (std.mem.eql(u8, cmd, "ason.fromJSON")) {
             // arg0 = raw JSON text (sent directly by the extension, not a URI)
-            if (arg0.len == 0) { try self.sendResult(id, .null, a); return; }
-            const out = features.jsonToAson(arg0, a) catch { try self.sendResult(id, .null, a); return; };
+            if (arg0.len == 0) {
+                try self.sendResult(id, .null, a);
+                return;
+            }
+            const out = features.jsonToAson(arg0, a) catch {
+                try self.sendResult(id, .null, a);
+                return;
+            };
             try self.sendResult(id, .{ .string = out }, a);
         } else {
             try self.sendResult(id, .null, a);
@@ -484,17 +532,17 @@ pub const Server = struct {
             var range = std.json.ObjectMap.init(a);
             var start = std.json.ObjectMap.init(a);
             var end_p = std.json.ObjectMap.init(a);
-            try start.put("line",      .{ .integer = @intCast(d.line) });
+            try start.put("line", .{ .integer = @intCast(d.line) });
             try start.put("character", .{ .integer = @intCast(d.col) });
-            try end_p.put("line",      .{ .integer = @intCast(d.end_line) });
+            try end_p.put("line", .{ .integer = @intCast(d.end_line) });
             try end_p.put("character", .{ .integer = @intCast(d.end_col) });
             try range.put("start", .{ .object = start });
-            try range.put("end",   .{ .object = end_p });
+            try range.put("end", .{ .object = end_p });
             try obj.put("range", .{ .object = range });
             const sev: i64 = if (d.severity == .err) 1 else if (d.severity == .warning) 2 else 3;
             try obj.put("severity", .{ .integer = sev });
-            try obj.put("message",  .{ .string = d.message });
-            try obj.put("source",   .{ .string = "ason-zig-lsp" });
+            try obj.put("message", .{ .string = d.message });
+            try obj.put("source", .{ .string = "lsp-ason" });
             try arr.append(.{ .object = obj });
         }
 
@@ -517,6 +565,6 @@ fn getPosition(params: std.json.Value) Pos {
     const c = pos.object.get("character") orelse std.json.Value{ .integer = 0 };
     return .{
         .line = @intCast(if (l == .integer) l.integer else 0),
-        .col  = @intCast(if (c == .integer) c.integer else 0),
+        .col = @intCast(if (c == .integer) c.integer else 0),
     };
 }

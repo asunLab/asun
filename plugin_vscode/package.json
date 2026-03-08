@@ -122,8 +122,8 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "lint": "eslint src --ext ts",
-    "build-lsp": "cd ../ason-zig-lsp && zig build -Drelease=true && mkdir -p ../vscode_plugin/server && cp zig-out/bin/ason-zig-lsp ../vscode_plugin/server/ason-zig-lsp",
-    "deploy-lsp": "npm run build-lsp && cp server/ason-zig-lsp \"$(node -e \"const p=require('path'),os=require('os'),f=require('fs');const ext=p.join(os.homedir(),'.vscode','extensions');const d=f.readdirSync(ext).find(x=>x.startsWith('ason.ason-vscode'));if(d){console.log(p.join(ext,d,'server','ason-zig-lsp'))}\")\""
+    "build-lsp": "cd ../lsp-ason && zig build -Drelease=true && mkdir -p ../plugin_vscode/server && cp zig-out/bin/lsp-ason ../plugin_vscode/server/lsp-ason",
+    "deploy-lsp": "npm run build-lsp && cp server/lsp-ason \"$(node -e \"const p=require('path'),os=require('os'),f=require('fs');const ext=p.join(os.homedir(),'.vscode','extensions');const d=f.readdirSync(ext).find(x=>x.startsWith('ason.ason-vscode'));if(d){console.log(p.join(ext,d,'server','lsp-ason'))}\")\""
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"

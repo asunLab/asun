@@ -1,6 +1,6 @@
-# ason-zig-lsp
+# lsp-ason
 
-`ason-zig-lsp` 是 ASON 的 Zig 版语言服务器，同时也是编辑器相关能力的公共运行时，包括格式化、压缩以及 ASON/JSON 双向转换。
+`lsp-ason` 是 ASON 的 Zig 版语言服务器，同时也是编辑器相关能力的公共运行时，包括格式化、压缩以及 ASON/JSON 双向转换。
 
 ## 作用
 
@@ -42,14 +42,14 @@ VS Code 插件当前会通过 `workspace/executeCommand` 调用这些命令：
 构建当前平台的本地二进制：
 
 ```bash
-cd lsp
+cd lsp-ason
 zig build
 ```
 
 输出位置：
 
 ```text
-zig-out/bin/ason-zig-lsp
+zig-out/bin/lsp-ason
 ```
 
 构建优化后的发布版本：
@@ -70,19 +70,19 @@ zig build -Dtarget=aarch64-macos --release=safe
 如果没有传入转换类参数，程序默认以 stdio 模式启动 LSP 服务。
 
 ```bash
-./zig-out/bin/ason-zig-lsp
+./zig-out/bin/lsp-ason
 ```
 
 也可以显式传入兼容参数：
 
 ```bash
-./zig-out/bin/ason-zig-lsp --stdio
+./zig-out/bin/lsp-ason --stdio
 ```
 
 查看版本：
 
 ```bash
-./zig-out/bin/ason-zig-lsp --version
+./zig-out/bin/lsp-ason --version
 ```
 
 ## 命令行工具模式
@@ -92,25 +92,25 @@ zig build -Dtarget=aarch64-macos --release=safe
 格式化：
 
 ```bash
-printf '%s\n' '{name:str,age:int}:(Alice,30)' | ./zig-out/bin/ason-zig-lsp --format
+printf '%s\n' '{name:str,age:int}:(Alice,30)' | ./zig-out/bin/lsp-ason --format
 ```
 
 压缩：
 
 ```bash
-printf '%s\n' '{name:str, age:int}:\n  (Alice, 30)' | ./zig-out/bin/ason-zig-lsp --compress
+printf '%s\n' '{name:str, age:int}:\n  (Alice, 30)' | ./zig-out/bin/lsp-ason --compress
 ```
 
 ASON 转 JSON：
 
 ```bash
-printf '%s\n' '{name:str,age:int}:(Alice,30)' | ./zig-out/bin/ason-zig-lsp --to-json
+printf '%s\n' '{name:str,age:int}:(Alice,30)' | ./zig-out/bin/lsp-ason --to-json
 ```
 
 JSON 转 ASON：
 
 ```bash
-printf '%s\n' '{"name":"Alice","age":30}' | ./zig-out/bin/ason-zig-lsp --from-json
+printf '%s\n' '{"name":"Alice","age":30}' | ./zig-out/bin/lsp-ason --from-json
 ```
 
 ## 测试
@@ -118,7 +118,7 @@ printf '%s\n' '{"name":"Alice","age":30}' | ./zig-out/bin/ason-zig-lsp --from-js
 运行单元测试和集成风格测试：
 
 ```bash
-cd lsp
+cd lsp-ason
 zig build test
 ```
 
@@ -127,7 +127,7 @@ zig build test
 构建 WebAssembly 产物：
 
 ```bash
-cd lsp
+cd lsp-ason
 zig build wasm
 ```
 
@@ -136,6 +136,8 @@ zig build wasm
 ```text
 zig-out/wasm/ason-lsp.wasm
 ```
+
+本地可执行文件名是 `lsp-ason`，而当前 WASM 产物文件名仍然是 `ason-lsp.wasm`。
 
 WASM 目标当前暴露这些能力：
 
@@ -150,7 +152,7 @@ WASM 目标当前暴露这些能力：
 
 `../plugin_vscode` 下的扩展会通过 stdio 启动这个二进制。常见打包流程通常是：
 
-1. 构建 `ason-zig-lsp`
+1. 构建 `lsp-ason`
 2. 把二进制复制到 `plugin_vscode/server/`
 3. 扩展宿主进程用 `-stdio` 启动它
 
@@ -163,7 +165,7 @@ WASM 目标当前暴露这些能力：
 ## 目录结构
 
 ```text
-lsp/
+lsp-ason/
 ├── build.zig
 ├── build.zig.zon
 ├── src/
@@ -182,4 +184,5 @@ lsp/
 
 - 默认传输方式就是 stdio。
 - 诊断信息同时包含解析错误和语义检查结果。
-- 这个目录是 Zig 版 LSP 的主实现目录，编辑器打包时应把这里视为 `ason-zig-lsp` 二进制的来源。
+- 这个目录是 Zig 版 LSP 的主实现目录，编辑器打包时应把这里视为 `lsp-ason` 二进制的来源。
+- 当前 WASM 输出文件名仍然是 `ason-lsp.wasm`，和本地可执行文件名不完全一致。

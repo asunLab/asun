@@ -47,7 +47,7 @@ export async function activate(context: ExtensionContext) {
   const serverPath = resolveServerPath(context);
   if (!serverPath) {
     window.showErrorMessage(
-      "ASON LSP binary not found. Please set ason.lspPath in settings or ensure ason-zig-lsp (or ason-lsp) is in PATH.",
+      "ASON LSP binary not found. Please set ason.lspPath in settings or ensure lsp-ason (or ason-lsp) is in PATH.",
     );
     return;
   }
@@ -123,13 +123,13 @@ function resolveServerPath(context: ExtensionContext): string | undefined {
   }
 
   // 2. Check bundled binary inside extension (like rust-analyzer)
-  //    Prefer ason-zig-lsp (Zig implementation), fall back to ason-lsp (Go).
+  //    Prefer lsp-ason (Zig implementation), fall back to ason-lsp (Go).
   const isWindows = process.platform === "win32";
   const ext = isWindows ? ".exe" : "";
   const bundledPaths = [
     // Zig LSP — primary (bundled server/ or dev sibling directory)
-    path.resolve(context.extensionPath, "server", `ason-zig-lsp${ext}`),
-    path.resolve(context.extensionPath, "..", "ason-zig-lsp", "zig-out", "bin", `ason-zig-lsp${ext}`),
+    path.resolve(context.extensionPath, "server", `lsp-ason${ext}`),
+    path.resolve(context.extensionPath, "..", "lsp-ason", "zig-out", "bin", `lsp-ason${ext}`),
     // Go LSP — fallback
     path.resolve(context.extensionPath, "server", `ason-lsp${ext}`),
     path.resolve(context.extensionPath, "..", "ason-lsp", `ason-lsp${ext}`),
@@ -148,9 +148,9 @@ function resolveServerPath(context: ExtensionContext): string | undefined {
     }
   }
 
-  // 3. Check PATH — prefer ason-zig-lsp, fall back to ason-lsp
+  // 3. Check PATH — prefer lsp-ason, fall back to ason-lsp
   const { execSync } = require("child_process");
-  for (const binaryName of ["ason-zig-lsp", "ason-lsp"]) {
+  for (const binaryName of ["lsp-ason", "ason-lsp"]) {
     try {
       const cmd = isWindows ? `where ${binaryName}` : `which ${binaryName}`;
       const which = execSync(cmd, { encoding: "utf8" }).trim();

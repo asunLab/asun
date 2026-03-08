@@ -2,7 +2,7 @@
 
 const std = @import("std");
 const features = @import("features.zig");
-const server   = @import("server.zig");
+const server = @import("server.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -16,7 +16,7 @@ pub fn main() !void {
         if (std.mem.eql(u8, arg, "--stdio") or std.mem.eql(u8, arg, "-stdio")) {
             // stdio mode is always used; flag accepted for LSP client compatibility
         } else if (std.mem.eql(u8, arg, "--version") or std.mem.eql(u8, arg, "-version")) {
-            try std.fs.File.stdout().writeAll("ason-zig-lsp 0.1.0\n");
+            try std.fs.File.stdout().writeAll("lsp-ason 0.1.0\n");
             return;
         } else if (std.mem.eql(u8, arg, "--format") or std.mem.eql(u8, arg, "-format")) {
             const src = try readStdin(alloc);
