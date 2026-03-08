@@ -1,299 +1,167 @@
 # ASON — Array-Schema Object Notation
 
-> _"The efficiency of arrays, the structure of objects."_
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-ASON is a high-performance serialization format designed for large-scale data exchange and LLM
-(Large Language Model) interaction. By separating **schema from data**, ASON eliminates the
-redundant key repetition of JSON, introduces a Markdown-like row-oriented syntax, and achieves
-dramatic token reduction while preserving human readability.
+**ASON** is a compact, schema-driven data format designed for **LLM interactions** and **high-performance data transmission**. It separates schema from data — keys are declared once, rows carry only values.
+
+[中文文档](README_CN.md)
 
 ---
 
 ## Why ASON?
 
-### Token Efficiency
+Standard JSON repeats every field name for every record. When sending structured datasets to an LLM or over a network, that redundancy burns tokens and bandwidth:
 
 ```json
-// JSON — 100 tokens
-{
-  "users": [
-    { "id": 1, "name": "Alice", "active": true },
-    { "id": 2, "name": "Bob", "active": false }
-  ]
-}
+[
+  {"id": 1, "name": "Alice", "active": true},
+  {"id": 2, "name": "Bob",   "active": false},
+  {"id": 3, "name": "Carol", "active": true}
+]
 ```
 
-```ason
-// ASON — ~35 tokens (65% savings)
-[{id:int, name:str, active:bool}]:
-  (1, Alice, true),
-  (2, Bob,   false)
+ASON declares the schema **once** and streams data as compact tuples:
+
+```
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false),(3,Carol,true)
 ```
 
-### Performance vs JSON
-
-| Metric                | ASON Text           | ASON-BIN           |
-| --------------------- | ------------------- | ------------------ |
-| Serialization speed   | **2–4× faster**     | **7–10× faster**   |
-| Deserialization speed | **1.2–2.5× faster** | **2–2.5× faster**  |
-| Payload size          | **53–61% smaller**  | **38–49% smaller** |
+**~65% fewer tokens. Same information. Machine-readable schema.**
 
 ---
 
-## Installation
+## ASON vs JSON
 
-Add to `Cargo.toml`:
+| Aspect                | JSON              | ASON                   |
+| --------------------- | ----------------- | ---------------------- |
+| Token efficiency      | 100% (baseline)   | **30–70%** ✓           |
+| Key repetition        | Every object      | Declared once ✓        |
+| Type annotations      | None              | Optional ✓             |
+| Human readable        | Yes               | Yes ✓                  |
+| Nested structs        | ✓                 | ✓                      |
+| Serialization speed   | 1×                | **~1.7–2.4× faster** ✓ |
+| Deserialization speed | 1×                | **~1.9–2.9× faster** ✓ |
+| Data size             | 100% (baseline)   | **40–60%** ✓           |
+| Binary codec          | ✗                 | ✓                      |
+| Struct reflection     | ✗                 | Compile-time ✓         |
 
-```toml
-[dependencies]
-ason = { path = "rust" }   # local
-serde = { version = "1", features = ["derive"] }
+### Token Savings — A Concrete Example
+
 ```
+JSON (100 tokens):
+{"users":[{"id":1,"name":"Alice","active":true},{"id":2,"name":"Bob","active":false}]}
+
+ASON (~35 tokens, 65% saving):
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
+```
+
+The schema header also serves as an inline hint for LLMs — field names and optional types are immediately visible without scanning every row.
 
 ---
 
-## Text Format API
+## ASON vs TOON
 
-### Data types
+[TOON (Token-Oriented Object Notation)](https://toonformat.dev) is another format designed for reducing tokens in LLM prompts. Both ASON and TOON share the core idea of eliminating key repetition for array-of-object data, but they differ significantly in design goals and scope.
 
-| Type            | Example         | Notes                         |
-| --------------- | --------------- | ----------------------------- |
-| Integer         | `42`, `-100`    | Any `i64`-range value         |
-| Float           | `3.14`, `-0.5`  | IEEE 754 double               |
-| Bool            | `true`, `false` | Lowercase only                |
-| Null            | _(empty)_       | Empty slot between commas     |
-| Unquoted string | `Alice Smith`   | Auto-trimmed, escape `,()[]\` |
-| Quoted string   | `" spaces "`    | Preserves whitespace          |
-| Array           | `[a, b, c]`     | Nested lists                  |
-| Nested struct   | `{...}:(...)`   | Recursive schema              |
+### Syntax at a glance
 
-### `StructSchema` trait
-
-ASON uses a compile-time schema trait so the serializer knows field names and types:
-
-```rust
-use ason::{Result, StructSchema, from_str, from_str_vec, to_string, to_string_vec};
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-struct User {
-    id: i64,
-    name: String,
-    active: bool,
-}
-
-impl StructSchema for User {
-    fn field_names() -> &'static [&'static str] { &["id", "name", "active"] }
-    fn field_types() -> &'static [&'static str] { &["int", "str", "bool"] }
-    fn serialize_fields(&self, ser: &mut ason::serialize::Serializer) -> Result<()> {
-        use serde::Serialize;
-        self.id.serialize(&mut *ser)?;
-        self.name.serialize(&mut *ser)?;
-        self.active.serialize(&mut *ser)?;
-        Ok(())
-    }
-}
+**TOON** — indentation-based, YAML-inspired:
+```
+users[2]{id,name,active}:
+  1,Alice,true
+  2,Bob,false
 ```
 
-### Serialization
-
-```rust
-// Single struct  →  "{id,name,active}:(1,Alice,true)"
-let s = to_string(&user)?;
-
-// Vec<T>  →  "[{id,name,active}]:\n  (1,Alice,true),\n  (2,Bob,false)"
-let s = to_string_vec(&users)?;
-
-// With type annotations
-let s = to_string_typed(&user)?;       // "{id:int,name:str,active:bool}:..."
-let s = to_string_vec_typed(&users)?;
+**ASON** — tuple-based, schema-explicit:
+```
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
-### Deserialization
+### Comparison Table
 
-```rust
-// Single struct (accepts both annotated and plain schemas)
-let user: User = from_str("{id,name,active}:(1,Alice,true)")?;
+| Aspect                    | TOON                                  | ASON                                       |
+| ------------------------- | ------------------------------------- | ------------------------------------------ |
+| Schema declaration        | Auto-detected at encode time          | Explicit, reusable, language-level ✓       |
+| Type annotations          | None (JSON data model only)           | Optional rich types (`int`, `str`, `bool`, `f64`, `opt_*`, `vec_*`, `map_*`) ✓ |
+| Syntax style              | YAML-like indentation                 | Compact tuple rows                         |
+| Array length markers      | `[N]` — helps detect truncation       | Schema header defines structure ✓          |
+| Nested structures         | Falls back to verbose list format     | Native, efficient, recursive ✓             |
+| Use case                  | LLM input only (read-only layer)      | LLM + serialization + data transmission ✓  |
+| Serialization speed       | Not measured (JS only)                | SIMD-accelerated, ~1.7–2.9× vs JSON ✓     |
+| Deserialization speed     | Not measured (JS only)                | Zero-copy parsing ✓                        |
+| Binary codec              | ✗                                     | ✓                                          |
+| Language implementations  | TypeScript / JavaScript only          | **C, C++, C#, Go, Java, JS, Python, Rust, Zig, Dart** ✓ |
+| Struct reflection         | Dynamic (runtime only)                | Compile-time (`ASON_FIELDS` macro) ✓       |
+| Deeply nested data        | Token cost increases significantly    | Efficient at any nesting level ✓           |
+| Round-trip fidelity       | JSON data model (no type info)        | Full type fidelity ✓                       |
 
-// Vec<T>
-let users: Vec<User> = from_str_vec(&s)?;
-```
+### When to Choose ASON
+
+- You need **high-performance serialization** in a compiled language (C, C++, Rust, Go, …)
+- Your data has **rich types** — optional fields, typed vectors, maps, nested structs
+- You need **binary encoding** alongside the text format
+- You work in **multiple languages** or need a language-neutral wire format
+- You want the schema to act as a **self-documenting API contract** for LLM prompts
+
+### When TOON May Be Enough
+
+- You're working exclusively in **TypeScript / JavaScript**
+- Your pipeline is **LLM prompt input only** (you don't parse it back into structs)
+- Your data is simple flat tables with no type constraints
 
 ---
 
-## Binary Format (ASON-BIN)
+## Format Overview
 
-ASON-BIN is a compact binary encoding of any `serde`-compatible type. It provides the largest
-performance gains, making it ideal for internal service communication, caches, and storage.
+### Single Object
 
-### API
-
-```rust
-use ason::{to_bin, to_bin_vec, from_bin, from_bin_vec};
+```
+{id:int, name:str, active:bool}:(42,Alice,true)
 ```
 
-| Function       | Signature                             | Description                              |
-| -------------- | ------------------------------------- | ---------------------------------------- |
-| `to_bin`       | `(value: &T) -> Result<Vec<u8>>`      | Serialize any `T: Serialize` to bytes    |
-| `from_bin`     | `(data: &'de [u8]) -> Result<T>`      | Deserialize with zero-copy string slices |
-| `to_bin_vec`   | `(values: &[T]) -> Result<Vec<u8>>`   | Serialize a slice to bytes               |
-| `from_bin_vec` | `(data: &'de [u8]) -> Result<Vec<T>>` | Deserialize a sequence from bytes        |
+### Array of Objects (Schema-Driven)
 
-### Usage
+Schema declared once, each row is a tuple:
 
-```rust
-use ason::{from_bin, from_bin_vec, to_bin, to_bin_vec};
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-struct User {
-    id: i64,
-    name: String,
-    active: bool,
-}
-
-fn main() -> ason::Result<()> {
-    // Single value
-    let user = User { id: 1, name: "Alice".into(), active: true };
-    let bytes = to_bin(&user)?;
-    let restored: User = from_bin(&bytes)?;
-    assert_eq!(user, restored);
-
-    // Vec
-    let users = vec![
-        User { id: 1, name: "Alice".into(), active: true },
-        User { id: 2, name: "Bob".into(),   active: false },
-    ];
-    let bytes = to_bin_vec(&users)?;
-    let restored: Vec<User> = from_bin_vec(&bytes)?;
-    assert_eq!(users, restored);
-
-    Ok(())
-}
+```
+[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false),(3,Carol,true)
 ```
 
-### Zero-Copy Deserialization
+### Nested Structs
 
-When your struct borrows string data with a `'de` lifetime, `from_bin` returns slices directly
-into the input buffer — no heap allocation for string fields:
-
-```rust
-#[derive(Debug, Deserialize)]
-struct BorrowedUser<'a> {
-    id: i64,
-    name: &'a str,   // zero-copy — points directly into the input bytes
-    active: bool,
-}
-
-let bytes = to_bin(&User { id: 1, name: "Alice".into(), active: true })?;
-let u: BorrowedUser = from_bin(&bytes)?;
-// u.name is a &str slice into `bytes`, no String allocation
+```
+{name:str, dept}:(Alice,(Engineering))
 ```
 
-### Wire Format
+### Optional Fields
 
-All integers are **little-endian**. Strings are length-prefixed (u32 LE + UTF-8 bytes).
+```
+{id:int, label:opt_str}:(1,hello),(2,)
+```
+*(blank value = `None`/`null`)*
 
-| Type             | Encoding                               |
-| ---------------- | -------------------------------------- |
-| `bool`           | 1 byte (0/1)                           |
-| `i8` / `u8`      | 1 byte                                 |
-| `i16` / `u16`    | 2 bytes LE                             |
-| `i32` / `u32`    | 4 bytes LE                             |
-| `i64` / `u64`    | 8 bytes LE                             |
-| `f32`            | 4 bytes IEEE 754 LE                    |
-| `f64`            | 8 bytes IEEE 754 LE                    |
-| `char`           | 4 bytes (u32 codepoint LE)             |
-| `str` / `String` | `[u32 len][UTF-8 bytes]`               |
-| `Option<T>`      | `[u8 tag: 0=None / 1=Some][payload]`   |
-| `Vec<T>` / seq   | `[u32 count][elements...]`             |
-| `HashMap` / map  | `[u32 count][key value pairs...]`      |
-| `struct`         | fields in declaration order, no prefix |
-| `tuple`          | elements in order, no prefix           |
-| `enum`           | `[u32 variant_index][payload]`         |
-| `unit`           | 0 bytes                                |
+### Typed Vectors and Maps
 
-### Performance (Apple M-series, release build)
-
-**Flat struct (8 fields)**
-
-| Test                | JSON      | ASON Text | ASON-BIN     | BIN vs JSON |
-| ------------------- | --------- | --------- | ------------ | ----------- |
-| Serialize × 1000    | 2.19 ms   | 1.07 ms   | **0.28 ms**  | **7.7×**    |
-| Deserialize × 1000  | 6.05 ms   | 5.10 ms   | **2.96 ms**  | **2.0×**    |
-| Payload size × 1000 | 121,675 B | 56,716 B  | **74,454 B** | 39% smaller |
-
-**Deep struct (5-level nested, × 100)**
-
-| Test               | JSON      | ASON Text | ASON-BIN      | BIN vs JSON |
-| ------------------ | --------- | --------- | ------------- | ----------- |
-| Serialize × 100    | 4.19 ms   | 2.67 ms   | **0.50 ms**   | **8.4×**    |
-| Deserialize × 100  | 9.37 ms   | 8.55 ms   | **3.72 ms**   | **2.5×**    |
-| Payload size × 100 | 438,112 B | 174,611 B | **225,434 B** | 49% smaller |
-
-**Single roundtrip (User, × 100,000)**
-
-| Format    | Time/op | vs JSON         |
-| --------- | ------- | --------------- |
-| ASON-BIN  | ~182 ns | **2.1× faster** |
-| JSON      | ~375 ns | —               |
-| ASON Text | ~552 ns | 0.7×            |
-
-### SIMD Acceleration
-
-`to_bin` uses platform SIMD intrinsics (NEON on ARM, SSE2 on x86-64) to bulk-copy string
-payloads ≥ 32 bytes in 16-byte chunks via `simd_bulk_extend`, avoiding scalar byte loops.
-
----
-
-## Running Examples
-
-```bash
-# Basic usage
-cargo run --release --example basic
-
-# Binary format (zero-copy demo, wire layout, benchmarks)
-cargo run --release --example binary
-
-# Comprehensive benchmark suite (all 9 sections)
-cargo run --release --example bench
-
-# Complex nested structures
-cargo run --release --example complex
+```
+{name:str, tags:vec_str, attrs:map_si}:(Alice,[rust,go,python],[(age,30),(score,95)])
 ```
 
 ---
 
-## ASON Text Format Syntax
+## Implementations
 
-```ason
-// Single struct
-{id, name, active}:(1, Alice, true)
-
-// Vec of structs  (schema declared once, bracket wrapping required)
-[{id:int, name:str, active:bool}]:
-  (1, Alice, true),
-  (2, Bob,   false),
-  (3, Carol, true)
-
-// Nested struct — multiple rows
-[{id:int, address:{city:str, zip:str}}]:
-  (1, (Berlin, 10115)),
-  (2, (Paris,  75001))
-
-// Nested arrays — multiple rows
-[{id:int, tags:[str]}]:
-  (1, [rust, go]),
-  (2, [python])
-
-// Enum value
-Role::Admin
-
-// Option  (empty slot = None) — multiple rows
-[{id, name, score}]:
-  (1, Alice,  9.5),
-  (2, Bob,       )    ← score is None
-```
+| Language   | Repository          | Notes                              |
+| ---------- | ------------------- | ---------------------------------- |
+| C          | [ason-c](ason-c/)   | C11, SIMD (NEON/SSE2), zero-copy   |
+| C++        | [ason-cpp](ason-cpp/) | C++17, header-only, SIMD         |
+| C#         | [ason-cs](ason-cs/) | .NET, SIMD                         |
+| Go         | [ason-go](ason-go/) |                                    |
+| Java       | [ason-java](ason-java/) |                                |
+| JavaScript | [ason-js](ason-js/) |                                    |
+| Python     | [ason-py](ason-py/) |                                    |
+| Rust       | [ason-rs](ason-rs/) |                                    |
+| Zig        | [ason-zig](ason-zig/) |                                  |
+| Dart       | [ason-dart](ason-dart/) |                                |
 
 ---
 
