@@ -72,7 +72,7 @@ users[2]{id,name,active}:
   2,Bob,false
 ```
 
-**ASON** —— 基于元组，Schema 显式：
+**ASON** —— 基于元组，Schema 显式/隐式：
 ```
 [{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
 ```
@@ -105,7 +105,6 @@ users[2]{id,name,active}:
 
 ### TOON 足够用的场景
 
-- 仅使用 **TypeScript / JavaScript**
 - 流程**仅为 LLM Prompt 输入**（不需要将结果解析回结构体）
 - 数据是无类型约束的简单平表
 
@@ -166,6 +165,14 @@ Schema 声明一次，每条数据为元组：
 | PHP       | [ason-php](ason-php/) |      TODO                        |
 | Kotlin       | [ason-dart](ason-kt/) |    TODO                       |
 | TypeScript  | [ason-dart](ason-ts/) |    TODO                        |
+
+## 插件
+
+| IDE       | 仓库    | 备注     |
+| ---------- | ------ | ------ |
+| VSCODE       | [plugin_vscode](plugin_vscode/)   | Done |
+| JETBRAIN       | [plugin_idea](plugin_idea/)   | Todo |
+| Zed       | [plugin_zed](plugin_zed/)   | Todo |
 
 ---
 

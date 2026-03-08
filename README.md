@@ -105,7 +105,6 @@ users[2]{id,name,active}:
 
 ### When TOON May Be Enough
 
-- You're working exclusively in **TypeScript / JavaScript**
 - Your pipeline is **LLM prompt input only** (you don't parse it back into structs)
 - Your data is simple flat tables with no type constraints
 
@@ -162,6 +161,18 @@ Schema declared once, each row is a tuple:
 | Rust       | [ason-rs](ason-rs/) |                                    |
 | Zig        | [ason-zig](ason-zig/) |                                  |
 | Dart       | [ason-dart](ason-dart/) |                                |
+| Swift      | [ason-swift](ason-swift/) |   TODO                      |
+| PHP       | [ason-php](ason-php/) |      TODO                        |
+| Kotlin       | [ason-dart](ason-kt/) |    TODO                       |
+| TypeScript  | [ason-dart](ason-ts/) |    TODO                        |
+
+## Plugins
+
+| IDE       | Repository    | Notes     |
+| ---------- | ------ | ------ |
+| VSCode       | [plugin_vscode](plugin_vscode/)   | Done |
+| Jetbrain       | [plugin_jetbrain](plugin_jetbrain/)   | Todo |
+| Zed       | [plugin_zed](plugin_zed/)   | Todo |
 
 ---
 
