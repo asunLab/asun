@@ -1,4 +1,5 @@
 .vscode
+.swiftly-cache
 build
 *.out
 tmp
