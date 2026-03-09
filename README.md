@@ -161,16 +161,16 @@ Schema declared once, each row is a tuple:
 | Rust       | [ason-rs](ason-rs/) |                                    |
 | Zig        | [ason-zig](ason-zig/) |                                  |
 | Dart       | [ason-dart](ason-dart/) |                                |
-| Swift      | [ason-swift](ason-swift/) |   TODO                      |
+| Swift      | [ason-swift](ason-swift/) |   ✓                      |
 | PHP       | [ason-php](ason-php/) |      TODO                        |
-| Kotlin       | [ason-dart](ason-kt/) |    TODO                       |
-| TypeScript  | [ason-dart](ason-ts/) |    TODO                        |
+| Kotlin       | [ason-kt](ason-kt/) |    TODO                       |
+| TypeScript  | [ason-ts](ason-ts/) |    TODO                        |
 
 ## Plugins
 
 | IDE       | Repository    | Notes     |
 | ---------- | ------ | ------ |
-| VSCode       | [plugin_vscode](plugin_vscode/)   | Done |
+| VSCode       | [plugin_vscode](plugin_vscode/)   | ✓ |
 | Jetbrain       | [plugin_jetbrain](plugin_jetbrain/)   | Todo |
 | Zed       | [plugin_zed](plugin_zed/)   | Todo |
 

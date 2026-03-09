@@ -170,7 +170,7 @@ Schema 声明一次，每条数据为元组：
 
 | IDE       | 仓库    | 备注     |
 | ---------- | ------ | ------ |
-| VSCODE       | [plugin_vscode](plugin_vscode/)   | Done |
+| VSCODE       | [plugin_vscode](plugin_vscode/)   | ✓ |
 | JETBRAIN       | [plugin_idea](plugin_idea/)   | Todo |
 | Zed       | [plugin_zed](plugin_zed/)   | Todo |
 
