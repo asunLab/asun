@@ -151,20 +151,20 @@ Schema 声明一次，每条数据为元组：
 
 | 语言       | 仓库                    | 备注                                 |
 | ---------- | ----------------------- | ------------------------------------ |
-| C          | [ason-c](ason-c/)       | C11, SIMD（NEON/SSE2）零拷贝  |
-| C++        | [ason-cpp](ason-cpp/)   | C++17,Header-only, SIMD       |
-| C#         | [ason-cs](ason-cs/)     | .NET, SIMD                    |
-| Go         | [ason-go](ason-go/)     |                               |
-| Java       | [ason-java](ason-java/) |                               |
-| JavaScript | [ason-js](ason-js/)     |                               |
-| Python     | [ason-py](ason-py/)     |                               |
-| Rust       | [ason-rs](ason-rs/)     |                               |
-| Zig        | [ason-zig](ason-zig/)   |                               |
-| Dart       | [ason-dart](ason-dart/) |                               |
+| C          | [ason-c](ason-c/)   | C11, ✓   |
+| C++        | [ason-cpp](ason-cpp/) | C++17, ✓         |
+| C#         | [ason-cs](ason-cs/) | .NET ✓                        |
+| Go         | [ason-go](ason-go/) |                  ✓                |
+| Java       | [ason-java](ason-java/) |            ✓                  |
+| JavaScript | [ason-js](ason-js/) |               ✓                   |
+| Python     | [ason-py](ason-py/) |               ✓                   |
+| Rust       | [ason-rs](ason-rs/) |              ✓                    |
+| Zig        | [ason-zig](ason-zig/) |              ✓                  |
+| Dart       | [ason-dart](ason-dart/) |          ✓                    |
 | Swift      | [ason-swift](ason-swift/) |   TODO                      |
 | PHP       | [ason-php](ason-php/) |      TODO                        |
-| Kotlin       | [ason-dart](ason-kt/) |    TODO                       |
-| TypeScript  | [ason-dart](ason-ts/) |    TODO                        |
+| Kotlin       | [ason-kt](ason-kt/) |    TODO                       |
+| TypeScript  | [ason-ts](ason-ts/) |    TODO                        |
 
 ## 插件
 
