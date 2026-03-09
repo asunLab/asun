@@ -1,9 +1,0 @@
-# SwiftPM build output
-.build/
-
-# SwiftPM metadata
-.swiftpm/
-Package.resolved
-
-# macOS
-.DS_Store
