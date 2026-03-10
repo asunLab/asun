@@ -40,6 +40,3 @@
 [submodule "website"]
 	path = website
 	url = https://athxx@github.com/ason-lab/website.git
-[submodule "ason-swift"]
-	path = ason-swift
-	url = https://github.com/ason-lab/ason-swift.git
