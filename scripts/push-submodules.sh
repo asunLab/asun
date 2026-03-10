@@ -15,9 +15,9 @@ usage() {
 Usage:
   scripts/push-submodules.sh [options]
 
-Push each submodule's current HEAD to its origin default branch, even when the
-submodule is in detached HEAD state. Optionally stage/commit/push the parent
-repository's updated submodule pointers.
+Fetch and sync each submodule to its origin default branch first, then push the
+submodule's current HEAD back to that branch if it is ahead. Optionally
+stage/commit/push the parent repository's updated submodule pointers.
 
 Options:
   --stage-parent            Run `git add` for changed submodule pointers in the parent repo
@@ -101,6 +101,7 @@ if [[ ${#submodules[@]} -eq 0 ]]; then
 fi
 
 pushed=()
+updated=()
 unchanged=()
 missing=()
 warnings=()
@@ -129,8 +130,9 @@ for submodule in "${submodules[@]}"; do
   fi
 
   if [[ -n "$(git -C "$submodule" status --short)" ]]; then
-    warnings+=("$submodule: has uncommitted changes")
-    log "Warning: worktree has uncommitted changes"
+    warnings+=("$submodule: has uncommitted changes; skipped sync/push")
+    log "Warning: worktree has uncommitted changes; skipping"
+    continue
   fi
 
   run_cmd git -C "$submodule" fetch origin "$remote_branch" --quiet
@@ -149,15 +151,36 @@ for submodule in "${submodules[@]}"; do
     ahead_count=1
   fi
 
+  if $remote_exists && [[ "$behind_count" != "0" ]]; then
+    current_branch="$(git -C "$submodule" branch --show-current)"
+    if [[ -n "$current_branch" ]]; then
+      log "Rebasing $current_branch onto origin/$remote_branch"
+      run_cmd git -C "$submodule" pull --rebase origin "$remote_branch"
+    elif [[ "$ahead_count" == "0" ]]; then
+      log "Updating detached HEAD to origin/$remote_branch"
+      run_cmd git -C "$submodule" checkout --detach "origin/$remote_branch"
+    else
+      log "Rebasing detached HEAD onto origin/$remote_branch"
+      run_cmd git -C "$submodule" rebase "origin/$remote_branch"
+    fi
+
+    head_sha="$(git -C "$submodule" rev-parse --short HEAD)"
+    updated+=("$submodule@$head_sha")
+
+    ahead_count="$(git -C "$submodule" rev-list --count "origin/$remote_branch..HEAD")"
+    behind_count="$(git -C "$submodule" rev-list --count "HEAD..origin/$remote_branch")"
+  fi
+
+  if [[ "$behind_count" != "0" ]]; then
+    warnings+=("$submodule: still behind origin/$remote_branch after sync")
+    log "Warning: still behind origin/$remote_branch after sync; skipping push"
+    continue
+  fi
+
   if [[ "$ahead_count" == "0" ]]; then
     unchanged+=("$submodule@$head_sha")
     log "No push needed: HEAD already reachable from origin/$remote_branch"
     continue
-  fi
-
-  if [[ "$behind_count" != "0" ]]; then
-    warnings+=("$submodule: local HEAD diverged from origin/$remote_branch by $behind_count commit(s) behind")
-    log "Warning: local HEAD is behind origin/$remote_branch by $behind_count commit(s)"
   fi
 
   log "Pushing $head_sha -> origin/$remote_branch"
@@ -203,6 +226,9 @@ log
 log "Summary"
 if [[ ${#pushed[@]} -gt 0 ]]; then
   printf '  pushed: %s\n' "${pushed[@]}"
+fi
+if [[ ${#updated[@]} -gt 0 ]]; then
+  printf '  updated: %s\n' "${updated[@]}"
 fi
 if [[ ${#unchanged[@]} -gt 0 ]]; then
   printf '  unchanged: %s\n' "${unchanged[@]}"
