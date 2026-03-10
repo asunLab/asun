@@ -152,22 +152,20 @@ _(blank value = `None`/`null`)_
 
 ## Implementations
 
-| Language   | Repository                | Notes   |
-| ---------- | ------------------------- | ------- |
-| C          | [ason-c](ason-c/)         | C11, ✓  |
-| C++        | [ason-cpp](ason-cpp/)     | ✓ C++17 |
-| C#         | [ason-cs](ason-cs/)       | .NET ✓  |
-| Go         | [ason-go](ason-go/)       | ✓       |
-| Java       | [ason-java](ason-java/)   | ✓       |
-| JavaScript | [ason-js](ason-js/)       | ✓       |
-| Python     | [ason-py](ason-py/)       | ✓       |
-| Rust       | [ason-rs](ason-rs/)       | ✓       |
-| Zig        | [ason-zig](ason-zig/)     | ✓       |
-| Dart       | [ason-dart](ason-dart/)   | ✓       |
-| Swift      | [ason-swift](ason-swift/) | TODO    |
-| PHP        | [ason-php](ason-php/)     | ✓       |
-| Kotlin     | [ason-kt](ason-kt/)       | TODO    |
-| TypeScript | [ason-ts](ason-ts/)       | TODO    |
+| Language                | Repository                | Notes      |
+| ----------------------- | ------------------------- | ---------- |
+| C                       | [ason-c](ason-c/)         | ✓ C11      |
+| C++                     | [ason-cpp](ason-cpp/)     | ✓ C++17    |
+| C#                      | [ason-cs](ason-cs/)       | ✓ .NET 8+  |
+| Go                      | [ason-go](ason-go/)       | ✓ Go 1.24+ |
+| Java / Kotlin           | [ason-java](ason-java/)   | ✓ Java 21+ |
+| JavaScript / TypeScript | [ason-js](ason-js/)       | ✓ JS/TS    |
+| Python                  | [ason-py](ason-py/)       | ✓          |
+| Rust                    | [ason-rs](ason-rs/)       | ✓          |
+| Zig                     | [ason-zig](ason-zig/)     | ✓          |
+| Dart                    | [ason-dart](ason-dart/)   | ✓          |
+| PHP                     | [ason-php](ason-php/)     | ✓ PHP 8.4+ |
+| Swift                   | [ason-swift](ason-swift/) | TODO       |
 
 ## Plugins
 
