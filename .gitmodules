@@ -43,3 +43,6 @@
 [submodule "ason-swift"]
 	path = ason-swift
 	url = https://github.com/ason-lab/ason-swift.git
+[submodule "ason-php"]
+	path = ason-php
+	url = https://github.com/ason-lab/ason-php.git
