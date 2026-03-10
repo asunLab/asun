@@ -14,9 +14,9 @@
 
 ```json
 [
-  {"id": 1, "name": "Alice", "active": true},
-  {"id": 2, "name": "Bob",   "active": false},
-  {"id": 3, "name": "Carol", "active": true}
+  { "id": 1, "name": "Alice", "active": true },
+  { "id": 2, "name": "Bob", "active": false },
+  { "id": 3, "name": "Carol", "active": true }
 ]
 ```
 
@@ -32,18 +32,18 @@ ASON 只声明 **一次** Schema，数据以紧凑元组方式流式传输：
 
 ## ASON vs JSON
 
-| 方面               | JSON              | ASON                      |
-| ------------------ | ----------------- | ------------------------- |
-| Token 效率         | 100%（基准）      | **30–70%** ✓              |
-| Key 重复           | 每个对象都有      | 声明一次 ✓                |
-| 类型注解           | 无                | 可选 ✓                    |
-| 人类可读           | 是                | 是 ✓                      |
-| 嵌套结构           | ✓                 | ✓                         |
-| 序列化速度         | 1×                | **~1.7–2.4× 更快** ✓     |
-| 反序列化速度       | 1×                | **~1.9–2.9× 更快** ✓     |
-| 数据体积           | 100%（基准）      | **40–60%** ✓              |
-| 二进制编解码       | ✗                 | ✓                         |
-| 结构体反射         | ✗                 | 编译期 ✓                  |
+| 方面         | JSON         | ASON                 |
+| ------------ | ------------ | -------------------- |
+| Token 效率   | 100%（基准） | **30–70%** ✓         |
+| Key 重复     | 每个对象都有 | 声明一次 ✓           |
+| 类型注解     | 无           | 可选 ✓               |
+| 人类可读     | 是           | 是 ✓                 |
+| 嵌套结构     | ✓            | ✓                    |
+| 序列化速度   | 1×           | **~1.7–2.4× 更快** ✓ |
+| 反序列化速度 | 1×           | **~1.9–2.9× 更快** ✓ |
+| 数据体积     | 100%（基准） | **40–60%** ✓         |
+| 二进制编解码 | ✗            | ✓                    |
+| 结构体反射   | ✗            | 编译期 ✓             |
 
 ### Token 节省 —— 具体示例
 
@@ -66,6 +66,7 @@ Schema 头部同时充当 LLM 的内联提示 —— 字段名和可选类型一
 ### 语法对比
 
 **TOON** —— 基于缩进，YAML 风格：
+
 ```
 users[2]{id,name,active}:
   1,Alice,true
@@ -73,27 +74,28 @@ users[2]{id,name,active}:
 ```
 
 **ASON** —— 基于元组，Schema 显式/隐式：
+
 ```
 [{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
 ### 对比表
 
-| 方面               | TOON                                     | ASON                                                           |
-| ------------------ | ---------------------------------------- | -------------------------------------------------------------- |
-| Schema 声明        | 编码时自动检测                           | 显式声明，可复用，语言级别 ✓                                   |
-| 类型注解           | 无（仅 JSON 数据模型）                   | 丰富可选类型（`int`、`str`、`bool`、`f64`、`opt_*`、`vec_*`、`map_*`）✓ |
-| 语法风格           | YAML 风格缩进                            | 紧凑元组行                                                     |
-| 数组长度标记       | `[N]` —— 有助于检测截断                  | Schema 头部定义结构 ✓                                          |
-| 嵌套结构           | 退化为冗长的列表格式                     | 原生高效，递归支持 ✓                                           |
-| 适用场景           | 仅 LLM 输入（只读转换层）                | LLM + 序列化 + 数据传输 ✓                                      |
-| 序列化性能         | 未测试（仅 JS）                          | SIMD 加速，约 1.7–2.9× vs JSON ✓                               |
-| 反序列化性能       | 未测试（仅 JS）                          | 零拷贝解析 ✓                                                   |
-| 二进制编解码       | ✗                                        | ✓                                                              |
-| 语言实现           | 仅 TypeScript / JavaScript               | **C、C++、C#、Go、Java、JS、Python、Rust、Zig、Dart** ✓        |
-| 结构体反射         | 动态（仅运行时）                         | 编译期（`ASON_FIELDS` 宏）✓                                    |
-| 深层嵌套数据       | Token 开销显著增加                       | 任意嵌套层级均高效 ✓                                           |
-| 往返保真度         | JSON 数据模型（无类型信息）              | 完整类型保真 ✓                                                 |
+| 方面         | TOON                        | ASON                                                                    |
+| ------------ | --------------------------- | ----------------------------------------------------------------------- |
+| Schema 声明  | 编码时自动检测              | 显式声明，可复用，语言级别 ✓                                            |
+| 类型注解     | 无（仅 JSON 数据模型）      | 丰富可选类型（`int`、`str`、`bool`、`f64`、`opt_*`、`vec_*`、`map_*`）✓ |
+| 语法风格     | YAML 风格缩进               | 紧凑元组行                                                              |
+| 数组长度标记 | `[N]` —— 有助于检测截断     | Schema 头部定义结构 ✓                                                   |
+| 嵌套结构     | 退化为冗长的列表格式        | 原生高效，递归支持 ✓                                                    |
+| 适用场景     | 仅 LLM 输入（只读转换层）   | LLM + 序列化 + 数据传输 ✓                                               |
+| 序列化性能   | 未测试（仅 JS）             | SIMD 加速，约 1.7–2.9× vs JSON ✓                                        |
+| 反序列化性能 | 未测试（仅 JS）             | 零拷贝解析 ✓                                                            |
+| 二进制编解码 | ✗                           | ✓                                                                       |
+| 语言实现     | 仅 TypeScript / JavaScript  | **C、C++、C#、Go、Java、JS、Python、Rust、Zig、Dart** ✓                 |
+| 结构体反射   | 动态（仅运行时）            | 编译期（`ASON_FIELDS` 宏）✓                                             |
+| 深层嵌套数据 | Token 开销显著增加          | 任意嵌套层级均高效 ✓                                                    |
+| 往返保真度   | JSON 数据模型（无类型信息） | 完整类型保真 ✓                                                          |
 
 ### 何时选择 ASON
 
@@ -137,7 +139,8 @@ Schema 声明一次，每条数据为元组：
 ```
 {id:int, label:opt_str}:(1,hello),(2,)
 ```
-*（空值 = `None` / `null`）*
+
+_（空值 = `None` / `null`）_
 
 ### 类型化向量与 Map
 
@@ -149,30 +152,30 @@ Schema 声明一次，每条数据为元组：
 
 ## 各语言实现
 
-| 语言       | 仓库                    | 备注                                 |
-| ---------- | ----------------------- | ------------------------------------ |
-| C          | [ason-c](ason-c/)   | C11, ✓   |
-| C++        | [ason-cpp](ason-cpp/) | C++17, ✓         |
-| C#         | [ason-cs](ason-cs/) | .NET ✓                        |
-| Go         | [ason-go](ason-go/) |                  ✓                |
-| Java       | [ason-java](ason-java/) |            ✓                  |
-| JavaScript | [ason-js](ason-js/) |               ✓                   |
-| Python     | [ason-py](ason-py/) |               ✓                   |
-| Rust       | [ason-rs](ason-rs/) |              ✓                    |
-| Zig        | [ason-zig](ason-zig/) |              ✓                  |
-| Dart       | [ason-dart](ason-dart/) |          ✓                    |
-| Swift      | [ason-swift](ason-swift/) |   TODO                      |
-| PHP       | [ason-php](ason-php/) |      TODO                        |
-| Kotlin       | [ason-kt](ason-kt/) |    TODO                       |
-| TypeScript  | [ason-ts](ason-ts/) |    TODO                        |
+| 语言       | 仓库                      | 备注     |
+| ---------- | ------------------------- | -------- |
+| C          | [ason-c](ason-c/)         | C11, ✓   |
+| C++        | [ason-cpp](ason-cpp/)     | C++17, ✓ |
+| C#         | [ason-cs](ason-cs/)       | .NET ✓   |
+| Go         | [ason-go](ason-go/)       | ✓        |
+| Java       | [ason-java](ason-java/)   | ✓        |
+| JavaScript | [ason-js](ason-js/)       | ✓        |
+| Python     | [ason-py](ason-py/)       | ✓        |
+| Rust       | [ason-rs](ason-rs/)       | ✓        |
+| Zig        | [ason-zig](ason-zig/)     | ✓        |
+| Dart       | [ason-dart](ason-dart/)   | ✓        |
+| Swift      | [ason-swift](ason-swift/) | TODO     |
+| PHP        | [ason-php](ason-php/)     | ✓        |
+| Kotlin     | [ason-kt](ason-kt/)       | TODO     |
+| TypeScript | [ason-ts](ason-ts/)       | TODO     |
 
 ## 插件
 
-| IDE       | 仓库    | 备注     |
-| ---------- | ------ | ------ |
-| VSCode       | [plugin_vscode](plugin_vscode/)   | ✓ |
-| Jetbrain       | [plugin_jetbrain](plugin_jetbrain/)   | Todo |
-| Zed       | [plugin_zed](plugin_zed/)   | Todo |
+| IDE      | 仓库                                | 备注 |
+| -------- | ----------------------------------- | ---- |
+| VSCode   | [plugin_vscode](plugin_vscode/)     | ✓    |
+| Jetbrain | [plugin_jetbrain](plugin_jetbrain/) | Todo |
+| Zed      | [plugin_zed](plugin_zed/)           | Todo |
 
 ---
 
