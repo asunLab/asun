@@ -46,3 +46,6 @@
 [submodule "ason-php"]
 	path = ason-php
 	url = https://github.com/ason-lab/ason-php.git
+[submodule "ason-kt"]
+	path = ason-kt
+	url = https://github.com/ason-lab/ason-kt.git
