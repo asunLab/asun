@@ -52,3 +52,6 @@
 [submodule "ason-ts"]
 	path = ason-ts
 	url = https://github.com/ason-lab/ason-ts.git
+[submodule "plugin_jetbrain"]
+	path = plugin_jetbrain
+	url = https://github.com/ason-lab/plugin_jetbrain.git
