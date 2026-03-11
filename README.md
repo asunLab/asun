@@ -165,7 +165,7 @@ _(blank value = `None`/`null`)_
 | Zig                     | [ason-zig](ason-zig/)     | ✓          |
 | Dart                    | [ason-dart](ason-dart/)   | ✓          |
 | PHP                     | [ason-php](ason-php/)     | ✓ PHP 8.4+ |
-| Swift                   | [ason-swift](ason-swift/) | TODO       |
+| Swift                   | [ason-swift](ason-swift/) | ✓          |
 
 ## Plugins
 
