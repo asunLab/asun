@@ -93,7 +93,10 @@ if ! git rev-parse --show-toplevel >/dev/null 2>&1; then
   exit 1
 fi
 
-mapfile -t submodules < <(git config --file .gitmodules --get-regexp '^submodule\..*\.path$' | awk '{print $2}')
+submodules=()
+while IFS= read -r line; do
+  submodules+=("$line")
+done < <(git config --file .gitmodules --get-regexp '^submodule\..*\.path$' | awk '{print $2}')
 
 if [[ ${#submodules[@]} -eq 0 ]]; then
   log "No submodules found."
