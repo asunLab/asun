@@ -188,6 +188,31 @@ While the `@type` for terminal scalar data (numbers, strings, etc.) is purely de
 - ✅ **Unannotated array**: `tags@[]` (kept `@[]` to indicate an array boundary)
 - ❌ **Fatal omission**: `dept` (without the brackets, the parser will not know `dept` corresponds to a complex object, leading to an overall breakdown of stream reading)
 
+### 3.3 Distinguishing Schema vs Value Character Rules
+
+`schema` and `value` live in the same text, but characters do not mean the same thing in both places. Pay special attention to `@`, whitespace, and special characters:
+
+| Position | Rule |
+| --- | --- |
+| Schema field name | `@` is part of the structural/type marker, such as `name@str` or `users@[{id@int}]`. Here, `@` is **not field-name content**. |
+| Schema field name | If a field name contains spaces, starts with a digit, or contains special characters, it should be written as a quoted field name, such as `"id uuid"`, `"65"`, or `"{}[]@\\\""`. |
+| Data value | In the data section, `@` is **not a type marker**; it is just an ordinary character. However, to avoid confusion with schema syntax, any value containing `@` should be written as a quoted string, for example `"@Alice"`. |
+| Data value | Unquoted strings automatically trim leading and trailing spaces. To preserve outer whitespace, use quotes, for example `"  Alice  "`. |
+| Data value | If a value contains delimiters or other potentially ambiguous special characters, prefer a quoted string. Do not apply schema field-name rules directly to data values. |
+
+Example:
+
+```text
+{"id uuid"@str,"65"@bool,"{}[]@\\\""@str}:
+("@Alice",true,"value@demo")
+```
+
+Explanation:
+
+- `"id uuid"`, `"65"`, and `"{}[]@\\\""` are **schema field names**
+- `"@Alice"` and `"value@demo"` are **data values**
+- The same `@` character marks structure in schema, but is plain string content in value
+
 ---
 
 ## 4. Escape Rules
