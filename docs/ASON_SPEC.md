@@ -683,7 +683,7 @@ In addition to the human-readable text format, ASON defines a compact binary wir
 | `i64` / `u64`  | 8           | Little-endian                               |
 | `f32`          | 4           | IEEE 754 bitcast, little-endian             |
 | `f64`          | 8           | IEEE 754 bitcast, little-endian             |
-| `string`       | 4 + N       | `u32 LE` byte length + N bytes UTF-8        |
+| `str`          | 4 + N       | `u32 LE` byte length + N bytes UTF-8        |
 | `Option<T>`    | 1 or 1+sizeof(T) | `u8` tag (`0x00` = null, `0x01` = some) + payload |
 | `Array<T>`     | 4 + N×sizeof(T) | `u32 LE` element count + N encoded elements |
 | `struct`       | Σ fields    | Fields encoded in declaration order; no padding or alignment |

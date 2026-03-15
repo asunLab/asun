@@ -81,17 +81,17 @@ users[2]{id,name,active}:
 
 ### 对比表
 
-| 方面         | TOON                       | ASON                                                                    |
-| ------------ | -------------------------- | ----------------------------------------------------------------------- |
-| Schema 声明  | 编码时自动检测             | 显式声明，可复用 ✓                                                      |
+| 方面         | TOON                       | ASON                                                           |
+| ------------ | -------------------------- | -------------------------------------------------------------- |
+| Schema 声明  | 编码时自动检测             | 显式声明，可复用 ✓                                             |
 | 类型注解     | 无（仅 JSON 数据模型）     | 可选结构提示（`int`、`str`、`bool`、`float`、数组、嵌套对象）✓ |
-| 语法风格     | YAML 风格缩进              | 紧凑元组行                                                              |
-| 数组长度标记 | `[N]` —— 有助于检测截断    | Schema 头部定义结构 ✓                                                   |
-| 嵌套结构     | 退化为冗长的列表格式       | 原生递归支持 ✓                                                          |
-| 适用场景     | 仅 LLM 输入                | LLM + 序列化 + 存储 + 传输 ✓                                            |
-| 二进制编解码 | ✗                          | ✓                                                                       |
-| 语言实现     | 仅 TypeScript / JavaScript | **C、C++、C#、Go、Java、JS、Python、Rust、Zig、Dart** ✓                 |
-| 往返保真度   | 仅 JSON 数据模型           | 完整类型保真 ✓                                                          |
+| 语法风格     | YAML 风格缩进              | 紧凑元组行                                                     |
+| 数组长度标记 | `[N]` —— 有助于检测截断    | Schema 头部定义结构 ✓                                          |
+| 嵌套结构     | 退化为冗长的列表格式       | 原生递归支持 ✓                                                 |
+| 适用场景     | 仅 LLM 输入                | LLM + 序列化 + 存储 + 传输 ✓                                   |
+| 二进制编解码 | ✗                          | ✓                                                              |
+| 语言实现     | 仅 TypeScript / JavaScript | **C、C++、C#、Go、Java、JS、Python、Rust、Zig、Dart** ✓        |
+| 往返保真度   | 仅 JSON 数据模型           | 完整类型保真 ✓                                                 |
 
 ### 何时选择 ASON
 
@@ -150,20 +150,20 @@ _（空值 = `None` / `null`）_
 
 ## 各语言实现
 
-| 语言                    | 仓库                      | 状态        |
-| ----------------------- | ------------------------- | ----------- |
-| C                       | [ason-c](ason-c/)         | Ready       |
-| C++                     | [ason-cpp](ason-cpp/)     | Ready       |
-| C#                      | [ason-cs](ason-cs/)       | Ready       |
-| Go                      | [ason-go](ason-go/)       | Ready       |
-| Java / Kotlin           | [ason-java](ason-java/)   | Ready       |
-| JavaScript / TypeScript | [ason-js](ason-js/)       | Ready       |
-| Python                  | [ason-py](ason-py/)       | In progress |
-| Rust                    | [ason-rs](ason-rs/)       | Ready       |
-| Zig                     | [ason-zig](ason-zig/)     | Ready       |
-| Dart                    | [ason-dart](ason-dart/)   | Ready       |
-| PHP                     | [ason-php](ason-php/)     | Ready       |
-| Swift                   | [ason-swift](ason-swift/) | Ready       |
+| 语言                    | 仓库                      | 状态 |
+| ----------------------- | ------------------------- | ---- |
+| C                       | [ason-c](ason-c/)         | ✓    |
+| C++                     | [ason-cpp](ason-cpp/)     | ✓    |
+| C#                      | [ason-cs](ason-cs/)       | ✓    |
+| Go                      | [ason-go](ason-go/)       | ✓    |
+| Java / Kotlin           | [ason-java](ason-java/)   | ✓    |
+| JavaScript / TypeScript | [ason-js](ason-js/)       | ✓    |
+| Python                  | [ason-py](ason-py/)       | ✓    |
+| Rust                    | [ason-rs](ason-rs/)       | ✓    |
+| Zig                     | [ason-zig](ason-zig/)     | ✓    |
+| Dart                    | [ason-dart](ason-dart/)   | ✓    |
+| PHP                     | [ason-php](ason-php/)     | ✓    |
+| Swift                   | [ason-swift](ason-swift/) | ✓    |
 
 ## 插件
 

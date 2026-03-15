@@ -681,7 +681,7 @@ ASON 除了人类可读的文本格式外，还定义了一种紧凑的二进制
 | `i64` / `u64` | 8                  | 小端序                                        |
 | `f32`         | 4                  | IEEE 754 bitcast, 小端序                      |
 | `f64`         | 8                  | IEEE 754 bitcast, 小端序                      |
-| `string`      | 4 + N              | u32 LE 字节长度 + N 字节 UTF-8                |
+| `str`         | 4 + N              | u32 LE 字节长度 + N 字节 UTF-8                |
 | `Option<T>`   | 1 或 1 + sizeof(T) | u8 标签 (`0x00` = null, `0x01` = some) + 载荷 |
 | `Array<T>`    | 4 + N × sizeof(T)  | u32 LE 元素数量 + N 个元素依次编码            |
 | `struct`      | Σ fields           | 按字段声明顺序依次编码，无任何间隔或对齐填充  |

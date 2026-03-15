@@ -81,17 +81,17 @@ users[2]{id,name,active}:
 
 ### Comparison Table
 
-| Aspect                   | TOON                              | ASON                                                                           |
-| ------------------------ | --------------------------------- | ------------------------------------------------------------------------------ |
-| Schema declaration       | Auto-detected at encode time      | Explicit and reusable ✓                                                        |
+| Aspect                   | TOON                              | ASON                                                                            |
+| ------------------------ | --------------------------------- | ------------------------------------------------------------------------------- |
+| Schema declaration       | Auto-detected at encode time      | Explicit and reusable ✓                                                         |
 | Type annotations         | None (JSON data model only)       | Optional schema hints (`int`, `str`, `bool`, `float`, arrays, nested structs) ✓ |
-| Syntax style             | YAML-like indentation             | Compact tuple rows                                                             |
-| Array length markers     | `[N]` — helps detect truncation   | Schema header defines structure ✓                                              |
-| Nested structures        | Falls back to verbose list format | Native and recursive ✓                                                         |
-| Use case                 | LLM input only                    | LLM + serialization + storage + transport ✓                                    |
-| Binary codec             | ✗                                 | ✓                                                                              |
-| Language implementations | TypeScript / JavaScript only      | **C, C++, C#, Go, Java, JS, Python, Rust, Zig, Dart** ✓                        |
-| Round-trip fidelity      | JSON data model only              | Full type fidelity ✓                                                           |
+| Syntax style             | YAML-like indentation             | Compact tuple rows                                                              |
+| Array length markers     | `[N]` — helps detect truncation   | Schema header defines structure ✓                                               |
+| Nested structures        | Falls back to verbose list format | Native and recursive ✓                                                          |
+| Use case                 | LLM input only                    | LLM + serialization + storage + transport ✓                                     |
+| Binary codec             | ✗                                 | ✓                                                                               |
+| Language implementations | TypeScript / JavaScript only      | **C, C++, C#, Go, Java, JS, Python, Rust, Zig, Dart** ✓                         |
+| Round-trip fidelity      | JSON data model only              | Full type fidelity ✓                                                            |
 
 ### When to Choose ASON
 
@@ -150,20 +150,20 @@ _(blank value = `None`/`null`)_
 
 ## Implementations
 
-| Language                | Repository                | Status      |
-| ----------------------- | ------------------------- | ----------- |
-| C                       | [ason-c](ason-c/)         | Ready       |
-| C++                     | [ason-cpp](ason-cpp/)     | Ready       |
-| C#                      | [ason-cs](ason-cs/)       | Ready       |
-| Go                      | [ason-go](ason-go/)       | Ready       |
-| Java / Kotlin           | [ason-java](ason-java/)   | Ready       |
-| JavaScript / TypeScript | [ason-js](ason-js/)       | Ready       |
-| Python                  | [ason-py](ason-py/)       | In progress |
-| Rust                    | [ason-rs](ason-rs/)       | Ready       |
-| Zig                     | [ason-zig](ason-zig/)     | Ready       |
-| Dart                    | [ason-dart](ason-dart/)   | Ready       |
-| PHP                     | [ason-php](ason-php/)     | Ready       |
-| Swift                   | [ason-swift](ason-swift/) | Ready       |
+| Language                | Repository                | Status |
+| ----------------------- | ------------------------- | ------ |
+| C                       | [ason-c](ason-c/)         | ✓      |
+| C++                     | [ason-cpp](ason-cpp/)     | ✓      |
+| C#                      | [ason-cs](ason-cs/)       | ✓      |
+| Go                      | [ason-go](ason-go/)       | ✓      |
+| Java / Kotlin           | [ason-java](ason-java/)   | ✓      |
+| JavaScript / TypeScript | [ason-js](ason-js/)       | ✓      |
+| Python                  | [ason-py](ason-py/)       | ✓      |
+| Rust                    | [ason-rs](ason-rs/)       | ✓      |
+| Zig                     | [ason-zig](ason-zig/)     | ✓      |
+| Dart                    | [ason-dart](ason-dart/)   | ✓      |
+| PHP                     | [ason-php](ason-php/)     | ✓      |
+| Swift                   | [ason-swift](ason-swift/) | ✓      |
 
 ## Plugins
 
