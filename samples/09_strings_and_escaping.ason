@@ -1,0 +1,2 @@
+{title@str, message@str, path@str, tags@[str]}:
+  ("ASON \"Guide\"", "line one\nline two", "/srv/app/config", ["alpha,beta", "hello [world]", "keep spaces"])

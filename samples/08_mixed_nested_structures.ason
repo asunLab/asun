@@ -1,0 +1,2 @@
+{app@{name@str, version@str}, replicas@[{region@str, nodes@[{host@str, port@int}]}], metadata@[{key@str, value@str}]}:
+  ((ason_core, 1.0.0), [(apac, [(node_a, 8080), (node_b, 8081)]), (us, [(node_c, 9090)])], [(owner, platform), (tier, critical), (mode, rolling)])

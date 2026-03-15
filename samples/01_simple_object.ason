@@ -1,0 +1,10 @@
+{
+    "id uuid",
+    name,
+    65
+}:
+(
+    1,
+    Alice,
+    true
+)

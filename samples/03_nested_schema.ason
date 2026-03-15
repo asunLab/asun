@@ -1,0 +1,16 @@
+{
+    user_id@int,
+    profile@{
+        first_name,
+        last_name,
+        city
+    }
+}:
+(
+    1,
+    (
+        Ada,
+        Lovelace,
+        London
+    )
+)

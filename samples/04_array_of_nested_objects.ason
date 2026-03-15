@@ -1,0 +1,2 @@
+{user_id@int, orders@[{order_id@int, amount@float, paid@bool}]}:
+  (101, [(5001, 19.99, true), (5002, 42.50, false), (5003, 5.25, true)])

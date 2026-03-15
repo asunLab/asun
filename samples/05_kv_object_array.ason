@@ -1,0 +1,1 @@
+{service@str,settings@[{key@str,value@str}]}:(api_gateway,[(host,localhost),(env,prod),(mode,safe)])

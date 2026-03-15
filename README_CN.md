@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**ASON** 是一种紧凑的、Schema 驱动的数据格式，专为 **LLM 交互**与**高性能数据传输**而设计。它将 Schema 与数据分离 —— Key 只声明一次，数据行仅保留纯值。
+**ASON** 是一种紧凑的、Schema 优先的数据格式，适合 **LLM Prompt**、**结构化 API** 和 **大规模数据集**。它将 Schema 与数据分离，Key 只声明一次，数据行只保留值。
 
 [English](README.md)
 
@@ -10,7 +10,7 @@
 
 ## 为什么选择 ASON？
 
-标准 JSON 在每条记录中都重复所有字段名。向 LLM 发送结构化数据集或在网络上传输时，这种冗余会大量消耗 Token 和带宽：
+标准 JSON 会在每条记录里重复所有字段名。无论是发给 LLM、通过 API 传输，还是服务之间交换数据，这种重复都会浪费 Token、带宽和阅读成本：
 
 ```json
 [
@@ -23,27 +23,27 @@
 ASON 只声明 **一次** Schema，数据以紧凑元组方式流式传输：
 
 ```
-[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false),(3,Carol,true)
+[{id@int, name@str, active@bool}]:(1,Alice,true),(2,Bob,false),(3,Carol,true)
 ```
 
-**减少约 65% 的 Token，信息量不变，Schema 机器可读。**
+**更少的 Token，更小的体积，更清晰的结构。**
 
 ---
 
 ## ASON vs JSON
 
-| 方面         | JSON         | ASON                 |
-| ------------ | ------------ | -------------------- |
-| Token 效率   | 100%（基准） | **30–70%** ✓         |
-| Key 重复     | 每个对象都有 | 声明一次 ✓           |
-| 类型注解     | 无           | 可选 ✓               |
-| 人类可读     | 是           | 是 ✓                 |
-| 嵌套结构     | ✓            | ✓                    |
-| 序列化速度   | 1×           | **~1.7–2.4× 更快** ✓ |
-| 反序列化速度 | 1×           | **~1.9–2.9× 更快** ✓ |
-| 数据体积     | 100%（基准） | **40–60%** ✓         |
-| 二进制编解码 | ✗            | ✓                    |
-| 结构体反射   | ✗            | 编译期 ✓             |
+| 方面          | JSON         | ASON                      |
+| ------------- | ------------ | ------------------------- |
+| Token 效率    | 100%（基准） | **30–70%** ✓              |
+| Key 重复      | 每个对象都有 | 声明一次 ✓                |
+| 类型注解      | 无           | 可选 ✓                    |
+| 人类可读      | 是           | 是 ✓                      |
+| 嵌套结构      | ✓            | ✓                         |
+| 序列化        | 重复 Key     | Schema 一次，后面只写值 ✓ |
+| 反序列化      | 通用对象扫描 | 基于 Schema 定向解码 ✓    |
+| 数据体积      | 100%（基准） | **40–60%** ✓              |
+| 二进制编解码  | ✗            | ✓                         |
+| 类型化 Schema | 有限         | 内建支持 ✓                |
 
 ### Token 节省 —— 具体示例
 
@@ -52,10 +52,10 @@ JSON（100 tokens）：
 {"users":[{"id":1,"name":"Alice","active":true},{"id":2,"name":"Bob","active":false}]}
 
 ASON（~35 tokens，节省 65%）：
-[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
+[{id@int, name@str, active@bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
-Schema 头部同时充当 LLM 的内联提示 —— 字段名和可选类型一目了然，无需扫描每一行。
+Schema 头部也可以直接充当 LLM 和人类读者的内联提示：字段名和可选类型先出现，不需要逐行反复扫描。
 
 ---
 
@@ -76,31 +76,29 @@ users[2]{id,name,active}:
 **ASON** —— 基于元组，Schema 显式/隐式：
 
 ```
-[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
+[{id@int, name@str, active@bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
 ### 对比表
 
-| 方面         | TOON                        | ASON                                                                    |
-| ------------ | --------------------------- | ----------------------------------------------------------------------- |
-| Schema 声明  | 编码时自动检测              | 显式声明，可复用，语言级别 ✓                                            |
-| 类型注解     | 无（仅 JSON 数据模型）      | 丰富可选类型（`int`、`str`、`bool`、`f64`、`opt_*`、`vec_*`、`map_*`）✓ |
-| 语法风格     | YAML 风格缩进               | 紧凑元组行                                                              |
-| 数组长度标记 | `[N]` —— 有助于检测截断     | Schema 头部定义结构 ✓                                                   |
-| 嵌套结构     | 退化为冗长的列表格式        | 原生高效，递归支持 ✓                                                    |
-| 适用场景     | 仅 LLM 输入（只读转换层）   | LLM + 序列化 + 数据传输 ✓                                               |
-| 序列化性能   | 未测试（仅 JS）             | SIMD 加速，约 1.7–2.9× vs JSON ✓                                        |
-| 反序列化性能 | 未测试（仅 JS）             | 零拷贝解析 ✓                                                            |
-| 二进制编解码 | ✗                           | ✓                                                                       |
-| 语言实现     | 仅 TypeScript / JavaScript  | **C、C++、C#、Go、Java、JS、Python、Rust、Zig、Dart** ✓                 |
-| 结构体反射   | 动态（仅运行时）            | 编译期（`ASON_FIELDS` 宏）✓                                             |
-| 深层嵌套数据 | Token 开销显著增加          | 任意嵌套层级均高效 ✓                                                    |
-| 往返保真度   | JSON 数据模型（无类型信息） | 完整类型保真 ✓                                                          |
+| 方面         | TOON                       | ASON                                                                    |
+| ------------ | -------------------------- | ----------------------------------------------------------------------- |
+| Schema 声明  | 编码时自动检测             | 显式声明，可复用 ✓                                                      |
+| 类型注解     | 无（仅 JSON 数据模型）     | 可选结构提示（`int`、`str`、`bool`、`float`、数组、嵌套对象）✓ |
+| 语法风格     | YAML 风格缩进              | 紧凑元组行                                                              |
+| 数组长度标记 | `[N]` —— 有助于检测截断    | Schema 头部定义结构 ✓                                                   |
+| 嵌套结构     | 退化为冗长的列表格式       | 原生递归支持 ✓                                                          |
+| 适用场景     | 仅 LLM 输入                | LLM + 序列化 + 存储 + 传输 ✓                                            |
+| 二进制编解码 | ✗                          | ✓                                                                       |
+| 语言实现     | 仅 TypeScript / JavaScript | **C、C++、C#、Go、Java、JS、Python、Rust、Zig、Dart** ✓                 |
+| 往返保真度   | 仅 JSON 数据模型           | 完整类型保真 ✓                                                          |
 
 ### 何时选择 ASON
 
-- 需要在编译型语言（C、C++、Rust、Go……）中实现**高性能序列化**
-- 数据具有**丰富类型** —— 可选字段、类型化向量、Map、嵌套结构体
+- 希望在不丢失结构的前提下得到**更少的 Token**和**更小的 payload**
+- 数据有**丰富类型** —— 可选字段、类型化数组、嵌套结构体、键值条目列表
+- 希望一个格式同时服务于 **LLM、API、存储、服务间传输**
+- 数据具有**丰富类型** —— 可选字段、类型化数组、嵌套结构体、键值条目列表
 - 除文本格式外还需要**二进制编码**
 - 跨**多种语言**工作，或需要与语言无关的线路格式
 - 希望 Schema 作为面向 LLM Prompt 的**自文档化 API 契约**
@@ -117,7 +115,7 @@ users[2]{id,name,active}:
 ### 单个对象
 
 ```
-{id:int, name:str, active:bool}:(42,Alice,true)
+{id@int, name@str, active@bool}:(42,Alice,true)
 ```
 
 ### 对象数组（Schema 驱动）
@@ -125,47 +123,47 @@ users[2]{id,name,active}:
 Schema 声明一次，每条数据为元组：
 
 ```
-[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false),(3,Carol,true)
+[{id@int, name@str, active@bool}]:(1,Alice,true),(2,Bob,false),(3,Carol,true)
 ```
 
 ### 嵌套结构体
 
 ```
-{name:str, dept}:(Alice,(Engineering))
+{name@str, dept@{title@str}}:(Alice,(Engineering))
 ```
 
 ### 可选字段
 
 ```
-{id:int, label:opt_str}:(1,hello),(2,)
+{id@int, label@str}:(1,hello),(2,)
 ```
 
 _（空值 = `None` / `null`）_
 
-### 类型化向量与 Map
+### 数组与键值条目
 
 ```
-{name:str, tags:vec_str, attrs:map_si}:(Alice,[rust,go,python],[(age,30),(score,95)])
+{name@str, scores@[int], attrs@[{key@str, value@int}]}:(Alice,[90,85,92],[(age,30),(score,95)])
 ```
 
 ---
 
 ## 各语言实现
 
-| 语言                    | 仓库                      | 备注       |
-| ----------------------- | ------------------------- | ---------- |
-| C                       | [ason-c](ason-c/)         | ✓ C11      |
-| C++                     | [ason-cpp](ason-cpp/)     | ✓ C++17    |
-| C#                      | [ason-cs](ason-cs/)       | ✓ .NET 8+  |
-| Go                      | [ason-go](ason-go/)       | ✓ Go 1.24+ |
-| Java / Kotlin           | [ason-java](ason-java/)   | ✓ Java 21+ |
-| JavaScript / TypeScript | [ason-js](ason-js/)       | ✓ JS/TS    |
-| Python                  | [ason-py](ason-py/)       | ✓          |
-| Rust                    | [ason-rs](ason-rs/)       | ✓          |
-| Zig                     | [ason-zig](ason-zig/)     | ✓          |
-| Dart                    | [ason-dart](ason-dart/)   | ✓          |
-| PHP                     | [ason-php](ason-php/)     | ✓ PHP 8.4+ |
-| Swift                   | [ason-swift](ason-swift/) | ✓          |
+| 语言                    | 仓库                      | 状态        |
+| ----------------------- | ------------------------- | ----------- |
+| C                       | [ason-c](ason-c/)         | Ready       |
+| C++                     | [ason-cpp](ason-cpp/)     | Ready       |
+| C#                      | [ason-cs](ason-cs/)       | Ready       |
+| Go                      | [ason-go](ason-go/)       | Ready       |
+| Java / Kotlin           | [ason-java](ason-java/)   | Ready       |
+| JavaScript / TypeScript | [ason-js](ason-js/)       | Ready       |
+| Python                  | [ason-py](ason-py/)       | In progress |
+| Rust                    | [ason-rs](ason-rs/)       | Ready       |
+| Zig                     | [ason-zig](ason-zig/)     | Ready       |
+| Dart                    | [ason-dart](ason-dart/)   | Ready       |
+| PHP                     | [ason-php](ason-php/)     | Ready       |
+| Swift                   | [ason-swift](ason-swift/) | Ready       |
 
 ## 插件
 

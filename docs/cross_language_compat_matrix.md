@@ -57,7 +57,7 @@ target" scenarios below.
 ### `A2-T`
 
 ```text
-{id:int,name:str,active:bool}:(42,Alice,true)
+{id@int,name@str,active@bool}:(42,Alice,true)
 ```
 
 Target:
@@ -93,7 +93,7 @@ Expected:
 ### `A3-T`
 
 ```text
-{id:int,name:str}:(42,Alice)
+{id@int,name@str}:(42,Alice)
 ```
 
 Target:
@@ -111,7 +111,7 @@ Expected:
 ### `A4-T`
 
 ```text
-{active:bool,id:int,name:str}:(true,42,Alice)
+{active@bool,id@int,name@str}:(true,42,Alice)
 ```
 
 Target:
@@ -127,7 +127,7 @@ Expected:
 ### `A5-T`
 
 ```text
-[{id:int,name:str,active:bool}]:(42,Alice,true),(7,Bob,false)
+[{id@int,name@str,active@bool}]:(42,Alice,true),(7,Bob,false)
 ```
 
 Target:
@@ -144,7 +144,7 @@ Expected:
 ### `A6-T`
 
 ```text
-[{id:int,name:str}]:(42,Alice),(7,Bob)
+[{id@int,name@str}]:(42,Alice),(7,Bob)
 ```
 
 Target:
@@ -176,7 +176,7 @@ Expected:
 ### `P1-T`
 
 ```text
-{id:int,name:str,score:float,active:bool}:(42,Alice,9.5,true)
+{id@int,name@str,score@float,active@bool}:(42,Alice,9.5,true)
 ```
 
 Target:
@@ -210,7 +210,7 @@ Expected:
 ### `P2-T`
 
 ```text
-{id:int,name:str}:(42,Alice)
+{id@int,name@str}:(42,Alice)
 ```
 
 Target:
@@ -243,7 +243,7 @@ Expected:
 ### `N1-T`
 
 ```text
-{name:str,inner:{x:int,y:int,z:float,w:bool},flag:bool}:(test,(10,20,3.14,true),true)
+{name@str,inner@{x@int,y@int,z@float,w@bool},flag@bool}:(test,(10,20,3.14,true),true)
 ```
 
 Target:
@@ -260,7 +260,7 @@ Expected:
 ### `N1-U`
 
 ```text
-{name,inner:{x,y,z,w},flag}:(test,(10,20,3.14,true),true)
+{name,inner@{x,y,z,w},flag}:(test,(10,20,3.14,true),true)
 ```
 
 Target:
@@ -276,7 +276,7 @@ Expected:
 ### `N2-T`
 
 ```text
-[{name:str,tasks:[{title:str,done:bool,priority:int,weight:float}]}]:(Alpha,[(Design,true,1,0.5),(Code,false,2,0.8)]),(Beta,[(Test,false,3,1.0)])
+[{name@str,tasks@[{title@str,done@bool,priority@int,weight@float}]}]:(Alpha,[(Design,true,1,0.5),(Code,false,2,0.8)]),(Beta,[(Test,false,3,1.0)])
 ```
 
 Target:
@@ -292,7 +292,7 @@ Expected:
 ### `N2-U`
 
 ```text
-[{name,tasks:[{title,done,priority,weight}]}]:(Alpha,[(Design,true,1,0.5),(Code,false,2,0.8)]),(Beta,[(Test,false,3,1.0)])
+[{name,tasks@[{title,done,priority,weight}]}]:(Alpha,[(Design,true,1,0.5),(Code,false,2,0.8)]),(Beta,[(Test,false,3,1.0)])
 ```
 
 Target:
@@ -308,7 +308,7 @@ Expected:
 ### `N3-T`
 
 ```text
-{id:int,child:{name:str,sub:{a:int,b:str,c:bool},code:int,tags:[str]},extra:str}:(7,(leaf,(11,hello,true),99,[x,y]),tail)
+{id@int,child@{name@str,sub@{a@int,b@str,c@bool},code@int,tags@[str]},extra@str}:(7,(leaf,(11,hello,true),99,[x,y]),tail)
 ```
 
 Target:
@@ -325,7 +325,7 @@ Expected:
 ### `N3-U`
 
 ```text
-{id,child:{name,sub:{a,b,c},code,tags},extra}:(7,(leaf,(11,hello,true),99,[x,y]),tail)
+{id,child@{name,sub@{a,b,c},code,tags},extra}:(7,(leaf,(11,hello,true),99,[x,y]),tail)
 ```
 
 Target:
@@ -341,7 +341,7 @@ Expected:
 ### `N4-T`
 
 ```text
-[{id:int,profile:{name:str,nick:str?,score:float?},active:bool}]:(1,(Alice,ally,9.5),true),(2,(Bob,,),false)
+[{id@int,profile@{name@str,nick@str?,score@float?},active@bool}]:(1,(Alice,ally,9.5),true),(2,(Bob,,),false)
 ```
 
 Target:
@@ -359,7 +359,7 @@ Expected:
 ### `N4-U`
 
 ```text
-[{id,profile:{name,nick,score},active}]:(1,(Alice,ally,9.5),true),(2,(Bob,,),false)
+[{id,profile@{name,nick,score},active}]:(1,(Alice,ally,9.5),true),(2,(Bob,,),false)
 ```
 
 Target:
@@ -375,7 +375,7 @@ Expected:
 ### `O1-T`
 
 ```text
-[{id:int,label:str?,score:float?,flag:bool}]:(1,hello,95.5,true),(2,,,false)
+[{id@int,label@str?,score@float?,flag@bool}]:(1,hello,95.5,true),(2,,,false)
 ```
 
 Target:

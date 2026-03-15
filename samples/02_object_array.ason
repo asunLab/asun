@@ -1,0 +1,24 @@
+[{
+    id,
+    name,
+    score,
+    passed
+}]:
+(
+    1,
+    Alice,
+    95.5,
+    true
+),
+(
+    2,
+    Bob,
+    82.0,
+    true
+),
+(
+    3,
+    Carol,
+    59.5,
+    false
+)

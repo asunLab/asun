@@ -33,7 +33,7 @@ ASON is a serialization format designed for large-scale data transmission and LL
 
 ```ason
 // ASON: ~35 tokens (65% token saving)
-[{id:int, name:str, active:bool}]:
+[{id@int, name@str, active@bool}]:
   (1, Alice, true),
   (2, Bob, false)
 ```
@@ -59,17 +59,35 @@ Beyond token savings in LLM scenarios, ASON also dramatically outperforms JSON i
 
 2. **Schema-Driven Parsing**:
    - **JSON**: The parser must dynamically infer the type of each value by peeking at the next character (`"`, `t`, `f`, `[`, `{`, digit), causing frequent CPU branch mispredictions.
-   - **ASON**: The schema provides structural information (e.g., `{id, name, active}`), so the parser reads each field value in a fixed, known order without dynamic type inference. In a serde framework the target struct's type is already known at compile time, and the parser calls `parse_int()` etc. directly. Type annotations in the schema (e.g., `{id:int}`) are optional decorative metadata and do not affect parse performance.
+   - **ASON**: The schema provides structural information (e.g., `{id, name, active}`), so the parser reads each field value in a fixed, known order without dynamic type inference. In a serde framework the target struct's type is already known at compile time, and the parser calls `parse_int()` etc. directly. Type annotations in the schema (e.g., `{id@int}`) are optional decorative metadata and do not affect parse performance.
 
 3. **Low Memory Footprint**:
    - JSON builds a dynamic DOM tree that allocates memory for every key string in every object. ASON data rows are essentially a flat tuple array — all rows share a single schema reference, keeping memory overhead minimal.
 
 ---
 
+## 1.3 Core Architecture Philosophy
+
+ASON's design goes beyond just saving tokens; its deep architectural philosophy dictates its extreme performance and precise semantics:
+
+1. **Physical Isolation via `Header : Body`**
+   - ASON uses `:` to strictly divide the text into Schema (Blueprint) and Data (Body).
+   - This physical isolation allows the parser to split the payload in **O(1)** time. The front-end parser can parse the Schema independently, pre-allocate structural memory, and then engage in high-speed or multi-threaded streaming of massive Data rows, completely discarding JSON's inefficient paradigm of continuously inferring object boundaries while parsing data.
+
+2. **Tuple Semantics `()` vs Object Semantics `{}`**
+   - In ASON, Schema uses `{}` to define the unordered key-value blueprint, but crucially, **data bodies are strictly wrapped in `()`**.
+   - `()` represents a **Tuple** in programming languages — a strictly ordered, keyless, position-bound data structure. It sends a strong signal to humans and AI: data must perfectly align with the schema positions and cannot be shuffled like in JSON. This architectural "harmony of shapes" visually isolates structural definitions from pure data with extreme sharpness, drastically reducing structure-related parsing errors.
+
+3. **Native Immunity to Key Collisions**
+   - JSON syntax allows ambiguous key duplications (e.g., `{"age": 30, "age": 40}`), often leading to the latter covering the former.
+   - By confining keys exclusively to the Schema header, ASON data regions consist solely of compact values (`(30), (40)`), completely insulating the format from key collisions at the syntactic source. By reducing Maps/Dictionaries to arrays of key-value tuples (e.g., `[{key, value}]: ((age,30))`), ASON perfectly extends this high-performance, collision-free design abstraction.
+
+---
+
 ## 2. Core Syntax Preview
 
 ```ason
-[{id:int, name:str, tags:[str]}]:
+[{id@int, name@str, tags@[str]}]:
   (1, Alice, [rust, go]),
   (2, Bob, [python, c++])
 ```
@@ -108,33 +126,32 @@ ASON supports two string forms:
 
 ### 3.2 Type Annotation System
 
-**ASON v1.4 introduces optional type annotations** — append `:type` after a schema field name to declare its type explicitly.
+**ASON v1.4 introduces optional type annotations** — append `@type` after a schema field name to declare its type explicitly.
 
-> **Core principle: Type annotations are purely decorative metadata.** Annotated and unannotated schemas are **completely equivalent** from the parser's perspective — the parser skips the `:type` portion and it has no effect on parsing or deserialization. Both of the following produce identical parse results:
+> **Core principle: Type annotations are purely decorative metadata.** Annotated and unannotated schemas are **completely equivalent** from the parser's perspective — the parser skips the `@type` portion and it has no effect on parsing or deserialization. Both of the following produce identical parse results:
 >
 > ```ason
 > // Without annotations
 > {id,name,active}:(1,Alice,true)
 >
 > // With annotations — identical parse result
-> {id:int,name:str,active:bool}:(1,Alice,true)
+> {id@int,name@str,active@bool}:(1,Alice,true)
 > ```
 
 **Supported types:**
 
 | Type    | Syntax                | Example               | Description                               |
 | ------- | --------------------- | --------------------- | ----------------------------------------- |
-| String  | `string` / `str`      | `name:str`            | Text data                                 |
-| Integer | `int` / `integer`     | `id:int`              | Signed integer                            |
-| Float   | `float` / `double`    | `salary:float`        | Floating-point number                     |
-| Boolean | `bool` / `boolean`    | `active:bool`         | Boolean value                             |
-| Map     | `map[K,V]`            | `attrs:map[str,int]`  | Key-value pairs; data expressed as tuple arrays |
+| String  | `string` / `str`      | `name@str`            | Text data                                 |
+| Integer | `int` / `integer`     | `id@int`              | Signed integer                            |
+| Float   | `float` / `double`    | `salary@float`        | Floating-point number                     |
+| Boolean | `bool` / `boolean`    | `active@bool`         | Boolean value                             |
 
 **Example with type annotations:**
 
 ```ason
 // Full type annotations
-[{id:int, name:str, salary:float, active:bool}]:
+[{id@int, name@str, salary@float, active@bool}]:
   (1, Alice, 5000.50, true),
   (2, Bob, 4500.00, false),
   (3, "Carol Smith", 6200.75, true)
@@ -143,9 +160,9 @@ ASON supports two string forms:
 **Key properties:**
 
 - ✅ **Optional**: Type annotations are not required and can be omitted entirely
-- ✅ **Equivalent**: Annotated and unannotated schemas parse identically; the parser auto-skips `:type`
+- ✅ **Equivalent**: Annotated and unannotated schemas parse identically; the parser auto-skips `@type`
 - ✅ **Partial**: You can annotate only some fields and omit the rest
-- ✅ **Negligible overhead**: Annotations only affect schema header parsing, not the data body. Vec scenarios: <0.1%, single struct: ~3% — constant overhead, does not grow with data volume
+- ✅ **Negligible overhead**: Annotations only affect schema header parsing, not the data body. Vec scenarios <0.1%, single struct ~3% — constant overhead, does not grow with data volume
 
 **Use cases:**
 
@@ -158,10 +175,18 @@ ASON supports two string forms:
 
 ```ason
 // Annotate only key fields (recommended style)
-[{id:int, name:str, email:str, age:int, bio:str}]:
+[{id@int, name@str, email@str, age@int, bio@str}]:
   (1, Alice, alice@example.com, 30, "Engineer"),
   (2, Bob, bob@example.com, 28, "Designer")
 ```
+
+**⚠️ CRITICAL WARNING: The `@` structural marker is mandatory for complex types!**
+
+While the `@type` for terminal scalar data (numbers, strings, etc.) is purely decorative and can be completely omitted, for **complex type containers (nested objects, arrays)**, even if you omit specific scalar types, the `@` followed by `{}` or `[]` acts as a crucial structural scaffold and **must absolutely not be omitted!**
+- ✅ **Annotated nesting**: `dept@{title@str}`
+- ✅ **Unannotated structural nesting**: `dept@{title}` (dropped `@str`, but the `@{}` must be kept to signal to the parser to enter the next object level)
+- ✅ **Unannotated array**: `tags@[]` (kept `@[]` to indicate an array boundary)
+- ❌ **Fatal omission**: `dept` (without the brackets, the parser will not know `dept` corresponds to a complex object, leading to an overall breakdown of stream reading)
 
 ---
 
@@ -186,7 +211,7 @@ Escape special characters when they appear inside string values:
 
 - ASON uses UTF-8 encoding by default.
 - In unquoted strings, `,()[]` must be escaped.
-- In quoted strings, only `"` and `\` need escaping.
+- In quoted strings, at minimum `"` and `\` must be escaped; control characters may use `\n`, `\t`, `\r`, `\b`, and `\f`.
 
 ## 5. Comments
 
@@ -194,7 +219,7 @@ Block comments are supported using `/* */` syntax:
 
 ```text
 /* This is a user list */
-[{name:str,age:int}]:(Alice,30),(Bob,25)
+[{name@str,age@int}]:(Alice,30),(Bob,25)
 ```
 
 Multi-line comments:
@@ -204,7 +229,7 @@ Multi-line comments:
   User data
   Last updated: 2024-01-01
 */
-[{name:str,age:int}]:
+[{name@str,age@int}]:
   (Alice,30),
   (Bob,25)
 ```
@@ -214,11 +239,11 @@ To ensure maximum streaming parse performance, comments **may only appear at the
 
 ```text
 ✅ Correct:
-/* username */ {name:str, age:int}:
+/* username */ {name@str, age@int}:
   (Alice, 30) /* age */
 
 ❌ Incorrect (comments inside data are forbidden):
-{name:str, age:int}:(Alice, /* age */ 30)
+{name@str, age@int}:(Alice, /* age */ 30)
 ```
 
 ## 6. Syntax Rules
@@ -226,7 +251,7 @@ To ensure maximum streaming parse performance, comments **may only appear at the
 ### 6.1 Single Object
 
 ```text
-{name:str,age:int}:(Alice,30)
+{name@str,age@int}:(Alice,30)
 ```
 
 → `{name: "Alice", age: 30}`
@@ -234,7 +259,7 @@ To ensure maximum streaming parse performance, comments **may only appear at the
 ### 6.2 Array of Objects (same structure, multiple rows)
 
 ```text
-[{name:str,age:int}]:(Alice,30),(Bob,25),(Charlie,35)
+[{name@str,age@int}]:(Alice,30),(Bob,25),(Charlie,35)
 ```
 
 → Array of 3 objects
@@ -244,7 +269,7 @@ To ensure maximum streaming parse performance, comments **may only appear at the
 ### 6.3 Null / Optional Fields
 
 ```text
-{name:str,age:int,email:str}:(Alice,30,)
+{name@str,age@int,email@str}:(Alice,30,)
 ```
 
 → `{name: "Alice", age: 30, email: null}`
@@ -252,7 +277,7 @@ To ensure maximum streaming parse performance, comments **may only appear at the
 ### 6.4 Nested Object
 
 ```text
-{name:str,addr:{city:str,zip:int}}:(Alice,(NYC,10001))
+{name@str,addr@{city@str,zip@int}}:(Alice,(NYC,10001))
 ```
 
 → `{name: "Alice", addr: {city: "NYC", zip: 10001}}`
@@ -260,7 +285,7 @@ To ensure maximum streaming parse performance, comments **may only appear at the
 ### 6.5 Object with a Simple Array Field
 
 ```text
-{name:str,scores:[int]}:(Alice,[90,85,92])
+{name@str,scores@[int]}:(Alice,[90,85,92])
 ```
 
 → `{name: "Alice", scores: [90, 85, 92]}`
@@ -268,20 +293,12 @@ To ensure maximum streaming parse performance, comments **may only appear at the
 ### 6.6 Object with an Array-of-Objects Field
 
 ```text
-{team:str,users:[{id:int,name:str}]}:(Dev,[(1,Alice),(2,Bob)])
+{team@str,users@[{id@int,name@str}]}:(Dev,[(1,Alice),(2,Bob)])
 ```
 
 → `{team: "Dev", users: [{id: 1, name: "Alice"}, {id: 2, name: "Bob"}]}`
 
-### 6.7 Object with a Map Field
-
-```text
-{name:str,attrs:map[str,int]}:(Alice,[(age,30),(score,95)])
-```
-
-→ `{name: "Alice", attrs: {"age": 30, "score": 95}}`
-
-### 6.8 Plain Array (no schema)
+### 6.7 Plain Array (no schema)
 
 ```text
 [1,2,3]
@@ -289,7 +306,7 @@ To ensure maximum streaming parse performance, comments **may only appear at the
 
 → `[1, 2, 3]`
 
-### 6.9 Array of Arrays
+### 6.8 Array of Arrays
 
 ```text
 [[1,2],[3,4]]
@@ -297,19 +314,19 @@ To ensure maximum streaming parse performance, comments **may only appear at the
 
 → `[[1, 2], [3, 4]]`
 
-### 6.10 Empty Array
+### 6.9 Empty Array
 
 ```text
 []
 ```
 
-### 6.11 Empty Object
+### 6.10 Empty Object
 
 ```text
 ()
 ```
 
-### 6.12 Mixed-Type Array
+### 6.11 Mixed-Type Array
 
 ```text
 [1,hello,true,3.14]
@@ -317,10 +334,10 @@ To ensure maximum streaming parse performance, comments **may only appear at the
 
 → `[1, "hello", true, 3.14]`
 
-### 6.13 Complex Nesting Example
+### 6.12 Complex Nesting Example
 
 ```text
-{company:str,employees:[{id:int,name:str,skills:[str]}],active:bool}:(ACME,[(1,Alice,[rust,go]),(2,Bob,[python])],true)
+{company@str,employees@[{id@int,name@str,skills@[str]}],active@bool}:(ACME,[(1,Alice,[rust,go]),(2,Bob,[python])],true)
 ```
 
 **Parsed result:**
@@ -331,10 +348,10 @@ To ensure maximum streaming parse performance, comments **may only appear at the
   - `{id: 2, name: "Bob", skills: ["python"]}`
 - `active` = `true`
 
-### 6.14 String Handling Examples
+### 6.13 String Handling Examples
 
 ```text
-[{name:str,city:str,zip:str,note:str}]:
+[{name@str,city@str,zip@str,note@str}]:
   (Alice, New York, "001234", hello world),
   (Bob, "  Los Angeles  ", 90210, "say \"hi\"")
 ```
@@ -348,10 +365,10 @@ To ensure maximum streaming parse performance, comments **may only appear at the
 | zip   | `"001234"` (string, leading zero preserved)  | `90210` (all digits → parsed as integer)      |
 | note  | `"hello world"` (unquoted, auto-trimmed)     | `"say \"hi\""` (quoted, escape supported)     |
 
-### 6.15 Real-World Example: Database Query Results
+### 6.14 Real-World Example: Database Query Results
 
 ```ason
-[{id:int, name:str, dept:{title:str}, skills:[str], active:bool}]:
+[{id@int, name@str, dept@{title@str}, skills@[str], active@bool}]:
   (1, Alice, (Manager), [Rust, Go], true),
   (2, Bob, (Engineer), [Python, "C++"], false),
   (3, "Carol Smith", (Director), [Leadership, Strategy], true)
@@ -393,12 +410,11 @@ To ensure maximum streaming parse performance, comments **may only appear at the
 
 | Element              | Schema Syntax                        | Data Syntax           |
 | -------------------- | ------------------------------------ | --------------------- |
-| Single object        | `{field1:type,field2:type}:`         | `(val1,val2)`         |
-| Array of objects     | `[{field1:type,field2:type}]:`       | `(v1,v2),(v3,v4)`     |
-| Simple array field   | `field:[type]`                       | `[v1,v2,v3]`          |
-| Array-of-objects field | `field:[{f1:type,f2:type}]`        | `[(v1,v2),(v3,v4)]`   |
-| Map field            | `field:map[K,V]`                     | `[(k1,v1),(k2,v2)]`   |
-| Nested object field  | `field:{f1:type,f2:type}`            | `(v1,(v3,v4))`        |
+| Single object        | `{field1@type,field2@type}:`         | `(val1,val2)`         |
+| Array of objects     | `[{field1@type,field2@type}]:`       | `(v1,v2),(v3,v4)`     |
+| Simple array field   | `field@[type]`                       | `[v1,v2,v3]`          |
+| Array-of-objects field | `field@[{f1@type,f2@type}]`        | `[(v1,v2),(v3,v4)]`   |
+| Nested object field  | `field@{f1@type,f2@type}`            | `(v1,(v3,v4))`        |
 | Null value           | —                                    | *(blank)*             |
 | Empty array          | —                                    | `[]`                  |
 | Empty object         | —                                    | `()`                  |
@@ -430,14 +446,14 @@ Examples:
 
 | ASON                               | Parse result             |
 | ---------------------------------- | ------------------------ |
-| `{name:str,age:int}:(Alice,)`      | `age = null`             |
-| `{name:str,age:int}:(Alice,"")`    | `age = ""` (empty string)|
+| `{name@str,age@int}:(Alice,)`      | `age = null`             |
+| `{name@str,age@int}:(Alice,"")`    | `age = ""` (empty string)|
 
 Example:
 
 ```text
-{name:str,bio:str}:(Alice,)         /* bio = null */
-{name:str,bio:str}:(Alice,"")       /* bio = "" (empty string) */
+{name@str,bio@str}:(Alice,)         /* bio = null */
+{name@str,bio@str}:(Alice,"")       /* bio = "" (empty string) */
 ```
 
 ### 8.3 Top-Level Structure Detection
@@ -446,8 +462,8 @@ There are **three top-level forms**, determined by the first character(s):
 
 | First char | Type                         | Example                                     |
 | ---------- | ---------------------------- | ------------------------------------------- |
-| `{`        | Single object with schema    | `{name:str,age:int}:(Alice,30)`             |
-| `[{`       | Array of objects with schema | `[{id:int,name:str}]:(1,Alice),(2,Bob)`     |
+| `{`        | Single object with schema    | `{name@str,age@int}:(Alice,30)`             |
+| `[{`       | Array of objects with schema | `[{id@int,name@str}]:(1,Alice),(2,Bob)`     |
 | `[`        | Plain array                  | `[1,2,3]`                                   |
 | Other      | Bare value (type inferred)   | `42`, `true`, `hello`                       |
 
@@ -475,13 +491,13 @@ There are **three top-level forms**, determined by the first character(s):
 Example:
 
 ```text
-{name:str, age:int}:(Alice Smith, 30)
+{name@str, age@int}:(Alice Smith, 30)
 ```
 
 is equivalent to:
 
 ```text
-{name:str,age:int}:(Alice Smith,30)
+{name@str,age@int}:(Alice Smith,30)
 ```
 
 → `{"name": "Alice Smith", "age": 30}`
@@ -491,7 +507,7 @@ is equivalent to:
 Newlines and indentation are treated as whitespace during parsing:
 
 ```text
-[{name:str,age:int}]:
+[{name@str,age@int}]:
   (Alice,30),
   (Bob,25),
   (Charlie,35)
@@ -500,7 +516,7 @@ Newlines and indentation are treated as whitespace during parsing:
 is equivalent to:
 
 ```text
-[{name:str,age:int}]:(Alice,30),(Bob,25),(Charlie,35)
+[{name@str,age@int}]:(Alice,30),(Bob,25),(Charlie,35)
 ```
 
 ### 8.7 Negative Number Rules
@@ -520,10 +536,10 @@ The minus sign `-` must immediately precede the digit — no space allowed:
 
 | Schema                | Data         | Result                     |
 | --------------------- | ------------ | -------------------------- |
-| `{a:int,b:int,c:int}` | `(1,2,3)`    | ✓ Correct                  |
-| `{a:int,b:int,c:int}` | `(1,2)`      | ✗ Error: missing field     |
-| `{a:int,b:int,c:int}` | `(1,2,3,4)`  | ✗ Error: too many fields   |
-| `{a:int,b:int,c:int}` | `(1,,3)`     | ✓ Correct: `b = null`      |
+| `{a@int,b@int,c@int}` | `(1,2,3)`    | ✓ Correct                  |
+| `{a@int,b@int,c@int}` | `(1,2)`      | ✗ Error: missing field     |
+| `{a@int,b@int,c@int}` | `(1,2,3,4)`  | ✗ Error: too many fields   |
+| `{a@int,b@int,c@int}` | `(1,,3)`     | ✓ Correct: `b = null`      |
 
 **Rationale**: ASON is a position-sensitive format. A field-count mismatch causes data misalignment and must be reported as a parse error.
 
@@ -531,12 +547,12 @@ The minus sign `-` must immediately precede the digit — no space allowed:
 
 | Incorrect                     | Reason                | Correct                                           |
 | ----------------------------- | --------------------- | ------------------------------------------------- |
-| `{a:int,b:int}:(1,2,3)`       | Too many values       | `{a:int,b:int,c:int}:(1,2,3)`                     |
-| `{a:int,b:int}:(1)`           | Missing field (no null)| `{a:int,b:int}:(1,)`                             |
-| `{a:int,b:int,c:int}:(1,2)`   | Insufficient data     | `{a:int,b:int,c:int}:(1,2,)`                      |
-| `(1,2,3)`                     | Bare tuple needs schema| `{a:int,b:int,c:int}:(1,2,3)`                   |
-| `{a:int,b:int}`               | Schema with no data   | `{a:int,b:int}:()` or `{a:int,b:int}:(1,2)`      |
-| `{a:int,b:int}[1,2]`          | Missing colon after schema | `{a:int,b:int}:(1,2)`                       |
+| `{a@int,b@int}:(1,2,3)`       | Too many values       | `{a@int,b@int,c@int}:(1,2,3)`                     |
+| `{a@int,b@int}:(1)`           | Missing field (no null)| `{a@int,b@int}:(1,)`                             |
+| `{a@int,b@int,c@int}:(1,2)`   | Insufficient data     | `{a@int,b@int,c@int}:(1,2,)`                      |
+| `(1,2,3)`                     | Bare tuple needs schema| `{a@int,b@int,c@int}:(1,2,3)`                   |
+| `{a@int,b@int}`               | Schema with no data   | `{a@int,b@int}:()` or `{a@int,b@int}:(1,2)`      |
+| `{a@int,b@int}[1,2]`          | Missing colon after schema | `{a@int,b@int}:(1,2)`                       |
 
 ### 8.10 Trailing Commas
 
@@ -557,15 +573,15 @@ To facilitate version control diffs and LLM generation, ASON **permits** trailin
 1. **Non-greedy matching**: When parsing `plain_str`, delimiters `,()[]` take priority over string content.
 2. **Lookahead**: When encountering a potential delimiter, first check whether it is preceded by an escape character.
 3. **Comment stripping**: Recommended to remove all `/* */` comments during the lexing phase.
-4. **Streaming parse**: After parsing the schema, build an access map; fill data fields by index position.
+4. **Streaming parse**: After parsing the schema, build a field index table; fill data fields by position.
 
 ### 9.2 Error Handling
 
 | Error Type         | Example                  | Handling                       |
 | ------------------ | ------------------------ | ------------------------------ |
-| Field count mismatch | `{a:int,b:int}:(1,2,3)` | Throw error with location info |
+| Field count mismatch | `{a@int,b@int}:(1,2,3)` | Throw error with location info |
 | Unclosed quote     | `("hello)`               | Throw error                    |
-| Unclosed bracket   | `{a:int,b:int}:(1,2`     | Throw error                    |
+| Unclosed bracket   | `{a@int,b@int}:(1,2`     | Throw error                    |
 | Unclosed comment   | `/* comment`             | Throw error                    |
 | Invalid escape     | `\x`                     | Throw error or keep verbatim   |
 
@@ -580,12 +596,11 @@ object_expr ::= schema ":" object
 array_expr  ::= "[" schema "]" ":" object_list
 schema      ::= "{" field_list "}"
 field_list  ::= field ("," field)*
-field       ::= identifier type_hint? | identifier ":" schema
-type_hint   ::= ":" type_def
-type_def    ::= base_type | array_type | map_type
+field       ::= identifier type_hint? | identifier "@" schema
+type_hint   ::= "@" type_def
+type_def    ::= base_type | array_type
 base_type   ::= "int" | "float" | "string" | "str" | "bool"
 array_type  ::= "[" type_def "]" | "[" schema "]"
-map_type    ::= "map[" base_type "," (type_def | schema) "]"
 identifier  ::= [a-zA-Z0-9_]+
 
 object_list ::= object ("," object)*
@@ -605,8 +620,8 @@ float       ::= "-"?[0-9]+"."[0-9]+
 
 quoted_str  ::= '"' (escaped_char | [^"\\])* '"'
 plain_str   ::= (plain_char | escaped_char)+
-plain_char  ::= [^,()[\]"\\]
-escaped_char::= "\\" | "\," | "\(" | "\)" | "\[" | "\]" | "\"" | "\n" | "\t" | "\\u" [0-9a-fA-F]{4}
+plain_char  ::= [^,()[\]<>:"\\]
+escaped_char::= "\\" | "\," | "\(" | "\)" | "\[" | "\]" | "\<" | "\>" | "\:" | "\"" | "\n" | "\t" | "\\u" [0-9a-fA-F]{4}
 
 null        ::= (empty)
 comment     ::= "/*" (any_char)* "*/"
@@ -751,18 +766,18 @@ ASON is optimized for interaction with large language models. This section provi
 You are a data format conversion expert. Output data in ASON format (Array-Schema Object Notation).
 
 Core ASON rules:
-1. Single object: {field1:type, field2:type, ...}:(val1, val2, ...)
-2. Array of objects: [{field1:type, field2:type, ...}]:(val1, val2, ...),(val3, val4, ...)
-3. Type annotations are optional: {field1:int, field2:str, ...}
-4. Supported types: int, float, string, bool, map[K,V]
-5. Array fields: name:[str] is a string array with value [item1, item2, ...]; array-of-objects is users:[{id:int}]
+1. Single object: `{field1@type, field2@type, ...}:(val1, val2, ...)`
+2. Array of objects: `[{field1@type, field2@type, ...}]:(val1, val2, ...),(val3, val4, ...)`
+3. Type annotations are optional: `{field1@int, field2@str, ...}`
+4. Supported types: `int`, `float`, `string`, `bool`, arrays, nested objects
+5. Array fields: `name@[str]` is a string array with value `[item1, item2, ...]`; array-of-objects is `users@[{id@int}]`
 
 You must follow:
 - Single objects use `{schema}:` prefix; arrays of objects use `[{schema}]:` prefix
 - Number of data items = number of schema fields (strict alignment)
 - Strings generally need no quotes (unless they contain special characters)
 - Null values are represented by blank content (empty between commas)
-- Nested objects use parentheses: outer:{inner:type}:(val1,(nested_val))
+- Nested objects use parentheses: outer@{inner@type}:(val1,(nested_val))
 
 Output ASON only, no additional explanation.
 ```
@@ -773,20 +788,20 @@ Output ASON only, no additional explanation.
 # Example 1: Multiple user records
 Input: User Alice age 30, User Bob age 25
 Output:
-[{name:str, age:int}]:
+[{name@str, age@int}]:
   (Alice, 30),
   (Bob, 25)
 
 # Example 2: Single user
 Input: ID 1 Alice Email alice@example.com Active true
 Output:
-{id:int, name:str, email:str, active:bool}:
+{id@int, name@str, email@str, active@bool}:
   (1, Alice, alice@example.com, true)
 
 # Example 3: Nested data
 Input: Company Acme, Department Engineering, Head Alice
 Output:
-{company:str, dept:{name:str, head:str}}:
+{company@str, dept@{name@str, head@str}}:
   (Acme, (Engineering, Alice))
 ```
 
@@ -804,22 +819,22 @@ Output:
 #### Error 1: Field Count Mismatch
 
 ```ason
-❌ {id:int,name:str}:(1,Alice,true)
-✅ {id:int,name:str,active:bool}:(1,Alice,true)
+❌ {id@int,name@str}:(1,Alice,true)
+✅ {id@int,name@str,active@bool}:(1,Alice,true)
 ```
 
 #### Error 2: Wrong Bracket Type for Nesting
 
 ```ason
-❌ {user:{id:int,name:str}}:({1,Alice})      /* curly braces used */
-✅ {user:{id:int,name:str}}:((1,Alice))      /* nested data uses parentheses */
+❌ {user@{id@int,name@str}}:({1,Alice})      /* curly braces used */
+✅ {user@{id@int,name@str}}:((1,Alice))      /* nested data uses parentheses */
 ```
 
 #### Error 3: Wrong Bracket Type for Arrays
 
 ```ason
-❌ {tags:[str]}:({python,rust})         /* curly braces */
-✅ {tags:[str]}:([python,rust])         /* arrays use square brackets */
+❌ {tags@[str]}:({python,rust})         /* curly braces */
+✅ {tags@[str]}:([python,rust])         /* arrays use square brackets */
 ```
 
 ### 12.6 Token Cost Comparison
@@ -843,6 +858,10 @@ Validate format (field count, alignment, types)
   └─ ✗ Fail → retry (max 3 times)
 ```
 
+8. 📋 v2.0: Implement serde support
+9. 📋 v2.0: Schema references and aliases
+10. 📋 v2.0: Full data validation framework
+
 ---
 
 ## 13. Appendix A: Type System Reference
@@ -852,14 +871,13 @@ Validate format (field count, alignment, types)
 | Scenario                   | Schema                 | Data           | Note                  |
 | -------------------------- | ---------------------- | -------------- | --------------------- |
 | No annotations (v1.3 compat) | `{id,name}`          | `(1,Alice)`    | Implicit inference    |
-| Explicit string            | `{name:str}`           | `(Alice)`      | Clear type            |
-| Integer                    | `{id:int}`             | `(1)`          | Integer type          |
-| Float                      | `{score:float}`        | `(95.5)`       | Floating-point        |
-| Boolean                    | `{active:bool}`        | `(true)`       | Boolean               |
-| Array                      | `{tags:[str]}`         | `([a,b,c])`    | Array type            |
-| Map                        | `{attrs:map[str,int]}` | `([(age,30)])` | Key-value pairs       |
-| Nested                     | `{user:{id:int}}`      | `((1))`        | Nested object         |
-| Mixed                      | `{id:int,bio:str}`     | `(1,Bio)`      | Partial annotations   |
+| Explicit string            | `{name@str}`           | `(Alice)`      | Clear type            |
+| Integer                    | `{id@int}`             | `(1)`          | Integer type          |
+| Float                      | `{score@float}`        | `(95.5)`       | Floating-point        |
+| Boolean                    | `{active@bool}`        | `(true)`       | Boolean               |
+| Array                      | `{tags@[str]}`         | `([a,b,c])`    | Array type            |
+| Nested                     | `{user@{id@int}}`      | `((1))`        | Nested object         |
+| Mixed                      | `{id@int,bio@str}`     | `(1,Bio)`      | Partial annotations   |
 
 ### A.2 Type Assertion Examples
 
@@ -867,7 +885,7 @@ Validate format (field count, alignment, types)
 
 ```ason
 // Correctly typed data
-[{id:int, score:float, pass:bool, name:str}]:
+[{id@int, score@float, pass@bool, name@str}]:
   (1, 95.5, true, Alice),      ✅ All types match
   (2, 87.0, false, Bob),       ✅ All types match
   (3, 76, true, "Carol Sue")   ✅ 76 auto-promoted to 76.0
@@ -902,7 +920,7 @@ id,name,role,active
 
 ```ason
 // ASON (35 tokens, with type information)
-[{id:int, name:str, role:str, active:bool}]:
+[{id@int, name@str, role@str, active@bool}]:
   (1, Alice, engineer, true),
   (2, Bob, designer, false)
 ```
@@ -920,7 +938,7 @@ id,name,role,active
 
 ```ason
 // ASON — more compact
-{employees:[{id:int, name:str, dept:{name:str, budget:int}}]}:
+{employees@[{id@int, name@str, dept@{name@str, budget@int}}]}:
   ([(1, Alice, (Eng, 500000))])
 ```
 
@@ -934,7 +952,7 @@ id,name,role,active
 - [ ] Comment handling: support `/* */` block comments
 - [ ] String parsing: support both quoted and unquoted forms
 - [ ] Escape rules: handle `\,`, `\"`, `\\`, etc.
-- [ ] Type annotation parsing: recognize `:int`, `:str`, etc.
+- [ ] Type annotation parsing: recognize `@int`, `@str`, etc.
 - [ ] Schema parsing: recursively parse nested structures
 - [ ] Alignment check: verify data field count matches schema field count
 - [ ] Error reporting: location-aware error messages
@@ -992,7 +1010,7 @@ Compared to JSON's indented readability, token savings and LLM friendliness take
 
 - **MessagePack**: Binary format, more compact but not human-readable
 - **Protocol Buffers**: Requires `.proto` definition files, higher complexity
-- **ASON**: Text format optimized for LLMs, balancing token efficiency with readability; also provides a binary mode for high-performance serde
+- **ASON**: Text format for LLM use, balancing token efficiency with readability
 
 ### Q5: What are the most common errors when LLMs generate ASON?
 

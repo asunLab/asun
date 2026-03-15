@@ -1,0 +1,4 @@
+[{id@int, nickname@str, tags@[str], note@str}]:
+  (1, ace, [red, blue], primary user),
+  (2, , [green], ),
+  (3, guest, [], temporary)
