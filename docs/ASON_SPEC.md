@@ -142,10 +142,10 @@ ASON supports two string forms:
 
 | Type    | Syntax                | Example               | Description                               |
 | ------- | --------------------- | --------------------- | ----------------------------------------- |
-| String  | `string` / `str`      | `name@str`            | Text data                                 |
-| Integer | `int` / `integer`     | `id@int`              | Signed integer                            |
-| Float   | `float` / `double`    | `salary@float`        | Floating-point number                     |
-| Boolean | `bool` / `boolean`    | `active@bool`         | Boolean value                             |
+| String  | `str`      | `name@str`            | Text data                                 |
+| Integer | `int`      | `id@int`              | Signed integer                            |
+| Float   | `float`    | `salary@float`        | Floating-point number                     |
+| Boolean | `bool`     | `active@bool`         | Boolean value                             |
 
 **Example with type annotations:**
 
@@ -624,7 +624,7 @@ field_list  ::= field ("," field)*
 field       ::= identifier type_hint? | identifier "@" schema
 type_hint   ::= "@" type_def
 type_def    ::= base_type | array_type
-base_type   ::= "int" | "float" | "string" | "str" | "bool"
+base_type   ::= "int" | "float" | "str" | "bool"
 array_type  ::= "[" type_def "]" | "[" schema "]"
 identifier  ::= [a-zA-Z0-9_]+
 
@@ -794,7 +794,7 @@ Core ASON rules:
 1. Single object: `{field1@type, field2@type, ...}:(val1, val2, ...)`
 2. Array of objects: `[{field1@type, field2@type, ...}]:(val1, val2, ...),(val3, val4, ...)`
 3. Type annotations are optional: `{field1@int, field2@str, ...}`
-4. Supported types: `int`, `float`, `string`, `bool`, arrays, nested objects
+4. Supported types: `int`, `float`, `str`, `bool`, arrays, nested objects
 5. Array fields: `name@[str]` is a string array with value `[item1, item2, ...]`; array-of-objects is `users@[{id@int}]`
 
 You must follow:

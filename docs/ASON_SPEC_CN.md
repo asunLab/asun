@@ -140,10 +140,10 @@ ASON 支持两种字符串形式：
 
 | 类型   | 写法               | 示例           | 说明             |
 | ------ | ------------------ | -------------- | ---------------- |
-| 字符串 | `string` / `str`   | `name@str`     | 文本数据         |
-| 整数   | `int` / `integer`  | `id@int`       | 整数（可带符号） |
-| 浮点   | `float` / `double` | `salary@float` | 浮点数           |
-| 布尔   | `bool` / `boolean` | `active@bool`  | 布尔值           |
+| 字符串 | `str`   | `name@str`     | 文本数据         |
+| 整数   | `int`   | `id@int`       | 整数（可带符号） |
+| 浮点   | `float` | `salary@float` | 浮点数           |
+| 布尔   | `bool`  | `active@bool`  | 布尔值           |
 
 **带类型注解的示例**：
 
@@ -622,7 +622,7 @@ field_list  ::= field ("," field)*
 field       ::= identifier type_hint? | identifier ":" schema
 type_hint   ::= "@" type_def
 type_def    ::= base_type | array_type
-base_type   ::= "int" | "float" | "string" | "str" | "bool"
+base_type   ::= "int" | "float" | "str" | "bool"
 array_type  ::= "[" type_def "]" | "[" schema "]"
 identifier  ::= [a-zA-Z0-9_]+
 
@@ -792,7 +792,7 @@ ASON 核心规则：
 1. 单个对象：{field1@type, field2@type, ...}:(val1, val2, ...)
 2. 对象数组：[{field1@type, field2@type, ...}]:(val1, val2, ...),(val3, val4, ...)
 3. 可选添加类型：{field1@int, field2@str, ...}
-4. 支持的类型：int, float, string, bool
+4. 支持的类型：int, float, str, bool
 5. 数组字段：name@[str] 表示字符串数组，值为 [item1, item2, ...]；对象数组为 users@[{id@int}]
 
 必须遵守：
