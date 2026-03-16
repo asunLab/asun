@@ -157,8 +157,8 @@ for submodule in "${submodules[@]}"; do
   if $remote_exists && [[ "$behind_count" != "0" ]]; then
     current_branch="$(git -C "$submodule" branch --show-current)"
     if [[ -n "$current_branch" ]]; then
-      log "Rebasing $current_branch onto origin/$remote_branch"
-      run_cmd git -C "$submodule" pull --rebase origin "$remote_branch"
+      log "Pulling $current_branch from origin/$remote_branch with rebase+autostash"
+      run_cmd git -C "$submodule" pull --rebase --autostash origin "$remote_branch"
     elif [[ "$ahead_count" == "0" ]]; then
       log "Updating detached HEAD to origin/$remote_branch"
       run_cmd git -C "$submodule" checkout --detach "origin/$remote_branch"

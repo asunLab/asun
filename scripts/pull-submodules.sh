@@ -15,7 +15,7 @@ usage() {
 Usage:
   scripts/pull-submodules.sh [options]
 
-Sync and initialize submodules, then fast-forward each submodule to its
+Sync and initialize submodules, then rebase each submodule onto its
 origin default branch when possible. Optionally stage/commit/push the parent
 repository's updated submodule pointers.
 
@@ -168,8 +168,8 @@ for submodule in "${submodules[@]}"; do
   fi
 
   if [[ -n "$current_branch" ]]; then
-    log "Pulling $current_branch from origin/$remote_branch"
-    run_cmd git -C "$submodule" pull --ff-only origin "$remote_branch"
+    log "Pulling $current_branch from origin/$remote_branch with rebase+autostash"
+    run_cmd git -C "$submodule" pull --rebase --autostash origin "$remote_branch"
   else
     log "Updating detached HEAD to origin/$remote_branch"
     run_cmd git -C "$submodule" checkout --detach "origin/$remote_branch"
