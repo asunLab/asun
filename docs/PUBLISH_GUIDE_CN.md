@@ -35,7 +35,7 @@
 | `ason-swift` | GitHub 仓库 + 语义化 tag | 否（只要 GitHub） | SwiftPM 通常直接消费 Git tag |
 | `ason-zig` | GitHub 仓库 + tag/release | 否（只要 GitHub） | Zig 当前没有官方中心仓库 |
 | `ason-c` | GitHub Releases | 否（只要 GitHub） | 可后续再补 vcpkg/conan/homebrew |
-| `ason-cpp` | GitHub Releases | 否（只要 GitHub） | 可后续再补 vcpkg/conan/homebrew |
+| `ason-cpp` | GitHub Releases + Conan / vcpkg / Homebrew | 否（只要 GitHub） | 现在已具备包管理器接入文件，可按需要逐步发布 |
 | `ason-php` | GitHub Releases + PIE 生态 | 否（建议先 GitHub） | 新 PECL 包当前不建议作为首发渠道 |
 
 ## 当前建议的发布顺序
@@ -69,7 +69,7 @@
 3. 测试全部通过。
 4. examples 至少跑一遍。
 5. 确认最终打包产物里没有把 `node_modules`、`build/`、`obj/`、临时文件、密钥、测试缓存一起带出去。
-6. 打 Git tag，例如 `v0.1.0`。
+6. 打 Git tag，例如 `v1.0.0`。
 7. 准备 GitHub Release 说明，哪怕该语言还有中心仓库，也建议保留 GitHub Release 作为对外版本记录。
 
 ## 1. JavaScript / TypeScript：`ason-js`
@@ -309,25 +309,64 @@ mise exec -- cargo publish
 
 ### 首次发布
 
-因为 `ason-java` 当前是 Gradle 项目，而 Sonatype 官方文档当前明确写了“还没有官方 Gradle 插件”，所以首发时建议二选一：
+`ason-java` 现在已经接入：
 
-1. 使用 Central Portal 兼容的 Gradle 发布方案。
-2. 或者把发布流程单独接到 Sonatype 的 Portal / OSSRH Staging API。
+1. `maven-publish`
+2. `signing`
+3. `sourcesJar`
+4. `javadocJar`
+5. Sonatype Central Portal 兼容发布端点
 
-无论你选哪条路，首次发布前都要先准备：
+因此首发时建议直接走当前仓库内置的 Gradle 发布方案。
 
-1. `groupId / artifactId / version`
-2. sources jar
-3. javadoc jar
-4. 签名
-5. POM 元数据（name、description、license、scm、developers）
+发布前你需要准备：
 
-本地至少先跑：
+1. Central Portal User Token
+2. GPG/PGP 签名私钥
+3. `groupId / artifactId / version`
+4. 确认 README / API / 测试都已经对齐
+
+先设置环境变量：
+
+```bash
+export SONATYPE_USERNAME=...
+export SONATYPE_PASSWORD=...
+export SIGNING_KEY='-----BEGIN PGP PRIVATE KEY BLOCK----- ...'
+export SIGNING_PASSWORD=...
+```
+
+本地先验证：
 
 ```bash
 cd ason-java
 mise exec -- ./gradlew test
+mise exec -- ./gradlew publishToMavenLocal
 ```
+
+正式发布：
+
+```bash
+cd ason-java
+mise exec -- ./gradlew publish
+```
+
+### Kotlin 怎么发布
+
+Kotlin **不需要单独发布一个新包**。
+
+原因是当前仓库里：
+
+- Java 和 Kotlin helper 在同一个 `ason-java` artifact 里
+- Kotlin API 只是对同一套 JVM runtime 的 helper 封装
+- 发布到 Maven Central 时，使用者拿到的是同一个坐标
+
+也就是说，当前发布对象只有这一份：
+
+- `groupId = io.ason`
+- `artifactId = ason-java`
+- `version = 例如 1.0.0`
+
+Kotlin 用户发布后仍然通过同一个 Maven 坐标消费，不存在单独的 `ason-kotlin` 包。
 
 ### 后续更新
 
@@ -361,14 +400,14 @@ mise exec -- go test ./...
 3. 打 tag：
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
 4. 验证：
 
 ```bash
-go list -m github.com/ason-lab/ason-go@v0.1.0
+go list -m github.com/ason-lab/ason-go@v1.0.0
 ```
 
 ### 后续更新
@@ -403,8 +442,8 @@ swift test
 3. 打 tag：
 
 ```bash
-git tag 0.1.0
-git push origin 0.1.0
+git tag 1.0.0
+git push origin 1.0.0
 ```
 
 4. 建一个 GitHub Release。
@@ -442,8 +481,8 @@ mise exec -- zig build test
 3. 打 tag：
 
 ```bash
-git tag 0.1.0
-git push origin 0.1.0
+git tag 1.0.0
+git push origin 1.0.0
 ```
 
 4. 建 GitHub Release，附带源码归档或二进制产物。
@@ -494,19 +533,154 @@ ctest --test-dir build --output-on-failure
 
 ## 11. C++：`ason-cpp`
 
-推荐渠道：GitHub Releases  
-流程与 `ason-c` 基本相同。
+推荐渠道：
 
-### 首次发布
+1. GitHub Release
+2. Conan
+3. vcpkg
+4. Homebrew
+
+说明：
+
+- `ason-cpp` 当前是标准 header-only CMake package
+- Conan recipe 已就绪
+- vcpkg 当前是 overlay port 级别
+- Homebrew 当前是 formula 模板级别，发布前需要填真实 tarball 的 `sha256`
+
+### 首次发布前验证
 
 ```bash
 cd ason-cpp
-cmake -S . -B build
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-然后 tag + GitHub Release。
+建议再额外验证一次标准 CMake 包导出是否可用：
+
+```bash
+cmake --install build --prefix /tmp/ason-cpp-install
+```
+
+### 11.1 GitHub Release
+
+这是最基础、也最先完成的一步。
+
+流程：
+
+1. 更新版本号（当前在 `CMakeLists.txt`、`conanfile.py`、`vcpkg/ports/ason-cpp/vcpkg.json`、`homebrew/ason-cpp.rb` 中都要一致）
+2. 跑完测试和本地安装验证
+3. 打 tag，例如 `v1.0.0`
+4. 在 GitHub 上创建 Release
+5. 上传源码归档，或直接使用 GitHub 自动生成的 source tarball / zip
+
+### 11.2 Conan
+
+仓库内已有：
+
+- `ason-cpp/conanfile.py`
+- `ason-cpp/test_package/`
+
+本地验证：
+
+```bash
+cd ason-cpp
+conan create . --build=missing
+```
+
+发布方式有两种：
+
+1. 先用仓库内 recipe 做本地或私有远端发布
+2. 后续再向 ConanCenter 提交 recipe
+
+如果只是你自己的 first-party 发布，最简单的是：
+
+```bash
+cd ason-cpp
+conan export . --version=1.0.0
+```
+
+然后在自己的 Conan remote 上上传对应 recipe/package。
+
+### 11.3 vcpkg
+
+仓库内已有 overlay port：
+
+- `ason-cpp/vcpkg/ports/ason-cpp/portfile.cmake`
+- `ason-cpp/vcpkg/ports/ason-cpp/vcpkg.json`
+- `ason-cpp/vcpkg/ports/ason-cpp/vcpkg-cmake-wrapper.cmake`
+
+当前定位：
+
+- 这套文件已经足够用于 overlay port
+- 如果要进入官方 vcpkg registry，还需要单独向 `microsoft/vcpkg` 提交 port PR
+
+本地验证：
+
+```bash
+vcpkg install ason-cpp --overlay-ports=/path/to/ason-cpp/vcpkg/ports
+```
+
+推荐发布步骤：
+
+1. 先完成 GitHub Release
+2. 确认 release tag、源码 tarball 稳定
+3. 基于当前 port 文件向 vcpkg 官方仓库提 PR
+
+### 11.4 Homebrew
+
+仓库内已有 formula 模板：
+
+- `ason-cpp/homebrew/ason-cpp.rb`
+
+注意：
+
+- 当前 formula 里的 `sha256` 还是占位符
+- 真正发布前，需要把它替换成 GitHub Release tarball 的真实 `sha256`
+
+计算方式示例：
+
+```bash
+curl -L -o /tmp/ason-v1.0.0.tar.gz \
+  https://github.com/ason-lab/ason/archive/refs/tags/v1.0.0.tar.gz
+shasum -a 256 /tmp/ason-v1.0.0.tar.gz
+```
+
+然后把得到的 hash 填入：
+
+- `ason-cpp/homebrew/ason-cpp.rb`
+
+本地验证可用：
+
+```bash
+brew install --build-from-source ./homebrew/ason-cpp.rb
+brew test ason-cpp
+```
+
+如果要正式对外发布，通常有两种方式：
+
+1. 自己维护一个 tap
+2. 后续尝试提交到 Homebrew core（通常要求更严格）
+
+### 后续更新
+
+每次发新版本时，建议按这个顺序推进：
+
+1. 更新 `CMakeLists.txt`
+2. 更新 `conanfile.py`
+3. 更新 `vcpkg/ports/ason-cpp/vcpkg.json`
+4. 更新 `homebrew/ason-cpp.rb` 中的版本、下载地址与 `sha256`
+5. 跑测试和打包验证
+6. 打 Git tag
+7. 创建 GitHub Release
+8. 再分别同步 Conan / vcpkg / Homebrew
+
+### 备注
+
+- Conan：现在已经是可用级别
+- vcpkg：现在是 overlay port 可用级别
+- Homebrew：现在是 formula 模板可用级别
+- 所以 `ason-cpp` 目前已经不只是“GitHub Release 可发”，而是已经具备继续进入包管理器生态的基础文件
 
 ## 12. PHP 扩展：`ason-php`
 
@@ -567,7 +741,7 @@ make test
 
 建议流程：
 
-1. 先打版本 tag，例如 `v0.1.0`
+1. 先打版本 tag，例如 `v1.0.0`
 2. 在 GitHub 上创建 Release
 3. 标题写成版本号
 4. Release notes 至少包含：
