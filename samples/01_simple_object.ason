@@ -1,10 +1,11 @@
 {
-    "id uuid",
+    "id uuid" /*uuuidiiddd*/,
     name,
     65
 }:
 (
     1,
-    Alice,
+    /*uuuidiiddd*/
+    Alice /*uuuidiiddd*/,
     true
 )
