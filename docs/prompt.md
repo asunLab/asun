@@ -21,9 +21,10 @@ ASON uses a colon `:` to physically isolate the Schema (Header) from the Data (B
 - **Array of Objects**: Starts with `[{`. Example: `[{id@int}] : (1), (2)`
 - **Plain Array**: `[1, 2, 3]`
 
-## 4. The `@` Structural Marker is MANDATORY for Complex Types
-For scalar types (int, str, bool), the type annotation is optional and purely decorative (`name@str` and `name` are functionally identical layout-wise).
-**HOWEVER**, for nested objects and arrays, the `@` followed by `{}` or `[]` acts as a crucial structural scaffold. You **MUST NOT** omit it.
+## 4. The `@` Field Binding Marker
+`@` is the field binding marker between a field name and its following schema/type description.
+For scalar types (int, str, bool), the `@type` portion is an optional hint (`name@str` and `name` are layout-equivalent).
+**HOWEVER**, for nested objects and arrays, the `@` followed by `{}` or `[]` is a required structural binding. You **MUST NOT** omit it.
 - **Nested Object**: `dept@{title@str, level@int}` or `dept@{title, level}` (Notice `@` and `{}` must remain even without scalar types).
 - **Array Field**: `tags@[str]` or `tags@[]`
 - **Map/Dict Representation**: Maps are represented as arrays of key-value tuples: `attrs@[{key@str, value@int}] : ( [(age,30), (score,95)] )`
@@ -39,17 +40,17 @@ For scalar types (int, str, bool), the type annotation is optional and purely de
 
 ## Summary Examples for AI Generation
 
-**1. Multiple records with nested structures (Annotated)**
+**1. Multiple records with nested structures (With Scalar Hints)**
 ```ason
 [{id@int, profile@{name@str, active@bool}}]:
   (1, (Alice, true)),
   (2, (Bob, false))
 ```
 
-**2. Configuration object with array of objects (Minimalist / Unannotated)**
+**2. Configuration object with array of objects (Minimal / Without Scalar Hints)**
 ```ason
 {service, rules@[{path, secure}]}:
   (api, [(/auth, true), (/health, false)])
 ```
 
-**CRITICAL REMINDER**: Never mix JSON habits into ASON. There are no keys in the data section. Strictly use `()` for data tuples, and always securely scaffold nested fields using `@{...}` or `@[...]` in the schema header.
+**CRITICAL REMINDER**: Never mix JSON habits into ASON. There are no keys in the data section. Strictly use `()` for data tuples, and always bind nested fields using `@{...}` or `@[...]` in the schema header.

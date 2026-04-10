@@ -8,3 +8,4 @@ tmp
 *.vsix
 tmp*
 tmp
+.*

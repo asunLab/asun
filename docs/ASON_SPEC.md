@@ -59,7 +59,7 @@ Beyond token savings in LLM scenarios, ASON also dramatically outperforms JSON i
 
 2. **Schema-Driven Parsing**:
    - **JSON**: The parser must dynamically infer the type of each value by peeking at the next character (`"`, `t`, `f`, `[`, `{`, digit), causing frequent CPU branch mispredictions.
-   - **ASON**: The schema provides structural information (e.g., `{id, name, active}`), so the parser reads each field value in a fixed, known order without dynamic type inference. In a serde framework the target struct's type is already known at compile time, and the parser calls `parse_int()` etc. directly. Type annotations in the schema (e.g., `{id@int}`) are optional decorative metadata and do not affect parse performance.
+   - **ASON**: The schema provides structural information (e.g., `{id, name, active}`), so the parser reads each field value in a fixed, known order without dynamic type inference. In a serde framework the target struct's type is already known at compile time, and the parser calls `parse_int()` etc. directly. In schema text, `@` is the binding marker between a field and its following schema/type description: scalar hints like `{id@int}` are optional, while structural bindings such as `@{}` and `@[]` are required for complex fields.
 
 3. **Low Memory Footprint**:
    - JSON builds a dynamic DOM tree that allocates memory for every key string in every object. ASON data rows are essentially a flat tuple array — all rows share a single schema reference, keeping memory overhead minimal.
@@ -124,17 +124,17 @@ ASON supports two string forms:
 - Force string type: `"true"`, `"123"`
 - Empty string: `""`
 
-### 3.2 Type Annotation System
+### 3.2 Field Binding and Optional Scalar Hints
 
-**ASON v1.4 introduces optional type annotations** — append `@type` after a schema field name to declare its type explicitly.
+**ASON v1.4 introduces the `@` binding syntax.** `@` is not merely a type-annotation symbol; it is the **field binding marker** between a field name and its following schema/type description.
 
-> **Core principle: Type annotations are purely decorative metadata.** Annotated and unannotated schemas are **completely equivalent** from the parser's perspective — the parser skips the `@type` portion and it has no effect on parsing or deserialization. Both of the following produce identical parse results:
+> **Core principle: `@` carries both structural binding and optional scalar hints.** For terminal scalar fields, `@type` is an optional hint; for complex fields, `@{}` / `@[]` are mandatory structural bindings. Both of the following are layout-equivalent:
 >
 > ```ason
 > // Without annotations
 > {id,name,active}:(1,Alice,true)
 >
-> // With annotations — identical parse result
+> // With scalar hints — identical parse result
 > {id@int,name@str,active@bool}:(1,Alice,true)
 > ```
 
@@ -147,10 +147,10 @@ ASON supports two string forms:
 | Float   | `float`    | `salary@float`        | Floating-point number                     |
 | Boolean | `bool`     | `active@bool`         | Boolean value                             |
 
-**Example with type annotations:**
+**Example with scalar hints:**
 
 ```ason
-// Full type annotations
+// Full scalar hints
 [{id@int, name@str, salary@float, active@bool}]:
   (1, Alice, 5000.50, true),
   (2, Bob, 4500.00, false),
@@ -159,14 +159,15 @@ ASON supports two string forms:
 
 **Key properties:**
 
-- ✅ **Optional**: Type annotations are not required and can be omitted entirely
-- ✅ **Equivalent**: Annotated and unannotated schemas parse identically; the parser auto-skips `@type`
-- ✅ **Partial**: You can annotate only some fields and omit the rest
-- ✅ **Negligible overhead**: Annotations only affect schema header parsing, not the data body. Vec scenarios <0.1%, single struct ~3% — constant overhead, does not grow with data volume
+- ✅ **Unified meaning**: `@` is the field binding marker for both scalar hints and complex structures
+- ✅ **Optional scalar hints**: `@int`, `@str`, `@bool`, and `@float` can be omitted when you do not need extra type clarity
+- ✅ **Required structural bindings**: `@{}` and `@[]` must stay for nested objects and arrays
+- ✅ **Partial**: You can add scalar hints only to selected terminal fields
+- ✅ **Negligible overhead**: Scalar hints only affect schema header parsing, not the data body. Vec scenarios <0.1%, single struct ~3% — constant overhead, does not grow with data volume
 
 **Use cases:**
 
-- **LLM prompts**: A typed schema helps the model understand and generate correct data
+- **LLM prompts**: A schema with scalar hints can help the model understand and generate correct data
 - **API documentation**: Self-describing structure without external docs
 - **Cross-language exchange**: Eliminates type ambiguity (`42` — is it `int` or `float`?)
 - **Debugging**: Field types visible at a glance
@@ -180,12 +181,12 @@ ASON supports two string forms:
   (2, Bob, bob@example.com, 28, "Designer")
 ```
 
-**⚠️ CRITICAL WARNING: The `@` structural marker is mandatory for complex types!**
+**⚠️ CRITICAL WARNING: The `@` structural binding is mandatory for complex types!**
 
-While the `@type` for terminal scalar data (numbers, strings, etc.) is purely decorative and can be completely omitted, for **complex type containers (nested objects, arrays)**, even if you omit specific scalar types, the `@` followed by `{}` or `[]` acts as a crucial structural scaffold and **must absolutely not be omitted!**
+While `@type` for terminal scalar data (numbers, strings, etc.) is only an optional hint, for **complex type containers (nested objects, arrays)** the `@` followed by `{}` or `[]` acts as a crucial structural binding and **must absolutely not be omitted!**
 - ✅ **Annotated nesting**: `dept@{title@str}`
-- ✅ **Unannotated structural nesting**: `dept@{title}` (dropped `@str`, but the `@{}` must be kept to signal to the parser to enter the next object level)
-- ✅ **Unannotated array**: `tags@[]` (kept `@[]` to indicate an array boundary)
+- ✅ **Structural nesting without scalar hints**: `dept@{title}` (dropped `@str`, but the `@{}` must be kept to signal to the parser to enter the next object level)
+- ✅ **Array without scalar hints**: `tags@[]` (kept `@[]` to indicate an array boundary)
 - ❌ **Fatal omission**: `dept` (without the brackets, the parser will not know `dept` corresponds to a complex object, leading to an overall breakdown of stream reading)
 
 ### 3.3 Distinguishing Schema vs Value Character Rules
@@ -906,7 +907,7 @@ Validate format (field count, alignment, types)
 
 ### A.2 Type Assertion Examples
 
-> **Note**: Type assertions are an optional spec-level extension. In the current implementations, parsers skip type annotations and type validation is guaranteed by the target struct's type system at the serde layer. The examples below illustrate what a parser with strict checking enabled might do:
+> **Note**: Strict scalar-hint assertions are an optional spec-level extension. In current implementations, parsers may skip these scalar hints and leave type validation to the target struct's type system at the serde layer. The examples below illustrate what a parser with strict checking enabled might do:
 
 ```ason
 // Correctly typed data
@@ -1012,14 +1013,14 @@ id,name,role,active
 
 Compared to JSON's indented readability, token savings and LLM friendliness take priority.
 
-### Q2: If implicit type inference is supported, why add type annotations?
+### Q2: If implicit type inference is supported, why add scalar hints with `@type`?
 
 **A**:
 
-- **Backward compatibility**: v1.3 code continues to work
-- **Production safety**: Explicit types prevent misinterpretation (e.g., `"123"` vs `123`)
-- **LLM friendliness**: Models generate more accurate data when types are explicit
-- **Optional**: Developers use them only when needed
+- **Unified binding model**: `@` consistently binds a field to its following schema or type description
+- **Production safety**: Explicit scalar hints help prevent misinterpretation (e.g., `"123"` vs `123`)
+- **LLM friendliness**: Models generate more accurate data when scalar hints are explicit
+- **Optional for scalars**: Developers use them only when needed on terminal fields
 
 ### Q3: Does ASON support large files?
 

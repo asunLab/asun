@@ -1,18 +1,18 @@
 # Cross-Language Compatibility Matrix
 
-This matrix defines the canonical text-format compatibility cases that typed
-language bindings should support when decoding ASON into a target struct/class
+This matrix defines the canonical text-format compatibility cases that
+schema-driven language bindings should support when decoding ASON into a target struct/class
 with fewer or reordered fields than the source payload.
 
-The same cases should be reused across Go, Rust, Java, and any future typed
-bindings. Dynamic bindings such as JS/Python can still decode the raw payload,
+The same cases should be reused across Go, Rust, Java, and any future
+schema-driven bindings. Dynamic bindings such as JS/Python can still decode the raw payload,
 but they are not the primary target for the "drop extra fields into a typed
 target" scenarios below.
 
 ## Conventions
 
-- `T` suffix: typed schema input
-- `U` suffix: untyped schema input
+- `T` suffix: schema input with scalar hints
+- `U` suffix: schema input without scalar hints
 - "Target default" means the language's normal zero/default/null value for a
   missing field
 
@@ -20,22 +20,22 @@ target" scenarios below.
 
 | Case ID | Category | Input shape | Target shape | Expected outcome |
 | --- | --- | --- | --- | --- |
-| `A1-T` | Exact match | typed single | exact fields | decode succeeds |
-| `A1-U` | Exact match | untyped single | exact fields | decode succeeds |
-| `A2-T` | Source has extra field | typed single | fewer fields | extra field ignored |
-| `A2-U` | Source has extra field | untyped single | fewer fields | extra field ignored |
-| `A3-T` | Target has extra field | typed single | more fields | missing field gets default |
-| `A3-U` | Target has extra field | untyped single | more fields | missing field gets default |
-| `A4-T` | Field reorder | typed single | reordered fields | fields matched by name |
-| `A4-U` | Field reorder | untyped single | reordered fields | fields matched by name |
-| `A5-T` | Source has extra field (vec) | typed vec | fewer fields | extra field ignored in each row |
-| `A5-U` | Source has extra field (vec) | untyped vec | fewer fields | extra field ignored in each row |
-| `A6-T` | Target has extra field (vec) | typed vec | more fields | missing field gets default |
-| `A6-U` | Target has extra field (vec) | untyped vec | more fields | missing field gets default |
-| `P1-T` | Partial overlap | typed single | target keeps a non-contiguous subset | only overlapping fields decoded |
-| `P1-U` | Partial overlap | untyped single | target keeps a non-contiguous subset | only overlapping fields decoded |
-| `P2-T` | No overlap | typed single | target shares no field names | target fields stay default |
-| `P2-U` | No overlap | untyped single | target shares no field names | target fields stay default |
+| `A1-T` | Exact match | single with scalar hints | exact fields | decode succeeds |
+| `A1-U` | Exact match | single without scalar hints | exact fields | decode succeeds |
+| `A2-T` | Source has extra field | single with scalar hints | fewer fields | extra field ignored |
+| `A2-U` | Source has extra field | single without scalar hints | fewer fields | extra field ignored |
+| `A3-T` | Target has extra field | single with scalar hints | more fields | missing field gets default |
+| `A3-U` | Target has extra field | single without scalar hints | more fields | missing field gets default |
+| `A4-T` | Field reorder | single with scalar hints | reordered fields | fields matched by name |
+| `A4-U` | Field reorder | single without scalar hints | reordered fields | fields matched by name |
+| `A5-T` | Source has extra field (vec) | vec with scalar hints | fewer fields | extra field ignored in each row |
+| `A5-U` | Source has extra field (vec) | vec without scalar hints | fewer fields | extra field ignored in each row |
+| `A6-T` | Target has extra field (vec) | vec with scalar hints | more fields | missing field gets default |
+| `A6-U` | Target has extra field (vec) | vec without scalar hints | more fields | missing field gets default |
+| `P1-T` | Partial overlap | single with scalar hints | target keeps a non-contiguous subset | only overlapping fields decoded |
+| `P1-U` | Partial overlap | single without scalar hints | target keeps a non-contiguous subset | only overlapping fields decoded |
+| `P2-T` | No overlap | single with scalar hints | target shares no field names | target fields stay default |
+| `P2-U` | No overlap | single without scalar hints | target shares no field names | target fields stay default |
 
 ## Recommended Nested / Optional Follow-ups
 

@@ -36,14 +36,14 @@ ASON declares the schema **once** and streams data as compact tuples:
 | -------------------- | ----------------------- | -------------------------- |
 | Token efficiency     | 100% (baseline)         | **30–70%** ✓               |
 | Key repetition       | Every object            | Declared once ✓            |
-| Type annotations     | None                    | Optional ✓                 |
+| Field binding        | None                    | Built-in `@...` ✓          |
 | Human readable       | Yes                     | Yes ✓                      |
 | Nested structs       | ✓                       | ✓                          |
 | Serialization        | Repeats keys            | Schema once, values only ✓ |
 | Deserialization      | Generic object scanning | Schema-guided decoding ✓   |
 | Data size            | 100% (baseline)         | **40–60%** ✓               |
 | Binary codec         | ✗                       | ✓                          |
-| Typed schema support | Limited                 | Built-in ✓                 |
+| Scalar hint support  | Limited                 | Optional via `@type` ✓     |
 
 ### Token Savings — A Concrete Example
 
@@ -55,7 +55,7 @@ ASON (~35 tokens, 65% saving):
 [{id@int, name@str, active@bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
-The schema header also acts as an inline hint for LLMs and humans: field names and optional types are visible up front instead of being repeated row by row.
+The schema header also acts as an inline hint for LLMs and humans: field names, structural bindings, and optional scalar hints are visible up front instead of being repeated row by row.
 
 ---
 
@@ -84,7 +84,7 @@ users[2]{id,name,active}:
 | Aspect                   | TOON                              | ASON                                                                            |
 | ------------------------ | --------------------------------- | ------------------------------------------------------------------------------- |
 | Schema declaration       | Auto-detected at encode time      | Explicit and reusable ✓                                                         |
-| Type annotations         | None (JSON data model only)       | Optional schema hints (`int`, `str`, `bool`, `float`, arrays, nested structs) ✓ |
+| Field/type binding       | None (JSON data model only)       | Explicit `@...` binding for scalar hints and complex structures ✓                |
 | Syntax style             | YAML-like indentation             | Compact tuple rows                                                              |
 | Array length markers     | `[N]` — helps detect truncation   | Schema header defines structure ✓                                               |
 | Nested structures        | Falls back to verbose list format | Native and recursive ✓                                                          |
@@ -96,12 +96,12 @@ users[2]{id,name,active}:
 ### When to Choose ASON
 
 - You want **fewer tokens and smaller payloads** without losing structure
-- You need **rich typed data** — optional fields, typed arrays, nested structs, keyed entry lists
+- You need **rich structured data** — optional fields, arrays, nested structs, keyed entry lists
 - You want one format to work across **LLMs, APIs, storage, and service-to-service transport**
-- Your data has **rich types** — optional fields, typed arrays, nested structs, keyed entry lists
+- Your data has **rich structure** — optional fields, arrays, nested structs, keyed entry lists
 - You need **binary encoding** alongside text
 - You work in **multiple languages** or need a language-neutral wire format
-- You want the schema to act as a **self-documenting API contract** for LLM prompts
+- You want the schema to act as a **self-documenting API contract** for LLM prompts, with `@` binding fields to structural descriptions and optional scalar hints
 
 ### When TOON May Be Enough
 
