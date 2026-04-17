@@ -1,14 +1,14 @@
-# ASON — Array-Schema Object Notation
+# ASUN — Array-Schema Unified Notation
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**ASON** is a compact, schema-first data format for **LLM prompts**, **structured APIs**, and **large datasets**. It separates schema from data, so keys are declared once and rows carry only values.
+**ASUN** is a compact, schema-first data format for **LLM prompts**, **structured APIs**, and **large datasets**. It separates schema from data, so keys are declared once and rows carry only values.
 
 [中文文档](README_CN.md)
 
 ---
 
-## Why ASON?
+## Why ASUN?
 
 Standard JSON repeats every field name in every record. When you send structured data to an LLM, over an API, or across services, that repetition wastes tokens, bytes, and attention:
 
@@ -20,7 +20,7 @@ Standard JSON repeats every field name in every record. When you send structured
 ]
 ```
 
-ASON declares the schema **once** and streams data as compact tuples:
+ASUN declares the schema **once** and streams data as compact tuples:
 
 ```
 [{id@int, name@str, active@bool}]:(1,Alice,true),(2,Bob,false),(3,Carol,true)
@@ -30,20 +30,20 @@ ASON declares the schema **once** and streams data as compact tuples:
 
 ---
 
-## ASON vs JSON
+## ASUN vs JSON
 
-| Aspect               | JSON                    | ASON                       |
-| -------------------- | ----------------------- | -------------------------- |
-| Token efficiency     | 100% (baseline)         | **30–70%** ✓               |
-| Key repetition       | Every object            | Declared once ✓            |
-| Field binding        | None                    | Built-in `@...` ✓          |
-| Human readable       | Yes                     | Yes ✓                      |
-| Nested structs       | ✓                       | ✓                          |
-| Serialization        | Repeats keys            | Schema once, values only ✓ |
-| Deserialization      | Generic object scanning | Schema-guided decoding ✓   |
-| Data size            | 100% (baseline)         | **40–60%** ✓               |
-| Binary codec         | ✗                       | ✓                          |
-| Scalar hint support  | Limited                 | Optional via `@type` ✓     |
+| Aspect              | JSON                    | ASUN                       |
+| ------------------- | ----------------------- | -------------------------- |
+| Token efficiency    | 100% (baseline)         | **30–70%** ✓               |
+| Key repetition      | Every object            | Declared once ✓            |
+| Field binding       | None                    | Built-in `@...` ✓          |
+| Human readable      | Yes                     | Yes ✓                      |
+| Nested structs      | ✓                       | ✓                          |
+| Serialization       | Repeats keys            | Schema once, values only ✓ |
+| Deserialization     | Generic object scanning | Schema-guided decoding ✓   |
+| Data size           | 100% (baseline)         | **40–60%** ✓               |
+| Binary codec        | ✗                       | ✓                          |
+| Scalar hint support | Limited                 | Optional via `@type` ✓     |
 
 ### Token Savings — A Concrete Example
 
@@ -51,7 +51,7 @@ ASON declares the schema **once** and streams data as compact tuples:
 JSON (100 tokens):
 {"users":[{"id":1,"name":"Alice","active":true},{"id":2,"name":"Bob","active":false}]}
 
-ASON (~35 tokens, 65% saving):
+ASUN (~35 tokens, 65% saving):
 [{id@int, name@str, active@bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
@@ -59,9 +59,9 @@ The schema header also acts as an inline hint for LLMs and humans: field names, 
 
 ---
 
-## ASON vs TOON
+## ASUN vs TOON
 
-[TOON (Token-Oriented Object Notation)](https://toonformat.dev) is another format designed for reducing tokens in LLM prompts. Both ASON and TOON share the core idea of eliminating key repetition for array-of-object data, but they differ significantly in design goals and scope.
+[TOON (Token-Oriented Object Notation)](https://toonformat.dev) is another format designed for reducing tokens in LLM prompts. Both ASUN and TOON share the core idea of eliminating key repetition for array-of-object data, but they differ significantly in design goals and scope.
 
 ### Syntax at a glance
 
@@ -73,7 +73,7 @@ users[2]{id,name,active}:
   2,Bob,false
 ```
 
-**ASON** — tuple-based, schema-explicit:
+**ASUN** — tuple-based, schema-explicit:
 
 ```
 [{id@int, name@str, active@bool}]:(1,Alice,true),(2,Bob,false)
@@ -81,19 +81,19 @@ users[2]{id,name,active}:
 
 ### Comparison Table
 
-| Aspect                   | TOON                              | ASON                                                                            |
-| ------------------------ | --------------------------------- | ------------------------------------------------------------------------------- |
-| Schema declaration       | Auto-detected at encode time      | Explicit and reusable ✓                                                         |
-| Field/type binding       | None (JSON data model only)       | Explicit `@...` binding for scalar hints and complex structures ✓                |
-| Syntax style             | YAML-like indentation             | Compact tuple rows                                                              |
-| Array length markers     | `[N]` — helps detect truncation   | Schema header defines structure ✓                                               |
-| Nested structures        | Falls back to verbose list format | Native and recursive ✓                                                          |
-| Use case                 | LLM input only                    | LLM + serialization + storage + transport ✓                                     |
-| Binary codec             | ✗                                 | ✓                                                                               |
-| Language implementations | TypeScript / JavaScript only      | **C, C++, C#, Go, Java, JS, Python, Rust, Zig, Dart** ✓                         |
-| Round-trip fidelity      | JSON data model only              | Full type fidelity ✓                                                            |
+| Aspect                   | TOON                              | ASUN                                                              |
+| ------------------------ | --------------------------------- | ----------------------------------------------------------------- |
+| Schema declaration       | Auto-detected at encode time      | Explicit and reusable ✓                                           |
+| Field/type binding       | None (JSON data model only)       | Explicit `@...` binding for scalar hints and complex structures ✓ |
+| Syntax style             | YAML-like indentation             | Compact tuple rows                                                |
+| Array length markers     | `[N]` — helps detect truncation   | Schema header defines structure ✓                                 |
+| Nested structures        | Falls back to verbose list format | Native and recursive ✓                                            |
+| Use case                 | LLM input only                    | LLM + serialization + storage + transport ✓                       |
+| Binary codec             | ✗                                 | ✓                                                                 |
+| Language implementations | TypeScript / JavaScript only      | **C, C++, C#, Go, Java, JS, Python, Rust, Zig, Dart** ✓           |
+| Round-trip fidelity      | JSON data model only              | Full type fidelity ✓                                              |
 
-### When to Choose ASON
+### When to Choose ASUN
 
 - You want **fewer tokens and smaller payloads** without losing structure
 - You need **rich structured data** — optional fields, arrays, nested structs, keyed entry lists
@@ -150,20 +150,20 @@ _(blank value = `None`/`null`)_
 
 ## Implementations
 
-| Language                | Repository                | Status |
-| ----------------------- | ------------------------- | ------ |
-| C                       | [ason-c](ason-c/)         | ✓      |
-| C++                     | [ason-cpp](ason-cpp/)     | ✓      |
-| C#                      | [ason-cs](ason-cs/)       | ✓      |
-| Go                      | [ason-go](ason-go/)       | ✓      |
-| Java / Kotlin           | [ason-java](ason-java/)   | ✓      |
-| JavaScript / TypeScript | [ason-js](ason-js/)       | ✓      |
-| Python                  | [ason-py](ason-py/)       | ✓      |
-| Rust                    | [ason-rs](ason-rs/)       | ✓      |
-| Zig                     | [ason-zig](ason-zig/)     | ✓      |
-| Dart                    | [ason-dart](ason-dart/)   | ✓      |
-| PHP                     | [ason-php](ason-php/)     | ✓      |
-| Swift                   | [ason-swift](ason-swift/) | ✓      |
+| Language                | Repository                           | Status |
+| ----------------------- | ------------------------------------ | ------ |
+| C                       | [asun-c](asun-c/)                    | ✓      |
+| C++                     | [asun-cpp](asun-cpp/)                | ✓      |
+| C#                      | [asun-cs](asun-cs/)                  | ✓      |
+| Go                      | [asun-go](asun-go/)                  | ✓      |
+| Java / Kotlin           | [asun-java](asun-java/)              | ✓      |
+| JavaScript / TypeScript | [asun-js](asun-js/) (`@athanx/asun`) | ✓      |
+| Python                  | [asun-py](asun-py/)                  | ✓      |
+| Rust                    | [asun-rs](asun-rs/)                  | ✓      |
+| Zig                     | [asun-zig](asun-zig/)                | ✓      |
+| Dart                    | [asun-dart](asun-dart/)              | ✓      |
+| PHP                     | [asun-php](asun-php/)                | ✓      |
+| Swift                   | [asun-swift](asun-swift/)            | ✓      |
 
 ## Plugins
 

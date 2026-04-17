@@ -1,9 +1,9 @@
-# ASON Format Specification v1.0
+# ASUN Format Specification v1.0
 
-> **ASON** = Array-Schema Object Notation  
+> **ASUN** = Array-Schema Unified Notation  
 > _"The efficiency of arrays, the structure of objects."_
 
-ASON is a serialization format designed for large-scale data transmission and LLM (Large Language Model) interactions. By **separating schema from data**, it eliminates the repetitive key redundancy found in JSON and introduces a Markdown-inspired, row-oriented syntax that minimizes token consumption while maintaining excellent human readability.
+ASUN is a serialization format designed for large-scale data transmission and LLM (Large Language Model) interactions. By **separating schema from data**, it eliminates the repetitive key redundancy found in JSON and introduces a Markdown-inspired, row-oriented syntax that minimizes token consumption while maintaining excellent human readability.
 
 ---
 
@@ -17,9 +17,9 @@ ASON is a serialization format designed for large-scale data transmission and LL
 
 ---
 
-## 1.1 Why ASON?
+## 1.1 Why ASUN?
 
-### JSON vs ASON
+### JSON vs ASUN
 
 ```json
 // JSON: 100 tokens
@@ -31,62 +31,62 @@ ASON is a serialization format designed for large-scale data transmission and LL
 }
 ```
 
-```ason
-// ASON: ~35 tokens (65% token saving)
+```asun
+// ASUN: ~35 tokens (65% token saving)
 [{id@int, name@str, active@bool}]:
   (1, Alice, true),
   (2, Bob, false)
 ```
 
-| Aspect              | JSON              | ASON              |
-| ------------------- | ----------------- | ----------------- |
-| **Token Efficiency**| 100%              | 30–70% ✓          |
-| **Key Repetition**  | Every row         | Declared once ✓   |
-| **Human Readable**  | High              | High ✓            |
-| **Learning Curve**  | Zero              | Low               |
-| **Nesting**         | Arbitrary depth   | Clear & bounded ✓ |
-| **Streaming**       | Line-by-line      | Native support ✓  |
+| Aspect               | JSON            | ASUN              |
+| -------------------- | --------------- | ----------------- |
+| **Token Efficiency** | 100%            | 30–70% ✓          |
+| **Key Repetition**   | Every row       | Declared once ✓   |
+| **Human Readable**   | High            | High ✓            |
+| **Learning Curve**   | Zero            | Low               |
+| **Nesting**          | Arbitrary depth | Clear & bounded ✓ |
+| **Streaming**        | Line-by-line    | Native support ✓  |
 
 ---
 
 ## 1.2 Extreme Parse Performance
 
-Beyond token savings in LLM scenarios, ASON also dramatically outperforms JSON in traditional serialization/deserialization (serde) use cases — behaving much more like CSV or Protobuf:
+Beyond token savings in LLM scenarios, ASUN also dramatically outperforms JSON in traditional serialization/deserialization (serde) use cases — behaving much more like CSV or Protobuf:
 
 1. **Zero Key-Hashing**:
    - **JSON**: When parsing an array of objects, every key in every row must be read, hashed, and matched against the target struct. 1,000 rows means 1,000 repeated hash lookups.
-   - **ASON**: The parser first parses the schema to build a positional index (e.g., `0 → id`, `1 → name`). When parsing data rows, values are assigned via array index in O(1) — zero hash computation or string matching throughout.
+   - **ASUN**: The parser first parses the schema to build a positional index (e.g., `0 → id`, `1 → name`). When parsing data rows, values are assigned via array index in O(1) — zero hash computation or string matching throughout.
 
 2. **Schema-Driven Parsing**:
    - **JSON**: The parser must dynamically infer the type of each value by peeking at the next character (`"`, `t`, `f`, `[`, `{`, digit), causing frequent CPU branch mispredictions.
-   - **ASON**: The schema provides structural information (e.g., `{id, name, active}`), so the parser reads each field value in a fixed, known order without dynamic type inference. In a serde framework the target struct's type is already known at compile time, and the parser calls `parse_int()` etc. directly. In schema text, `@` is the binding marker between a field and its following schema/type description: scalar hints like `{id@int}` are optional, while structural bindings such as `@{}` and `@[]` are required for complex fields.
+   - **ASUN**: The schema provides structural information (e.g., `{id, name, active}`), so the parser reads each field value in a fixed, known order without dynamic type inference. In a serde framework the target struct's type is already known at compile time, and the parser calls `parse_int()` etc. directly. In schema text, `@` is the binding marker between a field and its following schema/type description: scalar hints like `{id@int}` are optional, while structural bindings such as `@{}` and `@[]` are required for complex fields.
 
 3. **Low Memory Footprint**:
-   - JSON builds a dynamic DOM tree that allocates memory for every key string in every object. ASON data rows are essentially a flat tuple array — all rows share a single schema reference, keeping memory overhead minimal.
+   - JSON builds a dynamic DOM tree that allocates memory for every key string in every object. ASUN data rows are essentially a flat tuple array — all rows share a single schema reference, keeping memory overhead minimal.
 
 ---
 
 ## 1.3 Core Architecture Philosophy
 
-ASON's design goes beyond just saving tokens; its deep architectural philosophy dictates its extreme performance and precise semantics:
+ASUN's design goes beyond just saving tokens; its deep architectural philosophy dictates its extreme performance and precise semantics:
 
 1. **Physical Isolation via `Header : Body`**
-   - ASON uses `:` to strictly divide the text into Schema (Blueprint) and Data (Body).
+   - ASUN uses `:` to strictly divide the text into Schema (Blueprint) and Data (Body).
    - This physical isolation allows the parser to split the payload in **O(1)** time. The front-end parser can parse the Schema independently, pre-allocate structural memory, and then engage in high-speed or multi-threaded streaming of massive Data rows, completely discarding JSON's inefficient paradigm of continuously inferring object boundaries while parsing data.
 
 2. **Tuple Semantics `()` vs Object Semantics `{}`**
-   - In ASON, Schema uses `{}` to define the unordered key-value blueprint, but crucially, **data bodies are strictly wrapped in `()`**.
+   - In ASUN, Schema uses `{}` to define the unordered key-value blueprint, but crucially, **data bodies are strictly wrapped in `()`**.
    - `()` represents a **Tuple** in programming languages — a strictly ordered, keyless, position-bound data structure. It sends a strong signal to humans and AI: data must perfectly align with the schema positions and cannot be shuffled like in JSON. This architectural "harmony of shapes" visually isolates structural definitions from pure data with extreme sharpness, drastically reducing structure-related parsing errors.
 
 3. **Native Immunity to Key Collisions**
    - JSON syntax allows ambiguous key duplications (e.g., `{"age": 30, "age": 40}`), often leading to the latter covering the former.
-   - By confining keys exclusively to the Schema header, ASON data regions consist solely of compact values (`(30), (40)`), completely insulating the format from key collisions at the syntactic source. By reducing Maps/Dictionaries to arrays of key-value tuples (e.g., `[{key, value}]: ((age,30))`), ASON perfectly extends this high-performance, collision-free design abstraction.
+   - By confining keys exclusively to the Schema header, ASUN data regions consist solely of compact values (`(30), (40)`), completely insulating the format from key collisions at the syntactic source. By reducing Maps/Dictionaries to arrays of key-value tuples (e.g., `[{key, value}]: ((age,30))`), ASUN perfectly extends this high-performance, collision-free design abstraction.
 
 ---
 
 ## 2. Core Syntax Preview
 
-```ason
+```asun
 [{id@int, name@str, tags@[str]}]:
   (1, Alice, [rust, go]),
   (2, Bob, [python, c++])
@@ -98,23 +98,23 @@ ASON's design goes beyond just saving tokens; its deep architectural philosophy 
 
 ## 3. Data Type Rules
 
-| Type             | Example       | Description                                        |
-| ---------------- | ------------- | -------------------------------------------------- |
-| Integer          | `42`, `-100`  | Matches `-?[0-9]+`                                 |
-| Float            | `3.14`, `-0.5`| Matches `-?[0-9]+\.[0-9]+`                         |
-| Boolean          | `true`, `false` | Must be lowercase literals                       |
-| Null             | *(blank)*     | Empty content between commas parses as `null`      |
-| Empty string     | `""`          | Explicit empty string                              |
-| Unquoted string  | `Hello World` | Leading/trailing spaces auto-trimmed; must escape `,()[]\` |
-| Quoted string    | `" Space "`   | Spaces preserved as-is; supports `\"` escaping     |
+| Type            | Example         | Description                                                |
+| --------------- | --------------- | ---------------------------------------------------------- |
+| Integer         | `42`, `-100`    | Matches `-?[0-9]+`                                         |
+| Float           | `3.14`, `-0.5`  | Matches `-?[0-9]+\.[0-9]+`                                 |
+| Boolean         | `true`, `false` | Must be lowercase literals                                 |
+| Null            | _(blank)_       | Empty content between commas parses as `null`              |
+| Empty string    | `""`            | Explicit empty string                                      |
+| Unquoted string | `Hello World`   | Leading/trailing spaces auto-trimmed; must escape `,()[]\` |
+| Quoted string   | `" Space "`     | Spaces preserved as-is; supports `\"` escaping             |
 
 ### 3.1 String Rules
 
-ASON supports two string forms:
+ASUN supports two string forms:
 
-| Form     | Example       | Behavior                               |
-| -------- | ------------- | -------------------------------------- |
-| Unquoted | `hello world` | Leading/trailing whitespace auto-trimmed |
+| Form     | Example       | Behavior                                      |
+| -------- | ------------- | --------------------------------------------- |
+| Unquoted | `hello world` | Leading/trailing whitespace auto-trimmed      |
 | Quoted   | `" hello "`   | Content preserved verbatim (including spaces) |
 
 **When to use quotes:**
@@ -126,11 +126,11 @@ ASON supports two string forms:
 
 ### 3.2 Field Binding and Optional Scalar Hints
 
-**ASON v1.4 introduces the `@` binding syntax.** `@` is not merely a type-annotation symbol; it is the **field binding marker** between a field name and its following schema/type description.
+**ASUN v1.4 introduces the `@` binding syntax.** `@` is not merely a type-annotation symbol; it is the **field binding marker** between a field name and its following schema/type description.
 
 > **Core principle: `@` carries both structural binding and optional scalar hints.** For terminal scalar fields, `@type` is an optional hint; for complex fields, `@{}` / `@[]` are mandatory structural bindings. Both of the following are layout-equivalent:
 >
-> ```ason
+> ```asun
 > // Without annotations
 > {id,name,active}:(1,Alice,true)
 >
@@ -140,16 +140,16 @@ ASON supports two string forms:
 
 **Supported types:**
 
-| Type    | Syntax                | Example               | Description                               |
-| ------- | --------------------- | --------------------- | ----------------------------------------- |
-| String  | `str`      | `name@str`            | Text data                                 |
-| Integer | `int`      | `id@int`              | Signed integer                            |
-| Float   | `float`    | `salary@float`        | Floating-point number                     |
-| Boolean | `bool`     | `active@bool`         | Boolean value                             |
+| Type    | Syntax  | Example        | Description           |
+| ------- | ------- | -------------- | --------------------- |
+| String  | `str`   | `name@str`     | Text data             |
+| Integer | `int`   | `id@int`       | Signed integer        |
+| Float   | `float` | `salary@float` | Floating-point number |
+| Boolean | `bool`  | `active@bool`  | Boolean value         |
 
 **Example with scalar hints:**
 
-```ason
+```asun
 // Full scalar hints
 [{id@int, name@str, salary@float, active@bool}]:
   (1, Alice, 5000.50, true),
@@ -174,7 +174,7 @@ ASON supports two string forms:
 
 **Partial annotation example:**
 
-```ason
+```asun
 // Annotate only key fields (recommended style)
 [{id@int, name@str, email@str, age@int, bio@str}]:
   (1, Alice, alice@example.com, 30, "Engineer"),
@@ -184,6 +184,7 @@ ASON supports two string forms:
 **⚠️ CRITICAL WARNING: The `@` structural binding is mandatory for complex types!**
 
 While `@type` for terminal scalar data (numbers, strings, etc.) is only an optional hint, for **complex type containers (nested objects, arrays)** the `@` followed by `{}` or `[]` acts as a crucial structural binding and **must absolutely not be omitted!**
+
 - ✅ **Annotated nesting**: `dept@{title@str}`
 - ✅ **Structural nesting without scalar hints**: `dept@{title}` (dropped `@str`, but the `@{}` must be kept to signal to the parser to enter the next object level)
 - ✅ **Array without scalar hints**: `tags@[]` (kept `@[]` to indicate an array boundary)
@@ -193,13 +194,13 @@ While `@type` for terminal scalar data (numbers, strings, etc.) is only an optio
 
 `schema` and `value` live in the same text, but characters do not mean the same thing in both places. Pay special attention to `@`, whitespace, and special characters:
 
-| Position | Rule |
-| --- | --- |
-| Schema field name | `@` is part of the structural/type marker, such as `name@str` or `users@[{id@int}]`. Here, `@` is **not field-name content**. |
-| Schema field name | If a field name contains spaces, starts with a digit, or contains special characters, it should be written as a quoted field name, such as `"id uuid"`, `"65"`, or `"{}[]@\\\""`. |
-| Data value | In the data section, `@` is **not a type marker**; it is just an ordinary character. However, to avoid confusion with schema syntax, any value containing `@` should be written as a quoted string, for example `"@Alice"`. |
-| Data value | Unquoted strings automatically trim leading and trailing spaces. To preserve outer whitespace, use quotes, for example `"  Alice  "`. |
-| Data value | If a value contains delimiters or other potentially ambiguous special characters, prefer a quoted string. Do not apply schema field-name rules directly to data values. |
+| Position          | Rule                                                                                                                                                                                                                        |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Schema field name | `@` is part of the structural/type marker, such as `name@str` or `users@[{id@int}]`. Here, `@` is **not field-name content**.                                                                                               |
+| Schema field name | If a field name contains spaces, starts with a digit, or contains special characters, it should be written as a quoted field name, such as `"id uuid"`, `"65"`, or `"{}[]@\\\""`.                                           |
+| Data value        | In the data section, `@` is **not a type marker**; it is just an ordinary character. However, to avoid confusion with schema syntax, any value containing `@` should be written as a quoted string, for example `"@Alice"`. |
+| Data value        | Unquoted strings automatically trim leading and trailing spaces. To preserve outer whitespace, use quotes, for example `"  Alice  "`.                                                                                       |
+| Data value        | If a value contains delimiters or other potentially ambiguous special characters, prefer a quoted string. Do not apply schema field-name rules directly to data values.                                                     |
 
 Example:
 
@@ -220,22 +221,22 @@ Explanation:
 
 Escape special characters when they appear inside string values:
 
-| Character | Escape   | Description          |
-| --------- | -------- | -------------------- |
-| `,`       | `\,`     | Comma                |
-| `(`       | `\(`     | Left parenthesis     |
-| `)`       | `\)`     | Right parenthesis    |
-| `[`       | `\[`     | Left square bracket  |
-| `]`       | `\]`     | Right square bracket |
-| `"`       | `\"`     | Double quote         |
-| `\`       | `\\`     | Backslash            |
-| Newline   | `\n`     | Line feed            |
-| Tab       | `\t`     | Horizontal tab       |
+| Character | Escape   | Description                        |
+| --------- | -------- | ---------------------------------- |
+| `,`       | `\,`     | Comma                              |
+| `(`       | `\(`     | Left parenthesis                   |
+| `)`       | `\)`     | Right parenthesis                  |
+| `[`       | `\[`     | Left square bracket                |
+| `]`       | `\]`     | Right square bracket               |
+| `"`       | `\"`     | Double quote                       |
+| `\`       | `\\`     | Backslash                          |
+| Newline   | `\n`     | Line feed                          |
+| Tab       | `\t`     | Horizontal tab                     |
 | Unicode   | `\uXXXX` | Unicode character (e.g., `\u4e2d`) |
 
 **Notes:**
 
-- ASON uses UTF-8 encoding by default.
+- ASUN uses UTF-8 encoding by default.
 - In unquoted strings, `,()[]` must be escaped.
 - In quoted strings, at minimum `"` and `\` must be escaped; control characters may use `\n`, `\t`, `\r`, `\b`, and `\f`.
 
@@ -384,16 +385,16 @@ To ensure maximum streaming parse performance, comments **may only appear at the
 
 **Parsed result:**
 
-| Field | Alice row                                    | Bob row                                       |
-| ----- | -------------------------------------------- | --------------------------------------------- |
-| name  | `"Alice"` (unquoted, auto-trimmed)           | `"Bob"` (unquoted, auto-trimmed)              |
-| city  | `"New York"` (unquoted, auto-trimmed)        | `"  Los Angeles  "` (quoted, spaces preserved)|
-| zip   | `"001234"` (string, leading zero preserved)  | `90210` (all digits → parsed as integer)      |
-| note  | `"hello world"` (unquoted, auto-trimmed)     | `"say \"hi\""` (quoted, escape supported)     |
+| Field | Alice row                                   | Bob row                                        |
+| ----- | ------------------------------------------- | ---------------------------------------------- |
+| name  | `"Alice"` (unquoted, auto-trimmed)          | `"Bob"` (unquoted, auto-trimmed)               |
+| city  | `"New York"` (unquoted, auto-trimmed)       | `"  Los Angeles  "` (quoted, spaces preserved) |
+| zip   | `"001234"` (string, leading zero preserved) | `90210` (all digits → parsed as integer)       |
+| note  | `"hello world"` (unquoted, auto-trimmed)    | `"say \"hi\""` (quoted, escape supported)      |
 
 ### 6.14 Real-World Example: Database Query Results
 
-```ason
+```asun
 [{id@int, name@str, dept@{title@str}, skills@[str], active@bool}]:
   (1, Alice, (Manager), [Rust, Go], true),
   (2, Bob, (Engineer), [Python, "C++"], false),
@@ -428,22 +429,22 @@ To ensure maximum streaming parse performance, comments **may only appear at the
 ]
 ```
 
-**Token savings:** ASON ~65 tokens vs JSON ~180 tokens — **64% reduction** 🌟
+**Token savings:** ASUN ~65 tokens vs JSON ~180 tokens — **64% reduction** 🌟
 
 ---
 
 ## 7. Syntax Quick Reference
 
-| Element              | Schema Syntax                        | Data Syntax           |
-| -------------------- | ------------------------------------ | --------------------- |
-| Single object        | `{field1@type,field2@type}:`         | `(val1,val2)`         |
-| Array of objects     | `[{field1@type,field2@type}]:`       | `(v1,v2),(v3,v4)`     |
-| Simple array field   | `field@[type]`                       | `[v1,v2,v3]`          |
-| Array-of-objects field | `field@[{f1@type,f2@type}]`        | `[(v1,v2),(v3,v4)]`   |
-| Nested object field  | `field@{f1@type,f2@type}`            | `(v1,(v3,v4))`        |
-| Null value           | —                                    | *(blank)*             |
-| Empty array          | —                                    | `[]`                  |
-| Empty object         | —                                    | `()`                  |
+| Element                | Schema Syntax                  | Data Syntax         |
+| ---------------------- | ------------------------------ | ------------------- |
+| Single object          | `{field1@type,field2@type}:`   | `(val1,val2)`       |
+| Array of objects       | `[{field1@type,field2@type}]:` | `(v1,v2),(v3,v4)`   |
+| Simple array field     | `field@[type]`                 | `[v1,v2,v3]`        |
+| Array-of-objects field | `field@[{f1@type,f2@type}]`    | `[(v1,v2),(v3,v4)]` |
+| Nested object field    | `field@{f1@type,f2@type}`      | `(v1,(v3,v4))`      |
+| Null value             | —                              | _(blank)_           |
+| Empty array            | —                              | `[]`                |
+| Empty object           | —                              | `()`                |
 
 ## 8. Detailed Rules
 
@@ -459,21 +460,21 @@ When parsing a value, the following order is attempted:
 
 Examples:
 
-| Value    | Parsed as          |
-| -------- | ------------------ |
-| *(blank)*| `null`             |
-| `true`   | boolean `true`     |
-| `123`    | integer `123`      |
-| `3.14`   | float `3.14`       |
-| `hello`  | string `"hello"`   |
-| `123abc` | string `"123abc"`  |
+| Value     | Parsed as         |
+| --------- | ----------------- |
+| _(blank)_ | `null`            |
+| `true`    | boolean `true`    |
+| `123`     | integer `123`     |
+| `3.14`    | float `3.14`      |
+| `hello`   | string `"hello"`  |
+| `123abc`  | string `"123abc"` |
 
 ### 8.2 Null vs Empty String
 
-| ASON                               | Parse result             |
-| ---------------------------------- | ------------------------ |
-| `{name@str,age@int}:(Alice,)`      | `age = null`             |
-| `{name@str,age@int}:(Alice,"")`    | `age = ""` (empty string)|
+| ASUN                            | Parse result              |
+| ------------------------------- | ------------------------- |
+| `{name@str,age@int}:(Alice,)`   | `age = null`              |
+| `{name@str,age@int}:(Alice,"")` | `age = ""` (empty string) |
 
 Example:
 
@@ -486,12 +487,12 @@ Example:
 
 There are **three top-level forms**, determined by the first character(s):
 
-| First char | Type                         | Example                                     |
-| ---------- | ---------------------------- | ------------------------------------------- |
-| `{`        | Single object with schema    | `{name@str,age@int}:(Alice,30)`             |
-| `[{`       | Array of objects with schema | `[{id@int,name@str}]:(1,Alice),(2,Bob)`     |
-| `[`        | Plain array                  | `[1,2,3]`                                   |
-| Other      | Bare value (type inferred)   | `42`, `true`, `hello`                       |
+| First char | Type                         | Example                                 |
+| ---------- | ---------------------------- | --------------------------------------- |
+| `{`        | Single object with schema    | `{name@str,age@int}:(Alice,30)`         |
+| `[{`       | Array of objects with schema | `[{id@int,name@str}]:(1,Alice),(2,Bob)` |
+| `[`        | Plain array                  | `[1,2,3]`                               |
+| Other      | Bare value (type inferred)   | `42`, `true`, `hello`                   |
 
 **Key rules:**
 
@@ -508,11 +509,11 @@ There are **three top-level forms**, determined by the first character(s):
 
 ### 8.5 Whitespace Handling
 
-| Location     | Rule                                  |
-| ------------ | ------------------------------------- |
-| In schema    | All whitespace ignored                |
-| In data      | Whitespace preserved (part of string) |
-| After comma  | Leading whitespace ignored            |
+| Location    | Rule                                  |
+| ----------- | ------------------------------------- |
+| In schema   | All whitespace ignored                |
+| In data     | Whitespace preserved (part of string) |
+| After comma | Leading whitespace ignored            |
 
 Example:
 
@@ -549,46 +550,46 @@ is equivalent to:
 
 The minus sign `-` must immediately precede the digit — no space allowed:
 
-| Input   | Parsed as         | Note                        |
-| ------- | ----------------- | --------------------------- |
-| `-123`  | integer `-123`    | ✓ Correct                   |
-| `- 123` | string `"- 123"`  | ✗ Space → parsed as string  |
-| `-3.14` | float `-3.14`     | ✓ Correct                   |
-| `-0`    | integer `0`       | ✓ Special case              |
+| Input   | Parsed as        | Note                       |
+| ------- | ---------------- | -------------------------- |
+| `-123`  | integer `-123`   | ✓ Correct                  |
+| `- 123` | string `"- 123"` | ✗ Space → parsed as string |
+| `-3.14` | float `-3.14`    | ✓ Correct                  |
+| `-0`    | integer `0`      | ✓ Special case             |
 
 ### 8.8 Data Alignment Rule (Strict Mode)
 
 **The number of data items must exactly match the number of schema fields.**
 
-| Schema                | Data         | Result                     |
-| --------------------- | ------------ | -------------------------- |
-| `{a@int,b@int,c@int}` | `(1,2,3)`    | ✓ Correct                  |
-| `{a@int,b@int,c@int}` | `(1,2)`      | ✗ Error: missing field     |
-| `{a@int,b@int,c@int}` | `(1,2,3,4)`  | ✗ Error: too many fields   |
-| `{a@int,b@int,c@int}` | `(1,,3)`     | ✓ Correct: `b = null`      |
+| Schema                | Data        | Result                   |
+| --------------------- | ----------- | ------------------------ |
+| `{a@int,b@int,c@int}` | `(1,2,3)`   | ✓ Correct                |
+| `{a@int,b@int,c@int}` | `(1,2)`     | ✗ Error: missing field   |
+| `{a@int,b@int,c@int}` | `(1,2,3,4)` | ✗ Error: too many fields |
+| `{a@int,b@int,c@int}` | `(1,,3)`    | ✓ Correct: `b = null`    |
 
-**Rationale**: ASON is a position-sensitive format. A field-count mismatch causes data misalignment and must be reported as a parse error.
+**Rationale**: ASUN is a position-sensitive format. A field-count mismatch causes data misalignment and must be reported as a parse error.
 
 ### 8.9 Common Error Examples
 
-| Incorrect                     | Reason                | Correct                                           |
-| ----------------------------- | --------------------- | ------------------------------------------------- |
-| `{a@int,b@int}:(1,2,3)`       | Too many values       | `{a@int,b@int,c@int}:(1,2,3)`                     |
-| `{a@int,b@int}:(1)`           | Missing field (no null)| `{a@int,b@int}:(1,)`                             |
-| `{a@int,b@int,c@int}:(1,2)`   | Insufficient data     | `{a@int,b@int,c@int}:(1,2,)`                      |
-| `(1,2,3)`                     | Bare tuple needs schema| `{a@int,b@int,c@int}:(1,2,3)`                   |
-| `{a@int,b@int}`               | Schema with no data   | `{a@int,b@int}:()` or `{a@int,b@int}:(1,2)`      |
-| `{a@int,b@int}[1,2]`          | Missing colon after schema | `{a@int,b@int}:(1,2)`                       |
+| Incorrect                   | Reasun                     | Correct                                     |
+| --------------------------- | -------------------------- | ------------------------------------------- |
+| `{a@int,b@int}:(1,2,3)`     | Too many values            | `{a@int,b@int,c@int}:(1,2,3)`               |
+| `{a@int,b@int}:(1)`         | Missing field (no null)    | `{a@int,b@int}:(1,)`                        |
+| `{a@int,b@int,c@int}:(1,2)` | Insufficient data          | `{a@int,b@int,c@int}:(1,2,)`                |
+| `(1,2,3)`                   | Bare tuple needs schema    | `{a@int,b@int,c@int}:(1,2,3)`               |
+| `{a@int,b@int}`             | Schema with no data        | `{a@int,b@int}:()` or `{a@int,b@int}:(1,2)` |
+| `{a@int,b@int}[1,2]`        | Missing colon after schema | `{a@int,b@int}:(1,2)`                       |
 
 ### 8.10 Trailing Commas
 
-To facilitate version control diffs and LLM generation, ASON **permits** trailing commas in arrays and object data. Parsers must silently ignore them — they must **not** be interpreted as `null`.
+To facilitate version control diffs and LLM generation, ASUN **permits** trailing commas in arrays and object data. Parsers must silently ignore them — they must **not** be interpreted as `null`.
 
-| Input           | Parsed result         | Note                                               |
-| --------------- | --------------------- | -------------------------------------------------- |
-| `[1, 2, 3,]`   | `[1, 2, 3]`           | Trailing comma allowed                             |
-| `(Alice, 30,)` | `("Alice", 30)`       | Trailing comma allowed (schema has 2 fields)       |
-| `(Alice, 30,,)`| `("Alice", 30, null)` | Consecutive commas → null; final comma ignored     |
+| Input           | Parsed result         | Note                                           |
+| --------------- | --------------------- | ---------------------------------------------- |
+| `[1, 2, 3,]`    | `[1, 2, 3]`           | Trailing comma allowed                         |
+| `(Alice, 30,)`  | `("Alice", 30)`       | Trailing comma allowed (schema has 2 fields)   |
+| `(Alice, 30,,)` | `("Alice", 30, null)` | Consecutive commas → null; final comma ignored |
 
 ---
 
@@ -603,20 +604,20 @@ To facilitate version control diffs and LLM generation, ASON **permits** trailin
 
 ### 9.2 Error Handling
 
-| Error Type         | Example                  | Handling                       |
-| ------------------ | ------------------------ | ------------------------------ |
+| Error Type           | Example                 | Handling                       |
+| -------------------- | ----------------------- | ------------------------------ |
 | Field count mismatch | `{a@int,b@int}:(1,2,3)` | Throw error with location info |
-| Unclosed quote     | `("hello)`               | Throw error                    |
-| Unclosed bracket   | `{a@int,b@int}:(1,2`     | Throw error                    |
-| Unclosed comment   | `/* comment`             | Throw error                    |
-| Invalid escape     | `\x`                     | Throw error or keep verbatim   |
+| Unclosed quote       | `("hello)`              | Throw error                    |
+| Unclosed bracket     | `{a@int,b@int}:(1,2`    | Throw error                    |
+| Unclosed comment     | `/* comment`            | Throw error                    |
+| Invalid escape       | `\x`                    | Throw error or keep verbatim   |
 
 ---
 
 ## 10. Complete Grammar BNF (Simplified)
 
 ```bnf
-ason        ::= object_expr | array_expr | array | value
+asun        ::= object_expr | array_expr | array | value
 
 object_expr ::= schema ":" object
 array_expr  ::= "[" schema "]" ":" object_list
@@ -662,9 +663,9 @@ comment     ::= "/*" (any_char)* "*/"
 
 ---
 
-## 11. ASON Binary Format Specification
+## 11. ASUN Binary Format Specification
 
-In addition to the human-readable text format, ASON defines a compact binary wire format for high-performance serialization/deserialization.
+In addition to the human-readable text format, ASUN defines a compact binary wire format for high-performance serialization/deserialization.
 
 ### 11.1 Design Principles
 
@@ -675,19 +676,19 @@ In addition to the human-readable text format, ASON defines a compact binary wir
 
 ### 11.2 Type Encoding Rules
 
-| Type           | Bytes       | Encoding                                    |
-| -------------- | ----------- | ------------------------------------------- |
-| `bool`         | 1           | `0x00` = false, `0x01` = true               |
-| `i8` / `u8`    | 1           | Raw byte                                    |
-| `i16` / `u16`  | 2           | Little-endian                               |
-| `i32` / `u32`  | 4           | Little-endian                               |
-| `i64` / `u64`  | 8           | Little-endian                               |
-| `f32`          | 4           | IEEE 754 bitcast, little-endian             |
-| `f64`          | 8           | IEEE 754 bitcast, little-endian             |
-| `str`          | 4 + N       | `u32 LE` byte length + N bytes UTF-8        |
-| `Option<T>`    | 1 or 1+sizeof(T) | `u8` tag (`0x00` = null, `0x01` = some) + payload |
-| `Array<T>`     | 4 + N×sizeof(T) | `u32 LE` element count + N encoded elements |
-| `struct`       | Σ fields    | Fields encoded in declaration order; no padding or alignment |
+| Type          | Bytes            | Encoding                                                     |
+| ------------- | ---------------- | ------------------------------------------------------------ |
+| `bool`        | 1                | `0x00` = false, `0x01` = true                                |
+| `i8` / `u8`   | 1                | Raw byte                                                     |
+| `i16` / `u16` | 2                | Little-endian                                                |
+| `i32` / `u32` | 4                | Little-endian                                                |
+| `i64` / `u64` | 8                | Little-endian                                                |
+| `f32`         | 4                | IEEE 754 bitcast, little-endian                              |
+| `f64`         | 8                | IEEE 754 bitcast, little-endian                              |
+| `str`         | 4 + N            | `u32 LE` byte length + N bytes UTF-8                         |
+| `Option<T>`   | 1 or 1+sizeof(T) | `u8` tag (`0x00` = null, `0x01` = some) + payload            |
+| `Array<T>`    | 4 + N×sizeof(T)  | `u32 LE` element count + N encoded elements                  |
+| `struct`      | Σ fields         | Fields encoded in declaration order; no padding or alignment |
 
 ### 11.3 Single Struct vs Struct Array
 
@@ -744,25 +745,25 @@ Binary (20 bytes):
 
 ### 11.5 Correspondence with Text Format
 
-| Text format                       | Binary format                           |
-| --------------------------------- | --------------------------------------- |
-| `{schema}:(data)` single object   | Fields encoded in order, no wrapper     |
-| `[{schema}]:(d1),(d2),...` array  | `u32 LE` count + element sequence       |
-| `[v1,v2,v3]` plain array         | `u32 LE` count + element sequence       |
-| `true` / `false`                  | Single byte `0x01` / `0x00`             |
-| Null / Option null                | Single byte `0x00`                      |
-| Option some(v)                    | `0x01` + value encoding                 |
+| Text format                      | Binary format                       |
+| -------------------------------- | ----------------------------------- |
+| `{schema}:(data)` single object  | Fields encoded in order, no wrapper |
+| `[{schema}]:(d1),(d2),...` array | `u32 LE` count + element sequence   |
+| `[v1,v2,v3]` plain array         | `u32 LE` count + element sequence   |
+| `true` / `false`                 | Single byte `0x01` / `0x00`         |
+| Null / Option null               | Single byte `0x00`                  |
+| Option some(v)                   | `0x01` + value encoding             |
 
 ### 11.6 Performance Characteristics
 
-| Characteristic      | Text Format                    | Binary Format                         |
-| ------------------- | ------------------------------ | ------------------------------------- |
-| Human readable      | ✓                              | ✗                                     |
-| Encode speed        | Fast (1.5–2× JSON)             | Extremely fast (6–8× JSON)            |
-| Decode speed        | Fast (1.5–2.3× JSON)           | Extremely fast (17–47× JSON)          |
-| Size                | Compact (50–55% smaller than JSON) | More compact (39–55% smaller)     |
-| Zero-copy decode    | ✗                              | ✓ (strings reference input buffer)    |
-| Use cases           | API communication, LLM, debug  | RPC, IPC, high-frequency data pipelines |
+| Characteristic   | Text Format                        | Binary Format                           |
+| ---------------- | ---------------------------------- | --------------------------------------- |
+| Human readable   | ✓                                  | ✗                                       |
+| Encode speed     | Fast (1.5–2× JSON)                 | Extremely fast (6–8× JSON)              |
+| Decode speed     | Fast (1.5–2.3× JSON)               | Extremely fast (17–47× JSON)            |
+| Size             | Compact (50–55% smaller than JSON) | More compact (39–55% smaller)           |
+| Zero-copy decode | ✗                                  | ✓ (strings reference input buffer)      |
+| Use cases        | API communication, LLM, debug      | RPC, IPC, high-frequency data pipelines |
 
 ### 11.7 Byte Order Conventions
 
@@ -775,23 +776,23 @@ Binary (20 bytes):
 
 ## 12. LLM Best Practices & Benchmarks
 
-ASON is optimized for interaction with large language models. This section provides prompt templates, accuracy benchmarks, and corrections for common LLM errors.
+ASUN is optimized for interaction with large language models. This section provides prompt templates, accuracy benchmarks, and corrections for common LLM errors.
 
 ### 12.1 Core Design Advantages
 
-| Dimension         | ASON Advantage                                           |
-| ----------------- | -------------------------------------------------------- |
-| **Token efficiency** | 30–70% fewer tokens than JSON → more context headroom |
-| **Structure clarity** | Schema declared once → lower model comprehension cost |
-| **Generation pattern** | Row-oriented table format matches LLM training data   |
-| **Streaming** | Native row-by-row streaming, no need to buffer full output |
+| Dimension              | ASUN Advantage                                             |
+| ---------------------- | ---------------------------------------------------------- |
+| **Token efficiency**   | 30–70% fewer tokens than JSON → more context headroom      |
+| **Structure clarity**  | Schema declared once → lower model comprehension cost      |
+| **Generation pattern** | Row-oriented table format matches LLM training data        |
+| **Streaming**          | Native row-by-row streaming, no need to buffer full output |
 
 ### 12.2 Recommended System Prompt
 
 ```text
-You are a data format conversion expert. Output data in ASON format (Array-Schema Object Notation).
+You are a data format conversion expert. Output data in ASUN format (Array-Schema Unified Notation).
 
-Core ASON rules:
+Core ASUN rules:
 1. Single object: `{field1@type, field2@type, ...}:(val1, val2, ...)`
 2. Array of objects: `[{field1@type, field2@type, ...}]:(val1, val2, ...),(val3, val4, ...)`
 3. Type annotations are optional: `{field1@int, field2@str, ...}`
@@ -805,7 +806,7 @@ You must follow:
 - Null values are represented by blank content (empty between commas)
 - Nested objects use parentheses: outer@{inner@type}:(val1,(nested_val))
 
-Output ASON only, no additional explanation.
+Output ASUN only, no additional explanation.
 ```
 
 ### 12.3 Few-Shot Examples
@@ -833,32 +834,32 @@ Output:
 
 ### 12.4 Accuracy Benchmarks
 
-| Model              | Format Correct | Type Correct | Recommended  |
-| ------------------ | -------------- | ------------ | ------------ |
-| GPT-4 Turbo        | 99%+           | 97%+         | ⭐⭐⭐⭐⭐  |
-| Claude 3.5 Sonnet  | 98%+           | 96%+         | ⭐⭐⭐⭐⭐  |
-| GPT-4o             | 96%+           | 93%+         | ⭐⭐⭐⭐    |
-| Llama-2 70B        | 90%            | 85%          | ⭐⭐⭐      |
+| Model             | Format Correct | Type Correct | Recommended |
+| ----------------- | -------------- | ------------ | ----------- |
+| GPT-4 Turbo       | 99%+           | 97%+         | ⭐⭐⭐⭐⭐  |
+| Claude 3.5 Sonnet | 98%+           | 96%+         | ⭐⭐⭐⭐⭐  |
+| GPT-4o            | 96%+           | 93%+         | ⭐⭐⭐⭐    |
+| Llama-2 70B       | 90%            | 85%          | ⭐⭐⭐      |
 
 ### 12.5 Common Errors and Fixes
 
 #### Error 1: Field Count Mismatch
 
-```ason
+```asun
 ❌ {id@int,name@str}:(1,Alice,true)
 ✅ {id@int,name@str,active@bool}:(1,Alice,true)
 ```
 
 #### Error 2: Wrong Bracket Type for Nesting
 
-```ason
+```asun
 ❌ {user@{id@int,name@str}}:({1,Alice})      /* curly braces used */
 ✅ {user@{id@int,name@str}}:((1,Alice))      /* nested data uses parentheses */
 ```
 
 #### Error 3: Wrong Bracket Type for Arrays
 
-```ason
+```asun
 ❌ {tags@[str]}:({python,rust})         /* curly braces */
 ✅ {tags@[str]}:([python,rust])         /* arrays use square brackets */
 ```
@@ -867,10 +868,10 @@ Output:
 
 Test data: 500 user records, 8 fields each
 
-| Format | Token count | Cost (GPT-4) | Savings  |
-| ------ | ----------- | ------------ | -------- |
-| JSON   | 12,450      | $0.55        | —        |
-| ASON   | 4,280       | $0.19        | **65%**  |
+| Format | Token count | Cost (GPT-4) | Savings |
+| ------ | ----------- | ------------ | ------- |
+| JSON   | 12,450      | $0.55        | —       |
+| ASUN   | 4,280       | $0.19        | **65%** |
 
 ### 12.7 Integration Workflow
 
@@ -880,7 +881,7 @@ Request → Build prompt (system role + few-shot + data)
 Call LLM (temperature = 0.1–0.3)
   ↓
 Validate format (field count, alignment, types)
-  ├─ ✓ Pass → return ASON
+  ├─ ✓ Pass → return ASUN
   └─ ✗ Fail → retry (max 3 times)
 ```
 
@@ -894,22 +895,22 @@ Validate format (field count, alignment, types)
 
 ### A.1 Type Annotation Quick Reference
 
-| Scenario                   | Schema                 | Data           | Note                  |
-| -------------------------- | ---------------------- | -------------- | --------------------- |
-| No annotations (v1.3 compat) | `{id,name}`          | `(1,Alice)`    | Implicit inference    |
-| Explicit string            | `{name@str}`           | `(Alice)`      | Clear type            |
-| Integer                    | `{id@int}`             | `(1)`          | Integer type          |
-| Float                      | `{score@float}`        | `(95.5)`       | Floating-point        |
-| Boolean                    | `{active@bool}`        | `(true)`       | Boolean               |
-| Array                      | `{tags@[str]}`         | `([a,b,c])`    | Array type            |
-| Nested                     | `{user@{id@int}}`      | `((1))`        | Nested object         |
-| Mixed                      | `{id@int,bio@str}`     | `(1,Bio)`      | Partial annotations   |
+| Scenario                     | Schema             | Data        | Note                |
+| ---------------------------- | ------------------ | ----------- | ------------------- |
+| No annotations (v1.3 compat) | `{id,name}`        | `(1,Alice)` | Implicit inference  |
+| Explicit string              | `{name@str}`       | `(Alice)`   | Clear type          |
+| Integer                      | `{id@int}`         | `(1)`       | Integer type        |
+| Float                        | `{score@float}`    | `(95.5)`    | Floating-point      |
+| Boolean                      | `{active@bool}`    | `(true)`    | Boolean             |
+| Array                        | `{tags@[str]}`     | `([a,b,c])` | Array type          |
+| Nested                       | `{user@{id@int}}`  | `((1))`     | Nested object       |
+| Mixed                        | `{id@int,bio@str}` | `(1,Bio)`   | Partial annotations |
 
 ### A.2 Type Assertion Examples
 
 > **Note**: Strict scalar-hint assertions are an optional spec-level extension. In current implementations, parsers may skip these scalar hints and leave type validation to the target struct's type system at the serde layer. The examples below illustrate what a parser with strict checking enabled might do:
 
-```ason
+```asun
 // Correctly typed data
 [{id@int, score@float, pass@bool, name@str}]:
   (1, 95.5, true, Alice),      ✅ All types match
@@ -925,7 +926,7 @@ Validate format (field count, alignment, types)
 
 ## 14. Appendix B: Comparison with Other Formats
 
-### B.1 ASON vs JSON vs CSV
+### B.1 ASUN vs JSON vs CSV
 
 ```json
 // JSON (100 tokens)
@@ -944,8 +945,8 @@ id,name,role,active
 2,Bob,designer,false
 ```
 
-```ason
-// ASON (35 tokens, with type information)
+```asun
+// ASUN (35 tokens, with type information)
 [{id@int, name@str, role@str, active@bool}]:
   (1, Alice, engineer, true),
   (2, Bob, designer, false)
@@ -962,8 +963,8 @@ id,name,role,active
 }
 ```
 
-```ason
-// ASON — more compact
+```asun
+// ASUN — more compact
 {employees@[{id@int, name@str, dept@{name@str, budget@int}}]}:
   ([(1, Alice, (Eng, 500000))])
 ```
@@ -985,7 +986,7 @@ id,name,role,active
 
 ### C.2 Serializer Checklist
 
-- [ ] Value → ASON: serialize in-memory objects to text
+- [ ] Value → ASUN: serialize in-memory objects to text
 - [ ] Indentation and alignment: optional column alignment
 - [ ] Type annotation generation: infer and emit types from data
 - [ ] Quoting logic: determine when quotes are required vs optional
@@ -993,7 +994,7 @@ id,name,role,active
 
 ### C.3 Validation Tool Checklist
 
-- [ ] Format check: ASON syntactic correctness
+- [ ] Format check: ASUN syntactic correctness
 - [ ] Type check: field types match data (optional strict mode)
 - [ ] Data alignment: field count consistency
 - [ ] Schema validation: field name legality
@@ -1003,9 +1004,9 @@ id,name,role,active
 
 ## 16. Appendix D: FAQ
 
-### Q1: Why doesn't ASON use a human-friendly format similar to JSON?
+### Q1: Why doesn't ASUN use a human-friendly format similar to JSON?
 
-**A**: ASON is optimized for LLMs, which requires:
+**A**: ASUN is optimized for LLMs, which requires:
 
 1. Minimizing token consumption (every character counts)
 2. Clear structural boundaries (easy to parse)
@@ -1022,23 +1023,23 @@ Compared to JSON's indented readability, token savings and LLM friendliness take
 - **LLM friendliness**: Models generate more accurate data when scalar hints are explicit
 - **Optional for scalars**: Developers use them only when needed on terminal fields
 
-### Q3: Does ASON support large files?
+### Q3: Does ASUN support large files?
 
 **A**: Yes. The row-oriented format naturally supports:
 
 - Streaming without loading the entire file
 - Each row is independent, suitable for distributed processing
-- For very large datasets, the ASONL format is recommended (similar to JSONL)
+- For very large datasets, the ASUNL format is recommended (similar to JSONL)
 
-### Q4: How does ASON compare to MessagePack and Protocol Buffers?
+### Q4: How does ASUN compare to MessagePack and Protocol Buffers?
 
 **A**:
 
 - **MessagePack**: Binary format, more compact but not human-readable
 - **Protocol Buffers**: Requires `.proto` definition files, higher complexity
-- **ASON**: Text format for LLM use, balancing token efficiency with readability
+- **ASUN**: Text format for LLM use, balancing token efficiency with readability
 
-### Q5: What are the most common errors when LLMs generate ASON?
+### Q5: What are the most common errors when LLMs generate ASUN?
 
 **A**: See Section 12.5 for details. The three most common:
 
@@ -1046,9 +1047,9 @@ Compared to JSON's indented readability, token savings and LLM friendliness take
 2. Wrong bracket type for nesting
 3. Wrong bracket type for arrays
 
-### Q6: Is ASON's parse performance really faster than JSON?
+### Q6: Is ASUN's parse performance really faster than JSON?
 
-**A**: Yes. When processing arrays of objects (list data), ASON's parse performance far exceeds JSON, due to **schema-driven parsing**:
+**A**: Yes. When processing arrays of objects (list data), ASUN's parse performance far exceeds JSON, due to **schema-driven parsing**:
 
 1. **Zero key-hashing**: No need to repeatedly read key strings and compute hashes as JSON does.
 2. **Excellent branch prediction**: The parser knows the type of the next value in advance, maximizing CPU instruction pipeline efficiency.
@@ -1059,4 +1060,4 @@ Compared to JSON's indented readability, token savings and LLM friendliness take
 **Document version**: v1.4.0  
 **Last updated**: 2026-02-20  
 **License**: MIT  
-**GitHub**: https://github.com/ason-lab/ason
+**GitHub**: https://github.com/asun-lab/asun
