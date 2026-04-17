@@ -4,7 +4,7 @@
 
 **ASUN** 是一种紧凑的、Schema 优先的数据格式，适合 **LLM Prompt**、**结构化 API** 和 **大规模数据集**。它将 Schema 与数据分离，Key 只声明一次，数据行只保留值。
 
-[English](README.md)
+[English](https://github.com/asunLab/asun/blob/main/README.md)
 
 ---
 
@@ -22,8 +22,11 @@
 
 ASUN 只声明 **一次** Schema，数据以紧凑元组方式流式传输：
 
-```
-[{id@int, name@str, active@bool}]:(1,Alice,true),(2,Bob,false),(3,Carol,true)
+```asun
+[{id@int, name@str, active@bool}]:
+  (1,Alice,true),
+  (2,Bob,false),
+  (3,Carol,true)
 ```
 
 **更少的 Token，更小的体积，更清晰的结构。**
@@ -75,7 +78,7 @@ users[2]{id,name,active}:
 
 **ASUN** —— 基于元组，Schema 显式/隐式：
 
-```
+```asun
 [{id@int, name@str, active@bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
@@ -122,7 +125,7 @@ users[2]{id,name,active}:
 
 Schema 声明一次，每条数据为元组：
 
-```
+```asun
 [{id@int, name@str, active@bool}]:(1,Alice,true),(2,Bob,false),(3,Carol,true)
 ```
 

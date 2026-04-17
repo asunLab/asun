@@ -6,13 +6,13 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 
 pushGit() (
-  param=""
   if [[ "${2:-}" == "-f" ]]; then
-    param="-f origin"
+    cd "$ROOT_DIR/$1"
+    git push -f origin HEAD:main
   fi
   cd "$ROOT_DIR/$1"
   git pull --rebase --autostash
-  git push $param origin HEAD:main
+  git push origin HEAD:main
 )
 
 pids=()

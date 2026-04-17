@@ -126,7 +126,7 @@ Expected:
 
 ### `A5-T`
 
-```text
+```asun
 [{id@int,name@str,active@bool}]:(42,Alice,true),(7,Bob,false)
 ```
 
@@ -143,7 +143,7 @@ Expected:
 
 ### `A6-T`
 
-```text
+```asun
 [{id@int,name@str}]:(42,Alice),(7,Bob)
 ```
 
@@ -159,7 +159,7 @@ Expected:
 
 ### `A6-U`
 
-```text
+```asun
 [{id,name}]:(42,Alice),(7,Bob)
 ```
 
@@ -340,7 +340,7 @@ Expected:
 
 ### `N4-T`
 
-```text
+```asun
 [{id@int,profile@{name@str,nick@str?,score@float?},active@bool}]:(1,(Alice,ally,9.5),true),(2,(Bob,,),false)
 ```
 
@@ -358,7 +358,7 @@ Expected:
 
 ### `N4-U`
 
-```text
+```asun
 [{id,profile@{name,nick,score},active}]:(1,(Alice,ally,9.5),true),(2,(Bob,,),false)
 ```
 
@@ -374,7 +374,7 @@ Expected:
 
 ### `O1-T`
 
-```text
+```asun
 [{id@int,label@str?,score@float?,flag@bool}]:(1,hello,95.5,true),(2,,,false)
 ```
 
@@ -392,7 +392,7 @@ Expected:
 
 ### `O1-U`
 
-```text
+```asun
 [{id,label,score,flag}]:(1,hello,95.5,true),(2,,,false)
 ```
 

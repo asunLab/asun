@@ -6,17 +6,13 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 
 pullGit() (
-  param=""
-  if [[ "${2:-}" == "-f" ]]; then
-    param="-f origin"
-  fi
   cd "$ROOT_DIR/$1"
   git pull --rebase --autostash
 )
 
 pids=()
 modules=(
-  website lsp-asun
+  website lsp-asun js-format
   plugin_vscode plugin_zed plugin_jetbrain
   asun-c asun-cpp asun-cs asun-dart asun-go
   asun-java asun-js asun-php asun-py asun-rs asun-swift asun-zig
