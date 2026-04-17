@@ -1,54 +1,54 @@
-[submodule "ason-c"]
-	path = ason-c
-	url = https://athxx@github.com/ason-lab/ason-c.git
-[submodule "ason-cpp"]
-	path = ason-cpp
-	url = https://athxx@github.com/ason-lab/ason-cpp.git
-[submodule "ason-cs"]
-	path = ason-cs
-	url = https://athxx@github.com/ason-lab/ason-cs.git
-[submodule "ason-dart"]
-	path = ason-dart
-	url = https://athxx@github.com/ason-lab/ason-dart.git
-[submodule "ason-go"]
-	path = ason-go
-	url = https://athxx@github.com/ason-lab/ason-go.git
-[submodule "ason-java"]
-	path = ason-java
-	url = https://athxx@github.com/ason-lab/ason-java.git
-[submodule "ason-js"]
-	path = ason-js
-	url = https://athxx@github.com/ason-lab/ason-js.git
-[submodule "ason-py"]
-	path = ason-py
-	url = https://athxx@github.com/ason-lab/ason-py.git
-[submodule "ason-rs"]
-	path = ason-rs
-	url = https://athxx@github.com/ason-lab/ason-rs.git
-[submodule "ason-zig"]
-	path = ason-zig
-	url = https://athxx@github.com/ason-lab/ason-zig.git
+[submodule "asun-c"]
+	path = asun-c
+	url = https://athxx@github.com/asun-lab/asun-c.git
+[submodule "asun-cpp"]
+	path = asun-cpp
+	url = https://athxx@github.com/asun-lab/asun-cpp.git
+[submodule "asun-cs"]
+	path = asun-cs
+	url = https://athxx@github.com/asun-lab/asun-cs.git
+[submodule "asun-dart"]
+	path = asun-dart
+	url = https://athxx@github.com/asun-lab/asun-dart.git
+[submodule "asun-go"]
+	path = asun-go
+	url = https://athxx@github.com/asun-lab/asun-go.git
+[submodule "asun-java"]
+	path = asun-java
+	url = https://athxx@github.com/asun-lab/asun-java.git
+[submodule "asun-js"]
+	path = asun-js
+	url = https://athxx@github.com/asun-lab/asun-js.git
+[submodule "asun-py"]
+	path = asun-py
+	url = https://athxx@github.com/asun-lab/asun-py.git
+[submodule "asun-rs"]
+	path = asun-rs
+	url = https://athxx@github.com/asun-lab/asun-rs.git
+[submodule "asun-zig"]
+	path = asun-zig
+	url = https://athxx@github.com/asun-lab/asun-zig.git
 [submodule "js-format"]
 	path = js-format
-	url = https://athxx@github.com/ason-lab/js-format.git
-[submodule "lsp-ason"]
-	path = lsp-ason
-	url = https://athxx@github.com/ason-lab/lsp-ason.git
+	url = https://athxx@github.com/asun-lab/js-format.git
+[submodule "lsp-asun"]
+	path = lsp-asun
+	url = https://athxx@github.com/asun-lab/lsp-asun.git
 [submodule "plugin_vscode"]
 	path = plugin_vscode
-	url = https://athxx@github.com/ason-lab/plugin_vscode.git
+	url = https://athxx@github.com/asun-lab/plugin_vscode.git
 [submodule "website"]
 	path = website
-	url = https://athxx@github.com/ason-lab/website.git
-[submodule "ason-swift"]
-	path = ason-swift
-	url = https://github.com/ason-lab/ason-swift.git
-[submodule "ason-php"]
-	path = ason-php
-	url = https://github.com/ason-lab/ason-php.git
+	url = https://athxx@github.com/asun-lab/website.git
+[submodule "asun-swift"]
+	path = asun-swift
+	url = https://github.com/asun-lab/asun-swift.git
+[submodule "asun-php"]
+	path = asun-php
+	url = https://github.com/asun-lab/asun-php.git
 [submodule "plugin_jetbrain"]
 	path = plugin_jetbrain
-	url = https://github.com/ason-lab/plugin_jetbrain.git
+	url = https://github.com/asun-lab/plugin_jetbrain.git
 [submodule "plugin_zed"]
 	path = plugin_zed
-	url = https://github.com/ason-lab/plugin_zed.git
+	url = https://github.com/asun-lab/plugin_zed.git

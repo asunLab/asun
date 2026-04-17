@@ -6,13 +6,13 @@ The goal is not to simulate a full company org chart. The goal is to make repeat
 
 ## Repository Notes
 
-This repository is a multi-language ASON workspace.
+This repository is a multi-language ASUN workspace.
 
 Common areas:
 
-- language packages under `ason-*`
+- language packages under `asun-*`
 - docs in `docs/` and `website/`
-- tooling in `lsp-ason/`, `plugin_vscode/`, `plugin_jetbrain/`, and `plugin_zed/`
+- tooling in `lsp-asun/`, `plugin_vscode/`, `plugin_jetbrain/`, and `plugin_zed/`
 - examples and samples near each package or under `example/` and `samples/`
 
 Default rule:
@@ -136,7 +136,7 @@ Maintain developer tooling and editor integration quality.
 
 ### Responsibilities
 
-- inspect changes affecting `lsp-ason/` or editor plugins
+- inspect changes affecting `lsp-asun/` or editor plugins
 - check whether syntax updates need plugin support
 - verify tooling docs when commands or workflows change
 

@@ -1,7 +1,7 @@
 # Cross-Language Compatibility Matrix
 
 This matrix defines the canonical text-format compatibility cases that
-schema-driven language bindings should support when decoding ASON into a target struct/class
+schema-driven language bindings should support when decoding ASUN into a target struct/class
 with fewer or reordered fields than the source payload.
 
 The same cases should be reused across Go, Rust, Java, and any future
@@ -18,39 +18,39 @@ target" scenarios below.
 
 ## Core Cases
 
-| Case ID | Category | Input shape | Target shape | Expected outcome |
-| --- | --- | --- | --- | --- |
-| `A1-T` | Exact match | single with scalar hints | exact fields | decode succeeds |
-| `A1-U` | Exact match | single without scalar hints | exact fields | decode succeeds |
-| `A2-T` | Source has extra field | single with scalar hints | fewer fields | extra field ignored |
-| `A2-U` | Source has extra field | single without scalar hints | fewer fields | extra field ignored |
-| `A3-T` | Target has extra field | single with scalar hints | more fields | missing field gets default |
-| `A3-U` | Target has extra field | single without scalar hints | more fields | missing field gets default |
-| `A4-T` | Field reorder | single with scalar hints | reordered fields | fields matched by name |
-| `A4-U` | Field reorder | single without scalar hints | reordered fields | fields matched by name |
-| `A5-T` | Source has extra field (vec) | vec with scalar hints | fewer fields | extra field ignored in each row |
-| `A5-U` | Source has extra field (vec) | vec without scalar hints | fewer fields | extra field ignored in each row |
-| `A6-T` | Target has extra field (vec) | vec with scalar hints | more fields | missing field gets default |
-| `A6-U` | Target has extra field (vec) | vec without scalar hints | more fields | missing field gets default |
-| `P1-T` | Partial overlap | single with scalar hints | target keeps a non-contiguous subset | only overlapping fields decoded |
-| `P1-U` | Partial overlap | single without scalar hints | target keeps a non-contiguous subset | only overlapping fields decoded |
-| `P2-T` | No overlap | single with scalar hints | target shares no field names | target fields stay default |
-| `P2-U` | No overlap | single without scalar hints | target shares no field names | target fields stay default |
+| Case ID | Category                     | Input shape                 | Target shape                         | Expected outcome                |
+| ------- | ---------------------------- | --------------------------- | ------------------------------------ | ------------------------------- |
+| `A1-T`  | Exact match                  | single with scalar hints    | exact fields                         | decode succeeds                 |
+| `A1-U`  | Exact match                  | single without scalar hints | exact fields                         | decode succeeds                 |
+| `A2-T`  | Source has extra field       | single with scalar hints    | fewer fields                         | extra field ignored             |
+| `A2-U`  | Source has extra field       | single without scalar hints | fewer fields                         | extra field ignored             |
+| `A3-T`  | Target has extra field       | single with scalar hints    | more fields                          | missing field gets default      |
+| `A3-U`  | Target has extra field       | single without scalar hints | more fields                          | missing field gets default      |
+| `A4-T`  | Field reorder                | single with scalar hints    | reordered fields                     | fields matched by name          |
+| `A4-U`  | Field reorder                | single without scalar hints | reordered fields                     | fields matched by name          |
+| `A5-T`  | Source has extra field (vec) | vec with scalar hints       | fewer fields                         | extra field ignored in each row |
+| `A5-U`  | Source has extra field (vec) | vec without scalar hints    | fewer fields                         | extra field ignored in each row |
+| `A6-T`  | Target has extra field (vec) | vec with scalar hints       | more fields                          | missing field gets default      |
+| `A6-U`  | Target has extra field (vec) | vec without scalar hints    | more fields                          | missing field gets default      |
+| `P1-T`  | Partial overlap              | single with scalar hints    | target keeps a non-contiguous subset | only overlapping fields decoded |
+| `P1-U`  | Partial overlap              | single without scalar hints | target keeps a non-contiguous subset | only overlapping fields decoded |
+| `P2-T`  | No overlap                   | single with scalar hints    | target shares no field names         | target fields stay default      |
+| `P2-U`  | No overlap                   | single without scalar hints | target shares no field names         | target fields stay default      |
 
 ## Recommended Nested / Optional Follow-ups
 
-| Case ID | Category | Input shape | Target shape | Expected outcome |
-| --- | --- | --- | --- | --- |
-| `N1-T` | Nested object drops field | typed single | nested target has fewer fields | nested extra field ignored |
-| `N1-U` | Nested object drops field | untyped single | nested target has fewer fields | nested extra field ignored |
-| `N2-T` | Nested vec element drops field | typed vec | nested element target has fewer fields | nested extra field ignored |
-| `N2-U` | Nested vec element drops field | untyped vec | nested element target has fewer fields | nested extra field ignored |
-| `N3-T` | Three-level nested object drops fields | typed single | deep target has fewer fields | extra fields ignored at each level |
-| `N3-U` | Three-level nested object drops fields | untyped single | deep target has fewer fields | extra fields ignored at each level |
-| `N4-T` | Nested optional fields | typed vec | nested target keeps optional subset | nested optionals preserved, trailing fields ignored |
-| `N4-U` | Nested optional fields | untyped vec | nested target keeps optional subset | nested optionals preserved, trailing fields ignored |
-| `O1-T` | Optional present/null | typed vec | optional field on target | present values decoded, blank -> null |
-| `O1-U` | Optional present/null | untyped vec | optional field on target | untyped decode semantics preserved |
+| Case ID | Category                               | Input shape    | Target shape                           | Expected outcome                                    |
+| ------- | -------------------------------------- | -------------- | -------------------------------------- | --------------------------------------------------- |
+| `N1-T`  | Nested object drops field              | typed single   | nested target has fewer fields         | nested extra field ignored                          |
+| `N1-U`  | Nested object drops field              | untyped single | nested target has fewer fields         | nested extra field ignored                          |
+| `N2-T`  | Nested vec element drops field         | typed vec      | nested element target has fewer fields | nested extra field ignored                          |
+| `N2-U`  | Nested vec element drops field         | untyped vec    | nested element target has fewer fields | nested extra field ignored                          |
+| `N3-T`  | Three-level nested object drops fields | typed single   | deep target has fewer fields           | extra fields ignored at each level                  |
+| `N3-U`  | Three-level nested object drops fields | untyped single | deep target has fewer fields           | extra fields ignored at each level                  |
+| `N4-T`  | Nested optional fields                 | typed vec      | nested target keeps optional subset    | nested optionals preserved, trailing fields ignored |
+| `N4-U`  | Nested optional fields                 | untyped vec    | nested target keeps optional subset    | nested optionals preserved, trailing fields ignored |
+| `O1-T`  | Optional present/null                  | typed vec      | optional field on target               | present values decoded, blank -> null               |
+| `O1-U`  | Optional present/null                  | untyped vec    | optional field on target               | untyped decode semantics preserved                  |
 
 ## Canonical Text Inputs
 
@@ -412,9 +412,9 @@ Expected:
 
 This repository should at minimum keep the following implementations aligned:
 
-- `ason-go`
-- `ason-rs`
-- `ason-java`
+- `asun-go`
+- `asun-rs`
+- `asun-java`
 
 These bindings already support typed target decoding and field-name matching, so
 they are the best place to keep the canonical compatibility behavior locked in.

@@ -5,18 +5,18 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 LANGUAGE_REPOS=(
-  "ason-c"
-  "ason-cpp"
-  "ason-cs"
-  "ason-dart"
-  "ason-go"
-  "ason-java"
-  "ason-js"
-  "ason-php"
-  "ason-py"
-  "ason-rs"
-  "ason-swift"
-  "ason-zig"
+  "asun-c"
+  "asun-cpp"
+  "asun-cs"
+  "asun-dart"
+  "asun-go"
+  "asun-java"
+  "asun-js"
+  "asun-php"
+  "asun-py"
+  "asun-rs"
+  "asun-swift"
+  "asun-zig"
 )
 
 mode=""
@@ -43,8 +43,8 @@ Create the same release tag across all language repositories under this mono-rep
 If a repo has explicit package metadata files, this script also syncs those
 version fields to match the tag, creates a version-bump commit, and then tags it.
 By default this script only tags the official language repos:
-  ason-c ason-cpp ason-cs ason-dart ason-go ason-java ason-js
-  ason-php ason-py ason-rs ason-swift ason-zig
+  asun-c asun-cpp asun-cs asun-dart asun-go asun-java asun-js
+  asun-php asun-py asun-rs asun-swift asun-zig
 
 Modes:
   --tag TAG           Use the exact same tag for every language repo
@@ -122,7 +122,7 @@ def replace_regex(path: pathlib.Path, pattern: str, repl: str, count: int = 0):
         path.write_text(new_text)
         changed.append(str(path.relative_to(repo_path)))
 
-if repo_name == "ason-js":
+if repo_name == "asun-js":
     for rel in ("package.json", "package-lock.json"):
         path = repo_path / rel
         data = json.loads(path.read_text())
@@ -133,36 +133,36 @@ if repo_name == "ason-js":
                 pkgs[""]["version"] = version
         write_text_if_changed(path, json.dumps(data, indent=2, ensure_ascii=False) + "\n")
 
-elif repo_name == "ason-py":
+elif repo_name == "asun-py":
     replace_regex(repo_path / "pyproject.toml", r'^version = "[^"]+"$', f'version = "{version}"', count=1)
     replace_regex(repo_path / "setup.py", r'version="[^"]+"', f'version="{version}"', count=1)
 
-elif repo_name == "ason-cs":
-    replace_regex(repo_path / "src/Ason/Ason.csproj", r'<Version>[^<]+</Version>', f'<Version>{version}</Version>', count=1)
+elif repo_name == "asun-cs":
+    replace_regex(repo_path / "src/Asun/Asun.csproj", r'<Version>[^<]+</Version>', f'<Version>{version}</Version>', count=1)
 
-elif repo_name == "ason-dart":
+elif repo_name == "asun-dart":
     replace_regex(repo_path / "pubspec.yaml", r'^version:\s*[^\s]+$', f'version: {version}', count=1)
 
-elif repo_name == "ason-rs":
+elif repo_name == "asun-rs":
     replace_regex(repo_path / "Cargo.toml", r'^version = "[^"]+"$', f'version = "{version}"', count=1)
     lock_path = repo_path / "Cargo.lock"
     old_text = lock_path.read_text()
-    new_text = re.sub(r'(\[\[package\]\]\nname = "ason"\nversion = ")[^"]+(")', rf'\g<1>{version}\2', old_text, count=1)
+    new_text = re.sub(r'(\[\[package\]\]\nname = "asun"\nversion = ")[^"]+(")', rf'\g<1>{version}\2', old_text, count=1)
     if new_text != old_text:
         lock_path.write_text(new_text)
         changed.append("Cargo.lock")
 
-elif repo_name == "ason-java":
+elif repo_name == "asun-java":
     replace_regex(repo_path / "build.gradle", r"^version = '[^']+'$", f"version = '{version}'", count=1)
 
-elif repo_name == "ason-cpp":
-    replace_regex(repo_path / "CMakeLists.txt", r'project\(ason VERSION [^\s\)]+', f'project(ason VERSION {version}', count=1)
+elif repo_name == "asun-cpp":
+    replace_regex(repo_path / "CMakeLists.txt", r'project\(asun VERSION [^\s\)]+', f'project(asun VERSION {version}', count=1)
     replace_regex(repo_path / "conanfile.py", r'version = "[^"]+"', f'version = "{version}"', count=1)
-    vcpkg_path = repo_path / "vcpkg/ports/ason-cpp/vcpkg.json"
+    vcpkg_path = repo_path / "vcpkg/ports/asun-cpp/vcpkg.json"
     data = json.loads(vcpkg_path.read_text())
     data["version-string"] = version
     write_text_if_changed(vcpkg_path, json.dumps(data, indent=2, ensure_ascii=False) + "\n")
-    replace_regex(repo_path / "homebrew/ason-cpp.rb", r'url "https://github\.com/ason-lab/ason/archive/refs/tags/v[^"]+\.tar\.gz"', f'url "https://github.com/ason-lab/ason/archive/refs/tags/v{version}.tar.gz"', count=1)
+    replace_regex(repo_path / "homebrew/asun-cpp.rb", r'url "https://github\.com/asun-lab/asun/archive/refs/tags/v[^"]+\.tar\.gz"', f'url "https://github.com/asun-lab/asun/archive/refs/tags/v{version}.tar.gz"', count=1)
 
 print("\n".join(changed))
 PY
@@ -259,18 +259,18 @@ resolve_target() {
   local name="${1,,}"
   case "$name" in
     all) printf 'all\n' ;;
-    c|ason-c) printf 'ason-c\n' ;;
-    cpp|cxx|ason-cpp) printf 'ason-cpp\n' ;;
-    cs|csharp|dotnet|ason-cs) printf 'ason-cs\n' ;;
-    dart|ason-dart) printf 'ason-dart\n' ;;
-    go|golang|ason-go) printf 'ason-go\n' ;;
-    java|jvm|ason-java) printf 'ason-java\n' ;;
-    js|ts|javascript|typescript|ason-js) printf 'ason-js\n' ;;
-    php|ason-php) printf 'ason-php\n' ;;
-    py|python|ason-py) printf 'ason-py\n' ;;
-    rs|rust|ason-rs) printf 'ason-rs\n' ;;
-    swift|ason-swift) printf 'ason-swift\n' ;;
-    zig|ason-zig) printf 'ason-zig\n' ;;
+    c|asun-c) printf 'asun-c\n' ;;
+    cpp|cxx|asun-cpp) printf 'asun-cpp\n' ;;
+    cs|csharp|dotnet|asun-cs) printf 'asun-cs\n' ;;
+    dart|asun-dart) printf 'asun-dart\n' ;;
+    go|golang|asun-go) printf 'asun-go\n' ;;
+    java|jvm|asun-java) printf 'asun-java\n' ;;
+    js|ts|javascript|typescript|asun-js) printf 'asun-js\n' ;;
+    php|asun-php) printf 'asun-php\n' ;;
+    py|python|asun-py) printf 'asun-py\n' ;;
+    rs|rust|asun-rs) printf 'asun-rs\n' ;;
+    swift|asun-swift) printf 'asun-swift\n' ;;
+    zig|asun-zig) printf 'asun-zig\n' ;;
     *)
       return 1
       ;;
