@@ -1060,4 +1060,4 @@ Compared to JSON's indented readability, token savings and LLM friendliness take
 **Document version**: v1.4.0  
 **Last updated**: 2026-02-20  
 **License**: MIT  
-**GitHub**: https://github.com/asun-lab/asun
+**GitHub**: https://github.com/asunLab/asun
