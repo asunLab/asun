@@ -162,7 +162,7 @@ elif repo_name == "asun-cpp":
     data = json.loads(vcpkg_path.read_text())
     data["version-string"] = version
     write_text_if_changed(vcpkg_path, json.dumps(data, indent=2, ensure_ascii=False) + "\n")
-    replace_regex(repo_path / "homebrew/asun-cpp.rb", r'url "https://github\.com/asun-lab/asun/archive/refs/tags/v[^"]+\.tar\.gz"', f'url "https://github.com/asun-lab/asun/archive/refs/tags/v{version}.tar.gz"', count=1)
+    replace_regex(repo_path / "homebrew/asun-cpp.rb", r'url "https://github\.com/asunLab/asun/archive/refs/tags/v[^"]+\.tar\.gz"', f'url "https://github.com/asunLab/asun/archive/refs/tags/v{version}.tar.gz"', count=1)
 
 print("\n".join(changed))
 PY

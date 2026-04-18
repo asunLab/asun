@@ -716,7 +716,7 @@ git push origin v1.0.0
 4. 验证：
 
 ```bash
-go list -m github.com/asun-lab/asun-go@v1.0.0
+go list -m github.com/asunLab/asun-go@v1.0.0
 ```
 
 `asun-go` 当前更适合按源码模块发布，不需要上传多平台二进制；真正的版本号由 Git tag 决定。
@@ -981,7 +981,7 @@ vcpkg install asun-cpp --overlay-ports=/path/to/asun-cpp/vcpkg/ports
 
 ```bash
 curl -L -o /tmp/asun-v1.0.0.tar.gz \
-  https://github.com/asun-lab/asun/archive/refs/tags/v1.0.0.tar.gz
+  https://github.com/asunLab/asun/archive/refs/tags/v1.0.0.tar.gz
 shasum -a 256 /tmp/asun-v1.0.0.tar.gz
 ```
 

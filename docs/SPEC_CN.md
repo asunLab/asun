@@ -1058,4 +1058,4 @@ id,name,role,active
 **文档版本**: v1.4.0  
 **最后更新**: 2026-02-20  
 **许可证**: MIT  
-**GitHub**: https://github.com/asun-lab/asun
+**GitHub**: https://github.com/asunLab/asun
