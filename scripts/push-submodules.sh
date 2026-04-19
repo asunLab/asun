@@ -6,11 +6,11 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 
 pushGit() (
-  if [[ "${2:-}" == "-f" ]]; then
-    cd "$ROOT_DIR/$1"
-    git push -f origin HEAD:main
-  fi
   cd "$ROOT_DIR/$1"
+  if [[ "${2:-}" == "-f" ]]; then
+     git push -f origin HEAD:main
+     return
+  fi
   git pull --rebase --autostash
   git push origin HEAD:main
 )

@@ -4,7 +4,7 @@
 
 **ASUN** is a compact, schema-first data format for **LLM prompts**, **structured APIs**, and **large datasets**. It separates schema from data, so keys are declared once and rows carry only values.
 
-[中文文档](https://github.com/asunLab/asun/blob/main/README_CN.md)
+[中文文档](README_CN.md)
 
 ---
 
@@ -22,7 +22,7 @@ Standard JSON repeats every field name in every record. When you send structured
 
 ASUN declares the schema **once** and streams data as compact tuples:
 
-```asun
+```
 [{id@int, name@str, active@bool}]:(1,Alice,true),(2,Bob,false),(3,Carol,true)
 ```
 
@@ -75,7 +75,7 @@ users[2]{id,name,active}:
 
 **ASUN** — tuple-based, schema-explicit:
 
-```asun
+```
 [{id@int, name@str, active@bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
@@ -122,7 +122,7 @@ users[2]{id,name,active}:
 
 Schema declared once, each row is a tuple:
 
-```asun
+```
 [{id@int, name@str, active@bool}]:(1,Alice,true),(2,Bob,false),(3,Carol,true)
 ```
 

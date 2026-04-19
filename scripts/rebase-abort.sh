@@ -5,25 +5,22 @@
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 
-pullGit() (
-  param=""
-  if [[ "${2:-}" == "-f" ]]; then
-    param="-f origin"
-  fi
+abort() (
   cd "$ROOT_DIR/$1"
-  git pull --rebase --autostash
+  echo "$1"
+  git rebase --abort || true
 )
 
 pids=()
 modules=(
-  website lsp-asun
+  website lsp-asun js-format
   plugin_vscode plugin_zed plugin_jetbrain
   asun-c asun-cpp asun-cs asun-dart asun-go
   asun-java asun-js asun-php asun-py asun-rs asun-swift asun-zig
 )
 
 for mod in "${modules[@]}"; do
-  pullGit "$mod" "${1:-}" &
+  abort "$mod" "${1:-}" &
   pids+=($!)
 done
 
