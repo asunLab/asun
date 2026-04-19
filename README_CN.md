@@ -8,7 +8,9 @@
 
 ---
 
-## 为什么选择 ASUN？
+## 为什么选择 ASUN
+
+**json**
 
 标准 JSON 会在每条记录里重复所有字段名。无论是发给 LLM、通过 API 传输，还是服务之间交换数据，这种重复都会浪费 Token、带宽和阅读成本：
 
@@ -20,13 +22,18 @@
 ]
 ```
 
-ASUN 只声明 **一次** Schema，数据以紧凑元组方式流式传输：
+**asun**
 
-```
-[{id@int, name@str, active@bool}]:(1,Alice,true),(2,Bob,false),(3,Carol,true)
+ASUN 只声明 **一次** Schema，后续每一行只保留值：
+
+```asun
+[{id, name, active}]:
+  (1,Alice,true),
+  (2,Bob,false),
+  (3,Carol,true)
 ```
 
-**更少的 Token，更小的体积，更清晰的结构。**
+**这通常意味着更少的 token、更小的体积，更清晰的结构, 以及比重复键名 JSON 更快的解析。**
 
 ---
 

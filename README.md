@@ -10,6 +10,8 @@
 
 ## Why ASUN?
 
+**json**
+
 Standard JSON repeats every field name in every record. When you send structured data to an LLM, over an API, or across services, that repetition wastes tokens, bytes, and attention:
 
 ```json
@@ -20,13 +22,18 @@ Standard JSON repeats every field name in every record. When you send structured
 ]
 ```
 
+**asun**
+
 ASUN declares the schema **once** and streams data as compact tuples:
 
-```
-[{id@int, name@str, active@bool}]:(1,Alice,true),(2,Bob,false),(3,Carol,true)
+```asun
+[{id, name, active}]:
+  (1,Alice,true),
+  (2,Bob,false),
+  (3,Carol,true)
 ```
 
-**Fewer tokens. Smaller payloads. Clearer structure.**
+**Fewer tokens. Smaller payloads. Clearer structure, and faster parsing than repeated-object JSON.**
 
 ---
 

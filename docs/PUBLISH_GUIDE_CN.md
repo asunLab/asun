@@ -18,8 +18,9 @@
 - `asun-c`
 - `asun-cpp`
 - `asun-php`
+- `plugin_vscode`
 
-不包含编辑器插件、LSP、网站。
+不包含独立 LSP 和网站。
 
 ## 先看结论
 
@@ -37,6 +38,7 @@
 | `asun-c`                    | GitHub Releases                            | 否（只要 GitHub）    | 可后续再补 vcpkg/conan/homebrew              |
 | `asun-cpp`                  | GitHub Releases + Conan / vcpkg / Homebrew | 否（只要 GitHub）    | 现在已具备包管理器接入文件，可按需要逐步发布 |
 | `asun-php`                  | GitHub Releases + PIE 生态                 | 否（建议先 GitHub）  | 新 PECL 包当前不建议作为首发渠道             |
+| `plugin_vscode`             | VS Code Marketplace + Open VSX（可选）     | 是                   | 推荐先发 VS Code Marketplace，再决定是否补 Open VSX |
 
 ### 哪些语言需要“多平台二进制发布”
 
@@ -61,6 +63,7 @@
 - `asun-c`: Git tag / GitHub Release
 - `asun-cpp`: `asun-cpp/CMakeLists.txt`
 - `asun-php`: Git tag / GitHub Release
+- `plugin_vscode`: `plugin_vscode/package.json`
 
 ## 当前建议的发布顺序
 
@@ -81,8 +84,25 @@
 4. `asun-c`
 5. `asun-cpp`
 6. `asun-php`
+7. `plugin_vscode`
 
 原因很简单：前一组用户通常会直接通过包管理器安装，发布收益最高；后一组更多是源码依赖或 Release 分发。
+
+## 编辑器插件补充
+
+目前仓库里最适合单独发布的编辑器插件是：
+
+- `plugin_vscode`
+
+`plugin_vscode` 不是语言运行时库，而是一个带内置 `lsp-asun` 二进制的 VS Code 扩展。  
+它的发布流程与普通 npm 包不同，核心是：
+
+1. 先构建 TypeScript 扩展代码
+2. 再构建并打包 `lsp-asun`
+3. 生成 `.vsix`
+4. 发布到 VS Code Marketplace
+
+如果后续还要补发 Open VSX，可以在 Marketplace 流程稳定后再追加。
 
 ## 通用发布前清单
 
@@ -1118,6 +1138,171 @@ make test
 11. `asun-php` -> GitHub Release
 12. `asun-py` -> PyPI（建议等 `sdist + cibuildwheel` 多平台产物准备好后再发）
 
+## 13. VS Code 插件：`plugin_vscode`
+
+推荐渠道：VS Code Marketplace  
+可选补充渠道：Open VSX  
+仓库位置：
+
+- `plugin_vscode`
+
+当前 `package.json` 关键信息：
+
+- 扩展名：`asun-vscode`
+- 显示名：`ASUN Support`
+- `publisher`：`Athan`
+- 版本号文件：`plugin_vscode/package.json`
+
+### 发布前先确认
+
+1. `plugin_vscode/package.json` 里的 `version` 已更新。
+2. `publisher` 与 Marketplace 上创建的发布者一致。
+3. `README.md`、截图、图标、命令说明都已经准备好。
+4. `lsp-asun` 可以正常构建。
+5. 插件能在本地通过 VSIX 安装并工作。
+
+### 首次发布前要准备什么
+
+VS Code Marketplace 的发布者不是 npm 账号，也不是 GitHub 账号本身。首次发布通常需要：
+
+1. 注册/登录 Visual Studio Marketplace 发布者后台。
+2. 创建一个发布者（publisher），名称应与 `package.json` 里的 `publisher` 保持一致。
+3. 创建用于发布的 Personal Access Token。
+4. 在本机安装发布工具：
+
+```bash
+mise exec -- npm install -g @vscode/vsce
+```
+
+### 本地构建与打包
+
+仓库已经提供了跨平台打包脚本：
+
+- `plugin_vscode/scripts/build.sh`
+
+如果你只想先构建当前平台：
+
+```bash
+cd plugin_vscode
+mise exec -- npm install
+./scripts/build.sh current
+```
+
+如果你要一次生成全部平台的 VSIX：
+
+```bash
+cd plugin_vscode
+mise exec -- npm install
+./scripts/build.sh all
+```
+
+这个脚本会：
+
+1. 安装插件依赖
+2. 编译 TypeScript
+3. 进入 `../lsp-asun` 构建语言服务器
+4. 把 `lsp-asun` 打包进 `plugin_vscode/server/`
+5. 生成对应平台的 `.vsix`
+
+### 发布前建议的本地验证
+
+至少做一次当前平台完整检查：
+
+```bash
+cd plugin_vscode
+mise exec -- npm install
+./scripts/build.sh current
+```
+
+生成 VSIX 后，用 VS Code 本地安装验证：
+
+```bash
+code --install-extension ./asun-vscode-<platform>-<version>.vsix
+```
+
+验证项建议至少包括：
+
+1. `.asun` 文件语法高亮正常。
+2. 格式化命令可用。
+3. 压缩命令可用。
+4. `ASUN -> JSON` / `JSON -> ASUN` 命令可用。
+5. 诊断、hover、inlay hints 能正常工作。
+
+### 正式发布到 VS Code Marketplace
+
+如果已经拿到 Marketplace token，可以直接在 `plugin_vscode` 目录发布。
+
+先登录一次：
+
+```bash
+cd plugin_vscode
+mise exec -- vsce login Athan
+```
+
+然后发布：
+
+```bash
+cd plugin_vscode
+mise exec -- vsce publish
+```
+
+如果本次已经改好了版本号，也可以直接指定版本发布：
+
+```bash
+cd plugin_vscode
+mise exec -- vsce publish 0.1.0
+```
+
+如果你想先只生成包，不立刻发布：
+
+```bash
+cd plugin_vscode
+mise exec -- npx vsce package
+```
+
+### 平台包与 Marketplace 的关系
+
+这个插件内置了 `lsp-asun` 二进制，因此更适合按平台生成 VSIX。  
+仓库脚本已经支持：
+
+- `darwin-arm64`
+- `darwin-x64`
+- `linux-x64`
+- `linux-arm64`
+- `win32-x64`
+- `win32-arm64`
+
+你可以：
+
+1. 只构建当前平台并做本地验证。
+2. 再构建全部平台 VSIX。
+3. 最后选择发布策略。
+
+如果后续确认要把 Marketplace 也做成完整平台覆盖，建议把 `./scripts/build.sh all` 放进 CI，而不是只在本机手工打包。
+
+### 是否还要发 Open VSX
+
+如果目标用户包含：
+
+- VSCodium
+- OpenVSX 生态编辑器
+- 一些默认不连微软 Marketplace 的环境
+
+可以补发 Open VSX。
+
+建议顺序是：
+
+1. 先把 VS Code Marketplace 流程跑通。
+2. 确认版本号、README、图标、打包内容稳定。
+3. 再补 Open VSX 发布。
+
+### 发布后建议补做的事情
+
+1. 打 Git tag，例如 `plugin_vscode-v0.1.0`，或者跟随仓库统一版本策略。
+2. 在 GitHub Release 里附上 `.vsix`。
+3. 更新网站或文档中的安装说明。
+4. 记录本次发布覆盖了哪些平台包。
+
 ## 维护建议
 
 建议后续统一做三件事：
@@ -1147,5 +1332,7 @@ make test
 - Sonatype Gradle: https://central.sonatype.org/publish/publish-portal-gradle/
 - Sonatype OSSRH staging compatibility: https://central.sonatype.org/publish/publish-portal-ossrh-staging-api/
 - GitHub Releases: https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository
+- VS Code extension publishing: https://code.visualstudio.com/api/working-with-extensions/publishing-extension
+- vsce: https://github.com/microsoft/vscode-vsce
 - Zig package management note: https://ziglang.org/download/0.11.0/release-notes.html
 - PECL / PIE notice: https://pecl.php.net/account-request.php
