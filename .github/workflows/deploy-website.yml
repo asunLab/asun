@@ -37,6 +37,14 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
+      - name: Install asun-js dependencies
+        working-directory: asun-js
+        run: npm ci
+
+      - name: Build asun-js
+        working-directory: asun-js
+        run: npm run build
+
       - name: Install dependencies
         working-directory: website
         run: npm ci
