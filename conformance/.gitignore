@@ -1,0 +1,49 @@
+# Local/editor noise
+.DS_Store
+*.log
+*.tmp
+tmp/
+coverage/
+
+# Node / JavaScript runners
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python runners
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# C / C++ runners
+runners/c/asun-conformance-c
+runners/cpp/asun-conformance-cpp
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Java runners
+*.class
+
+# .NET / C# runners
+bin/
+obj/
+
+# Dart runners
+.dart_tool/
+.packages
+pubspec.lock
+
+# Rust runners
+target/
+
+# Zig runners
+.zig-cache/
+zig-out/

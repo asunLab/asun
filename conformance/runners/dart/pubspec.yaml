@@ -1,0 +1,10 @@
+name: asun_conformance_dart
+description: Conformance runner for asun-dart
+publish_to: none
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+dependencies:
+  asun:
+    path: ../../../asun-dart
+executables:
+  asun_conformance_dart: run

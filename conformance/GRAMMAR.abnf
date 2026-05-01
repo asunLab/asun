@@ -1,0 +1,231 @@
+; ============================================================================
+; ASUN — Array-Schema Unified Notation
+; Formal grammar in ABNF (RFC 5234, with case-sensitivity per RFC 7405).
+;
+; This file is the SINGLE SOURCE OF TRUTH for the textual ASUN syntax.
+; Every language implementation MUST accept exactly the strings derivable
+; from <asun-document> (modulo conformance/cases.json semantic checks).
+;
+; Notation:
+;   - Literals are case-sensitive (RFC 7405 %s prefix is implicit here;
+;     plain quoted literals are case-sensitive).
+;   - Names use kebab-case for readability.
+;   - Comments begin with ';'.
+;
+; Companion: conformance/cases.json — input/output test vectors.
+; Companion: conformance/README.md  — runner protocol.
+; ============================================================================
+
+; ----------------------------------------------------------------------------
+; Top level
+; ----------------------------------------------------------------------------
+
+asun-document   = ows top-form ows
+top-form        = object-form
+                / array-of-objects-form
+                / plain-array
+                / bare-value
+
+; ----------------------------------------------------------------------------
+; Object form:   {schema}:(values)
+; ----------------------------------------------------------------------------
+
+object-form     = schema ows ":" ows tuple
+
+; Array-of-objects form:   [{schema}]:(values),(values),...
+array-of-objects-form = "[" ows schema ows "]" ows ":" ows tuple-list
+
+tuple-list      = tuple *( ows "," ows tuple ) [ ows "," ]   ; trailing comma allowed
+
+; ----------------------------------------------------------------------------
+; Schema
+; ----------------------------------------------------------------------------
+
+schema          = "{" ows field-list ows "}"
+field-list      = field *( ows "," ows field ) [ ows "," ]
+field           = field-name [ binding ]
+binding         = ows "@" ows binding-target
+binding-target  = base-type
+                / nested-schema-binding
+                / array-binding
+
+base-type       = "int" / "float" / "str" / "bool"
+
+nested-schema-binding = schema           ; e.g. addr@{city@str,zip@int}
+array-binding         = array-type-hint  ; e.g. tags@[str], users@[{id@int}]
+
+array-type-hint = "[" ows array-inner ows "]"
+array-inner     = base-type
+                / schema
+                / array-type-hint        ; allow @[[int]]
+
+field-name      = bare-field-name / quoted-string
+bare-field-name = 1*( ALPHA / DIGIT / "_" )
+
+; ----------------------------------------------------------------------------
+; Data tuple:   ( v1 , v2 , ... )
+; ----------------------------------------------------------------------------
+
+tuple           = "(" ows tuple-body ows ")"
+tuple-body      = [ tuple-element *( ows "," ows tuple-element ) [ ows "," ] ]
+tuple-element   = value-or-empty       ; empty between commas means null
+
+; A tuple element may be a scalar, a nested tuple, or an array literal.
+value-or-empty  = value
+                / tuple                 ; nested object data: (Alice,(NYC,10001))
+                / array-literal
+                / empty-element
+
+empty-element   = ""                    ; the absence of any token between
+                                        ; two commas (or comma and ')')
+
+; ----------------------------------------------------------------------------
+; Plain (top-level) array literal
+; ----------------------------------------------------------------------------
+
+plain-array     = array-literal
+array-literal   = "[" ows [ array-body ] ows "]"
+array-body      = array-element *( ows "," ows array-element ) [ ows "," ]
+array-element   = value
+                / array-literal
+                / tuple                 ; element may itself be (a,b,...)
+
+; ----------------------------------------------------------------------------
+; Bare value (top level)
+; ----------------------------------------------------------------------------
+
+bare-value      = value
+
+; ----------------------------------------------------------------------------
+; Values
+; ----------------------------------------------------------------------------
+
+value           = null-value
+                / boolean
+                / number
+                / quoted-string
+                / plain-string
+
+null-value      = empty-element         ; only valid inside tuple/array between separators
+boolean         = "true" / "false"
+
+; -- Numbers ----------------------------------------------------------------
+
+number          = float / integer
+integer         = [ "-" ] 1*DIGIT
+float           = [ "-" ] 1*DIGIT [ "." 1*DIGIT ] exponent
+                / [ "-" ] 1*DIGIT "." 1*DIGIT [ exponent ]
+exponent        = ( "e" / "E" ) [ "+" / "-" ] 1*DIGIT
+
+; A leading minus MUST be immediately followed by a digit (no whitespace).
+; "- 5" is therefore NOT a number; it is a plain-string.
+;
+; Both the integer part and the fractional part require AT LEAST ONE digit.
+; The following tokens are therefore NOT numbers (they are plain-strings):
+;
+;     ".5"     ; missing integer part
+;     "5."     ; missing fractional part
+;     "."      ; no digits at all
+;     "+5"     ; leading "+" is forbidden
+;     "+.5"    ; leading "+" is forbidden
+;     ".5e2"   ; missing integer part
+;     "5.e2"   ; missing fractional part
+;     "1e"     ; missing exponent digits
+;     "1e+"    ; missing exponent digits
+;
+; Examples that ARE numbers:
+;
+;     "0", "-7", "0.5", "-2.5", "1e10", "1.5e-3", "-1.0E+100"
+
+; -- Strings ----------------------------------------------------------------
+
+quoted-string   = DQUOTE *qchar DQUOTE
+qchar           = unescaped-qchar / escape-seq
+unescaped-qchar = %x20-21 / %x23-5B / %x5D-10FFFF
+                ; any UTF-8 scalar except '"' (0x22) and '\' (0x5C)
+                ; control chars below 0x20 MUST use escapes
+
+plain-string    = 1*pchar
+pchar           = unescaped-pchar / escape-seq
+unescaped-pchar = %x21 / %x23-27 / %x2A-2B / %x2D-39      ; printable except special
+                / %x3B / %x3C / %x3D / %x3E / %x3F        ; (excludes : @ , ( ) [ ] { } " \)
+                / %x41-5A / %x5E-7A / %x7C / %x7E-10FFFF
+                ; Forbidden raw bytes in unquoted strings:
+                ;   , ( ) [ ] { } : @ " \   and any control char (<0x20)
+                ; Whitespace (SP/HTAB) inside an unquoted string IS allowed
+                ; but leading/trailing whitespace is trimmed.
+
+escape-seq      = "\" escape-char
+escape-char     = "\" / DQUOTE / "n" / "t" / "r" / "b" / "f"
+                / "," / "(" / ")" / "[" / "]" / "{" / "}" / ":" / "@"
+                / unicode-escape
+unicode-escape  = "u" 4HEXDIG
+
+; ----------------------------------------------------------------------------
+; Whitespace, comments, separators
+; ----------------------------------------------------------------------------
+
+ows             = *( WSP / NL / comment )       ; "optional whitespace"
+WSP             = SP / HTAB
+NL              = CR LF / LF / CR
+
+; Comments may appear wherever <ows> is allowed (i.e. between tokens),
+; but MUST NOT appear inside a quoted-string, plain-string,
+; number, or boolean literal.
+comment         = "/*" *comment-char "*/"
+comment-char    = %x00-2A / %x2C-FFFF / "*" %x00-2E / "*" %x30-FFFF
+                ; any char or "*" not followed by "/"
+
+; ----------------------------------------------------------------------------
+; Core ABNF imports (RFC 5234 Appendix B)
+; ----------------------------------------------------------------------------
+
+ALPHA           = %x41-5A / %x61-7A
+DIGIT           = %x30-39
+HEXDIG          = DIGIT / "A" / "B" / "C" / "D" / "E" / "F"
+                       / "a" / "b" / "c" / "d" / "e" / "f"
+DQUOTE          = %x22
+SP              = %x20
+HTAB            = %x09
+CR              = %x0D
+LF              = %x0A
+
+; ============================================================================
+; Semantic notes (NOT part of the grammar; enforced by conformance tests)
+; ============================================================================
+;
+; S1. Field count alignment:
+;     The number of <tuple-element>s in a <tuple> MUST equal the number of
+;     <field>s declared in the matching <schema>. A trailing comma does NOT
+;     add a null element. Two consecutive commas DO add a null element.
+;
+; S2. Plain string trimming:
+;     After lexing, an unquoted <plain-string> has leading and trailing
+;     ASCII whitespace (SP, HTAB) trimmed. Internal whitespace is preserved.
+;     Quoted strings are NOT trimmed.
+;
+; S3. Type resolution priority (for tuples WITHOUT scalar @-hints):
+;       1. empty            -> null
+;       2. "true"/"false"   -> boolean
+;       3. ^-?[0-9]+$       -> integer
+;       4. ^-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$
+;          AND contains "." or "e"/"E" -> float
+;       5. otherwise        -> string
+;     With @-hints, the declared type is authoritative; parsers MUST report
+;     a type error if the literal cannot be coerced.
+;     Tokens such as ".5", "5.", "+5", "1e", "1e+" do NOT match either
+;     pattern and therefore fall through to plain-string.
+;
+; S4. Comments:
+;     Comments are stripped before tokenisation. Comments inside data tuples
+;     `(...)` or array literals `[...]` are forbidden by SPEC §5.
+;     (Implementations MAY accept them with a warning; conformance tests
+;     mark such inputs as ERROR.)
+;
+; S5. Trailing comma vs null:
+;     `(a,b,)`  has 2 fields (trailing comma absorbed).
+;     `(a,b,,)` has 3 fields, the last being null.
+;
+; S6. Quoted field names:
+;     A <quoted-string> may appear in <field-name> position to allow names
+;     containing characters otherwise forbidden in <bare-field-name>.

@@ -11,7 +11,7 @@ pullGit() (
     param="-f origin"
   fi
   cd "$ROOT_DIR/$1"
-  git pull --rebase --autostash
+  git pull --rebase --autostash origin main
 )
 
 pids=()

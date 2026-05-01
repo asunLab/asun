@@ -1,0 +1,5995 @@
+{
+  "version": 1,
+  "spec": "../docs/SPEC.md",
+  "grammar": "GRAMMAR.abnf",
+  "count": 277,
+  "cases": [
+    {
+      "id": "primitives.bare.int.zero",
+      "category": "primitives.bare",
+      "desc": "bare int 0",
+      "input": "0",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": 0
+    },
+    {
+      "id": "primitives.bare.int.pos",
+      "category": "primitives.bare",
+      "desc": "positive int",
+      "input": "42",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": 42
+    },
+    {
+      "id": "primitives.bare.int.neg",
+      "category": "primitives.bare",
+      "desc": "negative int",
+      "input": "-7",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": -7
+    },
+    {
+      "id": "primitives.bare.int.large",
+      "category": "primitives.bare",
+      "desc": "i64-range int",
+      "input": "9223372036854775807",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": 9223372036854775807
+    },
+    {
+      "id": "primitives.bare.int.minusZero",
+      "category": "primitives.bare",
+      "desc": "negative zero int",
+      "input": "-0",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": 0
+    },
+    {
+      "id": "primitives.bare.float.basic",
+      "category": "primitives.bare",
+      "desc": "float 3.14",
+      "input": "3.14",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": 3.14
+    },
+    {
+      "id": "primitives.bare.float.neg",
+      "category": "primitives.bare",
+      "desc": "negative float",
+      "input": "-2.5",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": -2.5
+    },
+    {
+      "id": "primitives.bare.float.tiny",
+      "category": "primitives.bare",
+      "desc": "small float",
+      "input": "0.1",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": 0.1
+    },
+    {
+      "id": "primitives.bare.float.dotPrefix",
+      "category": "primitives.bare",
+      "desc": "leading-dot is NOT a number per ABNF; treated as plain-string",
+      "input": ".5",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": ".5"
+    },
+    {
+      "id": "primitives.bare.float.dotPrefixNeg",
+      "category": "primitives.bare",
+      "desc": "leading -. is NOT a number per ABNF; treated as plain-string",
+      "input": "-.5",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "-.5"
+    },
+    {
+      "id": "primitives.bare.float.dotSuffix",
+      "category": "primitives.bare",
+      "desc": "trailing-dot is NOT a number per ABNF; treated as plain-string",
+      "input": "5.",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "5."
+    },
+    {
+      "id": "primitives.bare.float.plusPrefix",
+      "category": "primitives.bare",
+      "desc": "leading + is NOT a number per ABNF; treated as plain-string",
+      "input": "+5",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "+5"
+    },
+    {
+      "id": "primitives.bare.float.plusDotPrefix",
+      "category": "primitives.bare",
+      "desc": "leading +. is NOT a number per ABNF; treated as plain-string",
+      "input": "+.5",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "+.5"
+    },
+    {
+      "id": "primitives.bare.float.dotPrefixExp",
+      "category": "primitives.bare",
+      "desc": "leading-dot with exponent is NOT a number; treated as plain-string",
+      "input": ".5e2",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": ".5e2"
+    },
+    {
+      "id": "primitives.bare.float.expEmpty",
+      "category": "primitives.bare",
+      "desc": "exponent without digits is NOT a number; treated as plain-string",
+      "input": "1e",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "1e"
+    },
+    {
+      "id": "primitives.bare.float.expSignOnly",
+      "category": "primitives.bare",
+      "desc": "exponent with sign but no digits is NOT a number; treated as plain-string",
+      "input": "1e+",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "1e+"
+    },
+    {
+      "id": "primitives.bare.float.exp",
+      "category": "primitives.bare",
+      "desc": "scientific notation is a number",
+      "input": "1e10",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": 10000000000.0
+    },
+    {
+      "id": "primitives.bare.float.expSigned",
+      "category": "primitives.bare",
+      "desc": "scientific notation with signed exponent",
+      "input": "1.5e-3",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": 0.0015
+    },
+    {
+      "id": "primitives.bare.float.expIntOnly",
+      "category": "primitives.bare",
+      "desc": "scientific notation without decimal part (lowercase)",
+      "input": "1e6",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": 1000000.0
+    },
+    {
+      "id": "primitives.bare.float.expIntOnlyCap",
+      "category": "primitives.bare",
+      "desc": "scientific notation without decimal part (uppercase)",
+      "input": "1E6",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": 1000000.0
+    },
+    {
+      "id": "primitives.bare.float.expBig",
+      "category": "primitives.bare",
+      "desc": "scientific notation with positive sign",
+      "input": "-2.0E+10",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": -20000000000.0
+    },
+    {
+      "id": "primitives.bare.bool.true",
+      "category": "primitives.bare",
+      "desc": "boolean true",
+      "input": "true",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": true
+    },
+    {
+      "id": "primitives.bare.bool.false",
+      "category": "primitives.bare",
+      "desc": "boolean false",
+      "input": "false",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": false
+    },
+    {
+      "id": "primitives.bare.string.plain",
+      "category": "primitives.bare",
+      "desc": "bare plain string",
+      "input": "hello",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "hello"
+    },
+    {
+      "id": "primitives.bare.string.alphanum",
+      "category": "primitives.bare",
+      "desc": "alphanumeric",
+      "input": "abc123",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "abc123"
+    },
+    {
+      "id": "primitives.bare.string.startsDigit",
+      "category": "primitives.bare",
+      "desc": "starts with digit (mixed)",
+      "input": "123abc",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "123abc"
+    },
+    {
+      "id": "primitives.bare.string.quoted.empty",
+      "category": "primitives.bare",
+      "desc": "quoted empty",
+      "input": "\"\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": ""
+    },
+    {
+      "id": "primitives.bare.string.quoted.basic",
+      "category": "primitives.bare",
+      "desc": "quoted basic",
+      "input": "\"hello\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "hello"
+    },
+    {
+      "id": "primitives.bare.string.quoted.spaces",
+      "category": "primitives.bare",
+      "desc": "preserves spaces",
+      "input": "\"  hi  \"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "  hi  "
+    },
+    {
+      "id": "primitives.bare.string.quoted.unicode",
+      "category": "primitives.bare",
+      "desc": "unicode literal",
+      "input": "\"中文\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "中文"
+    },
+    {
+      "id": "primitives.bare.string.trim.leading",
+      "category": "primitives.bare",
+      "desc": "leading ws trimmed",
+      "input": "  hello",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "hello"
+    },
+    {
+      "id": "primitives.bare.string.trim.trailing",
+      "category": "primitives.bare",
+      "desc": "trailing ws trimmed",
+      "input": "hello   ",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "hello"
+    },
+    {
+      "id": "primitives.bare.string.trim.both",
+      "category": "primitives.bare",
+      "desc": "both sides trimmed",
+      "input": "  hello  ",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "hello"
+    },
+    {
+      "id": "primitives.bare.string.internalWs",
+      "category": "primitives.bare",
+      "desc": "internal ws kept",
+      "input": "hello world",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "hello world"
+    },
+    {
+      "id": "primitives.bare.minus.notNumber",
+      "category": "primitives.bare",
+      "desc": "space after minus -> string",
+      "input": "- 5",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "- 5"
+    },
+    {
+      "id": "primitives.bare.minus.dashWord",
+      "category": "primitives.bare",
+      "desc": "lone dash word",
+      "input": "-foo",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "-foo"
+    },
+    {
+      "id": "strings.escape.bs.quote",
+      "category": "strings.escape",
+      "desc": "escaped quote",
+      "input": "\"a\\\"b\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a\"b"
+    },
+    {
+      "id": "strings.escape.bs.backslash",
+      "category": "strings.escape",
+      "desc": "escaped backslash",
+      "input": "\"a\\\\b\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a\\b"
+    },
+    {
+      "id": "strings.escape.bs.newline",
+      "category": "strings.escape",
+      "desc": "newline escape",
+      "input": "\"a\\nb\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a\nb"
+    },
+    {
+      "id": "strings.escape.bs.tab",
+      "category": "strings.escape",
+      "desc": "tab escape",
+      "input": "\"a\\tb\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a\tb"
+    },
+    {
+      "id": "strings.escape.bs.cr",
+      "category": "strings.escape",
+      "desc": "carriage return",
+      "input": "\"a\\rb\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a\rb"
+    },
+    {
+      "id": "strings.escape.bs.unicode.bmp",
+      "category": "strings.escape",
+      "desc": "unicode BMP",
+      "input": "\"\\u4e2d\\u6587\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "中文"
+    },
+    {
+      "id": "strings.escape.bs.unicode.ascii",
+      "category": "strings.escape",
+      "desc": "unicode ascii",
+      "input": "\"\\u0041\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "A"
+    },
+    {
+      "id": "strings.escape.bs.delim.comma",
+      "category": "strings.escape",
+      "desc": "escaped comma in quoted",
+      "input": "\"a\\,b\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a,b"
+    },
+    {
+      "id": "strings.escape.bs.delim.lparen",
+      "category": "strings.escape",
+      "desc": "escaped (",
+      "input": "\"a\\(b\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a(b"
+    },
+    {
+      "id": "strings.escape.bs.delim.rparen",
+      "category": "strings.escape",
+      "desc": "escaped )",
+      "input": "\"a\\)b\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a)b"
+    },
+    {
+      "id": "strings.escape.bs.delim.lbrack",
+      "category": "strings.escape",
+      "desc": "escaped [",
+      "input": "\"a\\[b\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a[b"
+    },
+    {
+      "id": "strings.escape.bs.delim.rbrack",
+      "category": "strings.escape",
+      "desc": "escaped ]",
+      "input": "\"a\\]b\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a]b"
+    },
+    {
+      "id": "strings.plainEscape.comma",
+      "category": "strings.plainEscape",
+      "desc": "plain string \\,",
+      "input": "a\\,b",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a,b"
+    },
+    {
+      "id": "strings.plainEscape.lparen",
+      "category": "strings.plainEscape",
+      "desc": "plain string \\(",
+      "input": "a\\(b",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a(b"
+    },
+    {
+      "id": "strings.plainEscape.rparen",
+      "category": "strings.plainEscape",
+      "desc": "plain string \\)",
+      "input": "a\\)b",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a)b"
+    },
+    {
+      "id": "strings.plainEscape.lbrack",
+      "category": "strings.plainEscape",
+      "desc": "plain string \\[",
+      "input": "a\\[b",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a[b"
+    },
+    {
+      "id": "strings.plainEscape.rbrack",
+      "category": "strings.plainEscape",
+      "desc": "plain string \\]",
+      "input": "a\\]b",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a]b"
+    },
+    {
+      "id": "strings.plainEscape.bsbs",
+      "category": "strings.plainEscape",
+      "desc": "plain string \\\\",
+      "input": "a\\\\b",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a\\b"
+    },
+    {
+      "id": "objects.single.basic",
+      "category": "objects.single",
+      "desc": "basic 3-field",
+      "input": "{id,name,active}:(1,Alice,true)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "id": 1,
+        "name": "Alice",
+        "active": true
+      }
+    },
+    {
+      "id": "objects.single.typed",
+      "category": "objects.single",
+      "desc": "with @-types",
+      "input": "{id@int,name@str,active@bool}:(1,Alice,true)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "id": 1,
+        "name": "Alice",
+        "active": true
+      }
+    },
+    {
+      "id": "objects.single.float",
+      "category": "objects.single",
+      "desc": "with float field",
+      "input": "{x@float,y@float}:(1.5,-2.5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 1.5,
+        "y": -2.5
+      }
+    },
+    {
+      "id": "objects.single.nullField",
+      "category": "objects.single",
+      "desc": "missing -> null",
+      "input": "{name@str,age@int}:(Alice,)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "name": "Alice",
+        "age": null
+      }
+    },
+    {
+      "id": "objects.single.emptyString",
+      "category": "objects.single",
+      "desc": "explicit empty string",
+      "input": "{name@str,bio@str}:(Alice,\"\")",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "name": "Alice",
+        "bio": ""
+      }
+    },
+    {
+      "id": "objects.single.singleField",
+      "category": "objects.single",
+      "desc": "single field",
+      "input": "{name@str}:(Alice)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "name": "Alice"
+      }
+    },
+    {
+      "id": "objects.single.partialHints",
+      "category": "objects.single",
+      "desc": "partial hints",
+      "input": "{id@int,name,active@bool}:(1,Alice,true)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "id": 1,
+        "name": "Alice",
+        "active": true
+      }
+    },
+    {
+      "id": "objects.single.numericLikeStringQuoted",
+      "category": "objects.single",
+      "desc": "leading-zero kept in quoted",
+      "input": "{zip@str}:(\"001234\")",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "zip": "001234"
+      }
+    },
+    {
+      "id": "objects.single.spaceAroundComma",
+      "category": "objects.single",
+      "desc": "schema with spaces",
+      "input": "{ id @ int , name @ str }:(1,Alice)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "id": 1,
+        "name": "Alice"
+      }
+    },
+    {
+      "id": "objects.single.boolForcedString",
+      "category": "objects.single",
+      "desc": "quoted bool stays string",
+      "input": "{flag@str}:(\"true\")",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "flag": "true"
+      }
+    },
+    {
+      "id": "objects.single.fieldNameWithDigit",
+      "category": "objects.single",
+      "desc": "field name starts with digit",
+      "input": "{1st@int,2nd@int}:(10,20)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "1st": 10,
+        "2nd": 20
+      }
+    },
+    {
+      "id": "objects.single.fieldNameUnderscore",
+      "category": "objects.single",
+      "desc": "field name with underscore",
+      "input": "{_id@int,user_name@str}:(7,bob)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "_id": 7,
+        "user_name": "bob"
+      }
+    },
+    {
+      "id": "objects.array.basic",
+      "category": "objects.array",
+      "desc": "two rows",
+      "input": "[{id@int,name@str,active@bool}]:(1,Alice,true),(2,Bob,false)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 1,
+          "name": "Alice",
+          "active": true
+        },
+        {
+          "id": 2,
+          "name": "Bob",
+          "active": false
+        }
+      ]
+    },
+    {
+      "id": "objects.array.empty",
+      "category": "objects.array",
+      "desc": "empty array of objects",
+      "input": "[{id@int,name@str}]:",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": []
+    },
+    {
+      "id": "objects.array.singleRow",
+      "category": "objects.array",
+      "desc": "single row in array form",
+      "input": "[{id@int,name@str}]:(1,Alice)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 1,
+          "name": "Alice"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.trailingComma",
+      "category": "objects.array",
+      "desc": "trailing comma between rows",
+      "input": "[{id@int,name@str}]:(1,Alice),(2,Bob),",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 1,
+          "name": "Alice"
+        },
+        {
+          "id": 2,
+          "name": "Bob"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.multilineIndented",
+      "category": "objects.array",
+      "desc": "indented multi-line",
+      "input": "[{id@int,name@str,active@bool}]:\n  (1, Alice, true),\n  (2, Bob, false)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 1,
+          "name": "Alice",
+          "active": true
+        },
+        {
+          "id": 2,
+          "name": "Bob",
+          "active": false
+        }
+      ]
+    },
+    {
+      "id": "objects.array.fifty.rows",
+      "category": "objects.array",
+      "desc": "50 rows",
+      "input": "[{id@int,name@str,active@bool}]:(0,user_000,false),(1,user_001,true),(2,user_002,false),(3,user_003,true),(4,user_004,false),(5,user_005,true),(6,user_006,false),(7,user_007,true),(8,user_008,false),(9,user_009,true),(10,user_010,false),(11,user_011,true),(12,user_012,false),(13,user_013,true),(14,user_014,false),(15,user_015,true),(16,user_016,false),(17,user_017,true),(18,user_018,false),(19,user_019,true),(20,user_020,false),(21,user_021,true),(22,user_022,false),(23,user_023,true),(24,user_024,false),(25,user_025,true),(26,user_026,false),(27,user_027,true),(28,user_028,false),(29,user_029,true),(30,user_030,false),(31,user_031,true),(32,user_032,false),(33,user_033,true),(34,user_034,false),(35,user_035,true),(36,user_036,false),(37,user_037,true),(38,user_038,false),(39,user_039,true),(40,user_040,false),(41,user_041,true),(42,user_042,false),(43,user_043,true),(44,user_044,false),(45,user_045,true),(46,user_046,false),(47,user_047,true),(48,user_048,false),(49,user_049,true)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "user_000",
+          "active": false
+        },
+        {
+          "id": 1,
+          "name": "user_001",
+          "active": true
+        },
+        {
+          "id": 2,
+          "name": "user_002",
+          "active": false
+        },
+        {
+          "id": 3,
+          "name": "user_003",
+          "active": true
+        },
+        {
+          "id": 4,
+          "name": "user_004",
+          "active": false
+        },
+        {
+          "id": 5,
+          "name": "user_005",
+          "active": true
+        },
+        {
+          "id": 6,
+          "name": "user_006",
+          "active": false
+        },
+        {
+          "id": 7,
+          "name": "user_007",
+          "active": true
+        },
+        {
+          "id": 8,
+          "name": "user_008",
+          "active": false
+        },
+        {
+          "id": 9,
+          "name": "user_009",
+          "active": true
+        },
+        {
+          "id": 10,
+          "name": "user_010",
+          "active": false
+        },
+        {
+          "id": 11,
+          "name": "user_011",
+          "active": true
+        },
+        {
+          "id": 12,
+          "name": "user_012",
+          "active": false
+        },
+        {
+          "id": 13,
+          "name": "user_013",
+          "active": true
+        },
+        {
+          "id": 14,
+          "name": "user_014",
+          "active": false
+        },
+        {
+          "id": 15,
+          "name": "user_015",
+          "active": true
+        },
+        {
+          "id": 16,
+          "name": "user_016",
+          "active": false
+        },
+        {
+          "id": 17,
+          "name": "user_017",
+          "active": true
+        },
+        {
+          "id": 18,
+          "name": "user_018",
+          "active": false
+        },
+        {
+          "id": 19,
+          "name": "user_019",
+          "active": true
+        },
+        {
+          "id": 20,
+          "name": "user_020",
+          "active": false
+        },
+        {
+          "id": 21,
+          "name": "user_021",
+          "active": true
+        },
+        {
+          "id": 22,
+          "name": "user_022",
+          "active": false
+        },
+        {
+          "id": 23,
+          "name": "user_023",
+          "active": true
+        },
+        {
+          "id": 24,
+          "name": "user_024",
+          "active": false
+        },
+        {
+          "id": 25,
+          "name": "user_025",
+          "active": true
+        },
+        {
+          "id": 26,
+          "name": "user_026",
+          "active": false
+        },
+        {
+          "id": 27,
+          "name": "user_027",
+          "active": true
+        },
+        {
+          "id": 28,
+          "name": "user_028",
+          "active": false
+        },
+        {
+          "id": 29,
+          "name": "user_029",
+          "active": true
+        },
+        {
+          "id": 30,
+          "name": "user_030",
+          "active": false
+        },
+        {
+          "id": 31,
+          "name": "user_031",
+          "active": true
+        },
+        {
+          "id": 32,
+          "name": "user_032",
+          "active": false
+        },
+        {
+          "id": 33,
+          "name": "user_033",
+          "active": true
+        },
+        {
+          "id": 34,
+          "name": "user_034",
+          "active": false
+        },
+        {
+          "id": 35,
+          "name": "user_035",
+          "active": true
+        },
+        {
+          "id": 36,
+          "name": "user_036",
+          "active": false
+        },
+        {
+          "id": 37,
+          "name": "user_037",
+          "active": true
+        },
+        {
+          "id": 38,
+          "name": "user_038",
+          "active": false
+        },
+        {
+          "id": 39,
+          "name": "user_039",
+          "active": true
+        },
+        {
+          "id": 40,
+          "name": "user_040",
+          "active": false
+        },
+        {
+          "id": 41,
+          "name": "user_041",
+          "active": true
+        },
+        {
+          "id": 42,
+          "name": "user_042",
+          "active": false
+        },
+        {
+          "id": 43,
+          "name": "user_043",
+          "active": true
+        },
+        {
+          "id": 44,
+          "name": "user_044",
+          "active": false
+        },
+        {
+          "id": 45,
+          "name": "user_045",
+          "active": true
+        },
+        {
+          "id": 46,
+          "name": "user_046",
+          "active": false
+        },
+        {
+          "id": 47,
+          "name": "user_047",
+          "active": true
+        },
+        {
+          "id": 48,
+          "name": "user_048",
+          "active": false
+        },
+        {
+          "id": 49,
+          "name": "user_049",
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "nested.objectInObject",
+      "category": "nested",
+      "desc": "addr@{...}",
+      "input": "{name@str,addr@{city@str,zip@int}}:(Alice,(NYC,10001))",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "name": "Alice",
+        "addr": {
+          "city": "NYC",
+          "zip": 10001
+        }
+      }
+    },
+    {
+      "id": "nested.arrayInObject",
+      "category": "nested",
+      "desc": "scores@[int]",
+      "input": "{name@str,scores@[int]}:(Alice,[90,85,92])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "name": "Alice",
+        "scores": [
+          90,
+          85,
+          92
+        ]
+      }
+    },
+    {
+      "id": "nested.arrayObjectsInObject",
+      "category": "nested",
+      "desc": "users@[{...}]",
+      "input": "{team@str,users@[{id@int,name@str}]}:(Dev,[(1,Alice),(2,Bob)])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "team": "Dev",
+        "users": [
+          {
+            "id": 1,
+            "name": "Alice"
+          },
+          {
+            "id": 2,
+            "name": "Bob"
+          }
+        ]
+      }
+    },
+    {
+      "id": "nested.deep",
+      "category": "nested",
+      "desc": "deeply nested",
+      "input": "{a@{b@{c@{d@int}}}}:(((((42)))))",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": {
+          "b": {
+            "c": {
+              "d": 42
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "nested.complexBig",
+      "category": "nested",
+      "desc": "company example",
+      "input": "{company@str,employees@[{id@int,name@str,skills@[str]}],active@bool}:(ACME,[(1,Alice,[rust,go]),(2,Bob,[python])],true)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "company": "ACME",
+        "employees": [
+          {
+            "id": 1,
+            "name": "Alice",
+            "skills": [
+              "rust",
+              "go"
+            ]
+          },
+          {
+            "id": 2,
+            "name": "Bob",
+            "skills": [
+              "python"
+            ]
+          }
+        ],
+        "active": true
+      }
+    },
+    {
+      "id": "nested.arrayOfArrays",
+      "category": "nested",
+      "desc": "array of arrays in field",
+      "input": "{m@[[int]]}:([[1,2],[3,4]])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "m": [
+          [
+            1,
+            2
+          ],
+          [
+            3,
+            4
+          ]
+        ]
+      }
+    },
+    {
+      "id": "arrays.plain.empty",
+      "category": "arrays.plain",
+      "desc": "empty array",
+      "input": "[]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": []
+    },
+    {
+      "id": "arrays.plain.ints",
+      "category": "arrays.plain",
+      "desc": "int array",
+      "input": "[1,2,3]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "arrays.plain.floats",
+      "category": "arrays.plain",
+      "desc": "float array",
+      "input": "[1.0,2.5,3.25]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        1.0,
+        2.5,
+        3.25
+      ]
+    },
+    {
+      "id": "arrays.plain.strings",
+      "category": "arrays.plain",
+      "desc": "plain strings",
+      "input": "[a,b,c]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        "a",
+        "b",
+        "c"
+      ]
+    },
+    {
+      "id": "arrays.plain.mixed",
+      "category": "arrays.plain",
+      "desc": "mixed types",
+      "input": "[1,hello,true,3.14]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        1,
+        "hello",
+        true,
+        3.14
+      ]
+    },
+    {
+      "id": "arrays.plain.nested",
+      "category": "arrays.plain",
+      "desc": "nested arrays",
+      "input": "[[1,2],[3,4]]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        [
+          1,
+          2
+        ],
+        [
+          3,
+          4
+        ]
+      ]
+    },
+    {
+      "id": "arrays.plain.trailingComma",
+      "category": "arrays.plain",
+      "desc": "trailing comma",
+      "input": "[1,2,3,]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "arrays.plain.singletonString",
+      "category": "arrays.plain",
+      "desc": "single string",
+      "input": "[hello]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        "hello"
+      ]
+    },
+    {
+      "id": "arrays.plain.boolArray",
+      "category": "arrays.plain",
+      "desc": "bool array",
+      "input": "[true,false,true]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        true,
+        false,
+        true
+      ]
+    },
+    {
+      "id": "arrays.plain.sparseNull",
+      "category": "arrays.plain",
+      "desc": "sparse with null",
+      "input": "[1,,3]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        1,
+        null,
+        3
+      ]
+    },
+    {
+      "id": "arrays.plain.size200",
+      "category": "arrays.plain",
+      "desc": "200-element ints",
+      "input": "[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159,160,161,162,163,164,165,166,167,168,169,170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125,
+        126,
+        127,
+        128,
+        129,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        138,
+        139,
+        140,
+        141,
+        142,
+        143,
+        144,
+        145,
+        146,
+        147,
+        148,
+        149,
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164,
+        165,
+        166,
+        167,
+        168,
+        169,
+        170,
+        171,
+        172,
+        173,
+        174,
+        175,
+        176,
+        177,
+        178,
+        179,
+        180,
+        181,
+        182,
+        183,
+        184,
+        185,
+        186,
+        187,
+        188,
+        189,
+        190,
+        191,
+        192,
+        193,
+        194,
+        195,
+        196,
+        197,
+        198,
+        199
+      ]
+    },
+    {
+      "id": "whitespace.schemaSpaces",
+      "category": "whitespace",
+      "desc": "spaces inside schema",
+      "input": "{ id @ int , name @ str }:(1, Alice)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "id": 1,
+        "name": "Alice"
+      }
+    },
+    {
+      "id": "whitespace.dataSpaceTrim",
+      "category": "whitespace",
+      "desc": "spaces around plain string trimmed",
+      "input": "{name@str}:(   Alice   )",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "name": "Alice"
+      }
+    },
+    {
+      "id": "whitespace.dataSpaceQuoted",
+      "category": "whitespace",
+      "desc": "spaces preserved in quoted",
+      "input": "{name@str}:(\"   Alice   \")",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "name": "   Alice   "
+      }
+    },
+    {
+      "id": "whitespace.crlf",
+      "category": "whitespace",
+      "desc": "CRLF line endings",
+      "input": "[{id@int,name@str}]:\r\n  (1,Alice),\r\n  (2,Bob)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 1,
+          "name": "Alice"
+        },
+        {
+          "id": 2,
+          "name": "Bob"
+        }
+      ]
+    },
+    {
+      "id": "whitespace.tabIndent",
+      "category": "whitespace",
+      "desc": "tab indentation",
+      "input": "[{id@int,name@str}]:\n\t(1,Alice),\n\t(2,Bob)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 1,
+          "name": "Alice"
+        },
+        {
+          "id": 2,
+          "name": "Bob"
+        }
+      ]
+    },
+    {
+      "id": "whitespace.leadingDocWs",
+      "category": "whitespace",
+      "desc": "leading document whitespace",
+      "input": "   \n  {id@int}:(1)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "id": 1
+      }
+    },
+    {
+      "id": "whitespace.trailingDocWs",
+      "category": "whitespace",
+      "desc": "trailing document whitespace",
+      "input": "{id@int}:(1)\n   \n",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "id": 1
+      }
+    },
+    {
+      "id": "comments.leading",
+      "category": "comments",
+      "desc": "leading block comment",
+      "input": "/* hello */ {id@int}:(1)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "id": 1
+      }
+    },
+    {
+      "id": "comments.trailing",
+      "category": "comments",
+      "desc": "trailing block comment",
+      "input": "{id@int}:(1) /* tail */",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "id": 1
+      }
+    },
+    {
+      "id": "comments.between",
+      "category": "comments",
+      "desc": "comment in schema",
+      "input": "{id@int /* pk */, name@str}:(1,Alice)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "id": 1,
+        "name": "Alice"
+      }
+    },
+    {
+      "id": "comments.multiline",
+      "category": "comments",
+      "desc": "multiline comment",
+      "input": "/*\n  doc\n*/\n{id@int}:(1)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "id": 1
+      }
+    },
+    {
+      "id": "comments.betweenRows",
+      "category": "comments",
+      "desc": "comment between rows",
+      "input": "[{id@int}]:(1) /* row1 */ ,(2)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 1
+        },
+        {
+          "id": 2
+        }
+      ]
+    },
+    {
+      "id": "commas.trail",
+      "category": "commas",
+      "desc": "trailing comma absorbed",
+      "input": "{a@int,b@int}:(1,2,)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": 1,
+        "b": 2
+      }
+    },
+    {
+      "id": "commas.consec",
+      "category": "commas",
+      "desc": "consecutive commas -> null",
+      "input": "{a@int,b@int,c@int}:(1,,3)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": 1,
+        "b": null,
+        "c": 3
+      }
+    },
+    {
+      "id": "commas.consecAndTrail",
+      "category": "commas",
+      "desc": "null then trailing",
+      "input": "{a@int,b@int,c@int}:(1,2,,)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": 1,
+        "b": 2,
+        "c": null
+      }
+    },
+    {
+      "id": "commas.allNull",
+      "category": "commas",
+      "desc": "all nulls",
+      "input": "{a@int,b@int,c@int}:(,,)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": null,
+        "b": null,
+        "c": null
+      }
+    },
+    {
+      "id": "errors.unclosedQuote",
+      "category": "errors",
+      "desc": "unterminated quoted string",
+      "input": "{a@str}:(\"hello)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "lex.unterminated_string"
+    },
+    {
+      "id": "errors.unclosedTuple",
+      "category": "errors",
+      "desc": "missing close paren",
+      "input": "{a@int,b@int}:(1,2",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.unclosed_tuple"
+    },
+    {
+      "id": "errors.unclosedSchema",
+      "category": "errors",
+      "desc": "missing close brace",
+      "input": "{a@int,b@int:(1,2)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.unclosed_schema"
+    },
+    {
+      "id": "errors.unclosedComment",
+      "category": "errors",
+      "desc": "unterminated comment",
+      "input": "/* nope {a@int}:(1)",
+      "kind": "error",
+      "schemaDriven": false,
+      "errorHint": "lex.unterminated_comment"
+    },
+    {
+      "id": "errors.tooMany",
+      "category": "errors",
+      "desc": "too many values",
+      "input": "{a@int,b@int}:(1,2,3)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.field_count"
+    },
+    {
+      "id": "errors.tooFew",
+      "category": "errors",
+      "desc": "too few values (no trailing comma)",
+      "input": "{a@int,b@int}:(1)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.field_count"
+    },
+    {
+      "id": "errors.bareTuple",
+      "category": "errors",
+      "desc": "bare tuple at top",
+      "input": "(1,2,3)",
+      "kind": "error",
+      "schemaDriven": false,
+      "errorHint": "parse.bare_tuple"
+    },
+    {
+      "id": "errors.missingColon",
+      "category": "errors",
+      "desc": "missing : after schema",
+      "input": "{a@int,b@int}(1,2)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.missing_colon"
+    },
+    {
+      "id": "errors.invalidEscape",
+      "category": "errors",
+      "desc": "invalid escape sequence",
+      "input": "{a@str}:(\"a\\xb\")",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "lex.bad_escape"
+    },
+    {
+      "id": "errors.commentInsideTuple",
+      "category": "errors",
+      "desc": "comment inside data tuple is forbidden",
+      "input": "{a@int,b@int}:(1,/*x*/2)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.comment_in_data"
+    },
+    {
+      "id": "errors.typeMismatch",
+      "category": "errors",
+      "desc": "string in @int field",
+      "input": "{a@int}:(hello)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "type.coercion"
+    },
+    {
+      "id": "errors.boolWrongCase",
+      "category": "errors",
+      "desc": "True (capitalised) is a string, not boolean",
+      "input": "{a@bool}:(True)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "type.coercion"
+    },
+    {
+      "id": "primitives.numeric.int.0",
+      "category": "primitives.numeric",
+      "desc": "int 0 in tuple",
+      "input": "{x@int}:(0)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 0
+      }
+    },
+    {
+      "id": "primitives.numeric.int.1",
+      "category": "primitives.numeric",
+      "desc": "int 1 in tuple",
+      "input": "{x@int}:(1)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 1
+      }
+    },
+    {
+      "id": "primitives.numeric.int.-1",
+      "category": "primitives.numeric",
+      "desc": "int -1 in tuple",
+      "input": "{x@int}:(-1)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": -1
+      }
+    },
+    {
+      "id": "primitives.numeric.int.10",
+      "category": "primitives.numeric",
+      "desc": "int 10 in tuple",
+      "input": "{x@int}:(10)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 10
+      }
+    },
+    {
+      "id": "primitives.numeric.int.-10",
+      "category": "primitives.numeric",
+      "desc": "int -10 in tuple",
+      "input": "{x@int}:(-10)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": -10
+      }
+    },
+    {
+      "id": "primitives.numeric.int.127",
+      "category": "primitives.numeric",
+      "desc": "int 127 in tuple",
+      "input": "{x@int}:(127)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 127
+      }
+    },
+    {
+      "id": "primitives.numeric.int.-128",
+      "category": "primitives.numeric",
+      "desc": "int -128 in tuple",
+      "input": "{x@int}:(-128)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": -128
+      }
+    },
+    {
+      "id": "primitives.numeric.int.32767",
+      "category": "primitives.numeric",
+      "desc": "int 32767 in tuple",
+      "input": "{x@int}:(32767)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 32767
+      }
+    },
+    {
+      "id": "primitives.numeric.int.-32768",
+      "category": "primitives.numeric",
+      "desc": "int -32768 in tuple",
+      "input": "{x@int}:(-32768)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": -32768
+      }
+    },
+    {
+      "id": "primitives.numeric.int.2147483647",
+      "category": "primitives.numeric",
+      "desc": "int 2147483647 in tuple",
+      "input": "{x@int}:(2147483647)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 2147483647
+      }
+    },
+    {
+      "id": "primitives.numeric.int.-2147483648",
+      "category": "primitives.numeric",
+      "desc": "int -2147483648 in tuple",
+      "input": "{x@int}:(-2147483648)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": -2147483648
+      }
+    },
+    {
+      "id": "primitives.numeric.int.9223372036854775806",
+      "category": "primitives.numeric",
+      "desc": "int 9223372036854775806 in tuple",
+      "input": "{x@int}:(9223372036854775806)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 9223372036854775806
+      }
+    },
+    {
+      "id": "primitives.numeric.int.-9223372036854775807",
+      "category": "primitives.numeric",
+      "desc": "int -9223372036854775807 in tuple",
+      "input": "{x@int}:(-9223372036854775807)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": -9223372036854775807
+      }
+    },
+    {
+      "id": "primitives.numeric.int.100",
+      "category": "primitives.numeric",
+      "desc": "int 100 in tuple",
+      "input": "{x@int}:(100)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 100
+      }
+    },
+    {
+      "id": "primitives.numeric.int.1000",
+      "category": "primitives.numeric",
+      "desc": "int 1000 in tuple",
+      "input": "{x@int}:(1000)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 1000
+      }
+    },
+    {
+      "id": "primitives.numeric.int.100000",
+      "category": "primitives.numeric",
+      "desc": "int 100000 in tuple",
+      "input": "{x@int}:(100000)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 100000
+      }
+    },
+    {
+      "id": "primitives.numeric.int.1000000",
+      "category": "primitives.numeric",
+      "desc": "int 1000000 in tuple",
+      "input": "{x@int}:(1000000)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 1000000
+      }
+    },
+    {
+      "id": "primitives.numeric.float.0_0",
+      "category": "primitives.numeric",
+      "desc": "float 0.0 in tuple",
+      "input": "{x@float}:(0.0)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 0.0
+      }
+    },
+    {
+      "id": "primitives.numeric.float.1_0",
+      "category": "primitives.numeric",
+      "desc": "float 1.0 in tuple",
+      "input": "{x@float}:(1.0)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 1.0
+      }
+    },
+    {
+      "id": "primitives.numeric.float.m1_0",
+      "category": "primitives.numeric",
+      "desc": "float -1.0 in tuple",
+      "input": "{x@float}:(-1.0)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": -1.0
+      }
+    },
+    {
+      "id": "primitives.numeric.float.0_5",
+      "category": "primitives.numeric",
+      "desc": "float 0.5 in tuple",
+      "input": "{x@float}:(0.5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 0.5
+      }
+    },
+    {
+      "id": "primitives.numeric.float.m0_5",
+      "category": "primitives.numeric",
+      "desc": "float -0.5 in tuple",
+      "input": "{x@float}:(-0.5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": -0.5
+      }
+    },
+    {
+      "id": "primitives.numeric.float.3_14",
+      "category": "primitives.numeric",
+      "desc": "float 3.14 in tuple",
+      "input": "{x@float}:(3.14)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 3.14
+      }
+    },
+    {
+      "id": "primitives.numeric.float.m3_14",
+      "category": "primitives.numeric",
+      "desc": "float -3.14 in tuple",
+      "input": "{x@float}:(-3.14)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": -3.14
+      }
+    },
+    {
+      "id": "primitives.numeric.float.2_5",
+      "category": "primitives.numeric",
+      "desc": "float 2.5 in tuple",
+      "input": "{x@float}:(2.5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 2.5
+      }
+    },
+    {
+      "id": "primitives.numeric.float.100_25",
+      "category": "primitives.numeric",
+      "desc": "float 100.25 in tuple",
+      "input": "{x@float}:(100.25)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 100.25
+      }
+    },
+    {
+      "id": "primitives.numeric.float.m1000_125",
+      "category": "primitives.numeric",
+      "desc": "float -1000.125 in tuple",
+      "input": "{x@float}:(-1000.125)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": -1000.125
+      }
+    },
+    {
+      "id": "primitives.numeric.float.0_125",
+      "category": "primitives.numeric",
+      "desc": "float 0.125 in tuple",
+      "input": "{x@float}:(0.125)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 0.125
+      }
+    },
+    {
+      "id": "primitives.numeric.float.1_5",
+      "category": "primitives.numeric",
+      "desc": "float 1.5 in tuple",
+      "input": "{x@float}:(1.5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 1.5
+      }
+    },
+    {
+      "id": "primitives.numeric.float.99_99",
+      "category": "primitives.numeric",
+      "desc": "float 99.99 in tuple",
+      "input": "{x@float}:(99.99)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 99.99
+      }
+    },
+    {
+      "id": "strings.shape.ascii_lower",
+      "category": "strings.shape",
+      "desc": "string shape ascii_lower",
+      "input": "{x@str}:(hello)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "hello"
+      }
+    },
+    {
+      "id": "strings.shape.ascii_upper",
+      "category": "strings.shape",
+      "desc": "string shape ascii_upper",
+      "input": "{x@str}:(HELLO)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "HELLO"
+      }
+    },
+    {
+      "id": "strings.shape.ascii_mixed",
+      "category": "strings.shape",
+      "desc": "string shape ascii_mixed",
+      "input": "{x@str}:(Hello)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "Hello"
+      }
+    },
+    {
+      "id": "strings.shape.with_dash",
+      "category": "strings.shape",
+      "desc": "string shape with_dash",
+      "input": "{x@str}:(a-b-c)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "a-b-c"
+      }
+    },
+    {
+      "id": "strings.shape.with_dot",
+      "category": "strings.shape",
+      "desc": "string shape with_dot",
+      "input": "{x@str}:(file.ext)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "file.ext"
+      }
+    },
+    {
+      "id": "strings.shape.with_slash",
+      "category": "strings.shape",
+      "desc": "string shape with_slash",
+      "input": "{x@str}:(path/to/file)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "path/to/file"
+      }
+    },
+    {
+      "id": "strings.shape.with_eq",
+      "category": "strings.shape",
+      "desc": "string shape with_eq",
+      "input": "{x@str}:(a=b)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "a=b"
+      }
+    },
+    {
+      "id": "strings.shape.with_amp",
+      "category": "strings.shape",
+      "desc": "string shape with_amp",
+      "input": "{x@str}:(a&b)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "a&b"
+      }
+    },
+    {
+      "id": "strings.shape.with_pct",
+      "category": "strings.shape",
+      "desc": "string shape with_pct",
+      "input": "{x@str}:(100%)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "100%"
+      }
+    },
+    {
+      "id": "strings.shape.with_plus",
+      "category": "strings.shape",
+      "desc": "string shape with_plus",
+      "input": "{x@str}:(a+b)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "a+b"
+      }
+    },
+    {
+      "id": "strings.shape.with_star",
+      "category": "strings.shape",
+      "desc": "string shape with_star",
+      "input": "{x@str}:(a*b)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "a*b"
+      }
+    },
+    {
+      "id": "strings.shape.with_q",
+      "category": "strings.shape",
+      "desc": "string shape with_q",
+      "input": "{x@str}:(a?b)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "a?b"
+      }
+    },
+    {
+      "id": "strings.shape.with_excl",
+      "category": "strings.shape",
+      "desc": "string shape with_excl",
+      "input": "{x@str}:(wow!)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "wow!"
+      }
+    },
+    {
+      "id": "strings.shape.with_hash",
+      "category": "strings.shape",
+      "desc": "string shape with_hash",
+      "input": "{x@str}:(#tag)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "#tag"
+      }
+    },
+    {
+      "id": "strings.shape.with_dollar",
+      "category": "strings.shape",
+      "desc": "string shape with_dollar",
+      "input": "{x@str}:($amount)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "$amount"
+      }
+    },
+    {
+      "id": "strings.shape.emoji",
+      "category": "strings.shape",
+      "desc": "string shape emoji",
+      "input": "{x@str}:(\"🚀\")",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "🚀"
+      }
+    },
+    {
+      "id": "strings.shape.cjk_kr",
+      "category": "strings.shape",
+      "desc": "string shape cjk_kr",
+      "input": "{x@str}:(\"한국어\")",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "한국어"
+      }
+    },
+    {
+      "id": "strings.shape.cjk_jp",
+      "category": "strings.shape",
+      "desc": "string shape cjk_jp",
+      "input": "{x@str}:(\"日本語\")",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "日本語"
+      }
+    },
+    {
+      "id": "strings.shape.rtl_ar",
+      "category": "strings.shape",
+      "desc": "string shape rtl_ar",
+      "input": "{x@str}:(\"العربية\")",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "العربية"
+      }
+    },
+    {
+      "id": "strings.shape.mixed_unicode",
+      "category": "strings.shape",
+      "desc": "string shape mixed_unicode",
+      "input": "{x@str}:(\"Hi 🌍 안녕\")",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "Hi 🌍 안녕"
+      }
+    },
+    {
+      "id": "optionals.someInt",
+      "category": "optionals",
+      "desc": "Some(int)",
+      "input": "{x@int}:(7)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 7
+      }
+    },
+    {
+      "id": "optionals.noneInt",
+      "category": "optionals",
+      "desc": "None(int)",
+      "input": "{x@int}:()",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": null
+      }
+    },
+    {
+      "id": "optionals.someStr",
+      "category": "optionals",
+      "desc": "Some(str)",
+      "input": "{x@str}:(hi)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "hi"
+      }
+    },
+    {
+      "id": "optionals.noneStr",
+      "category": "optionals",
+      "desc": "None(str)",
+      "input": "{x@str}:()",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": null
+      }
+    },
+    {
+      "id": "optionals.emptyStrSome",
+      "category": "optionals",
+      "desc": "explicit empty string is some",
+      "input": "{x@str}:(\"\")",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": ""
+      }
+    },
+    {
+      "id": "optionals.middleNone",
+      "category": "optionals",
+      "desc": "middle field is null",
+      "input": "{a@int,b@int,c@int}:(1,,3)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": 1,
+        "b": null,
+        "c": 3
+      }
+    },
+    {
+      "id": "objects.array.bulk.n01",
+      "category": "objects.array.bulk",
+      "desc": "1 rows",
+      "input": "[{id@int,name@str}]:(0,u0)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n02",
+      "category": "objects.array.bulk",
+      "desc": "2 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n03",
+      "category": "objects.array.bulk",
+      "desc": "3 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n04",
+      "category": "objects.array.bulk",
+      "desc": "4 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n05",
+      "category": "objects.array.bulk",
+      "desc": "5 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n06",
+      "category": "objects.array.bulk",
+      "desc": "6 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n07",
+      "category": "objects.array.bulk",
+      "desc": "7 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n08",
+      "category": "objects.array.bulk",
+      "desc": "8 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n09",
+      "category": "objects.array.bulk",
+      "desc": "9 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n10",
+      "category": "objects.array.bulk",
+      "desc": "10 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8),(9,u9)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        },
+        {
+          "id": 9,
+          "name": "u9"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n11",
+      "category": "objects.array.bulk",
+      "desc": "11 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8),(9,u9),(10,u10)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        },
+        {
+          "id": 9,
+          "name": "u9"
+        },
+        {
+          "id": 10,
+          "name": "u10"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n12",
+      "category": "objects.array.bulk",
+      "desc": "12 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8),(9,u9),(10,u10),(11,u11)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        },
+        {
+          "id": 9,
+          "name": "u9"
+        },
+        {
+          "id": 10,
+          "name": "u10"
+        },
+        {
+          "id": 11,
+          "name": "u11"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n13",
+      "category": "objects.array.bulk",
+      "desc": "13 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8),(9,u9),(10,u10),(11,u11),(12,u12)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        },
+        {
+          "id": 9,
+          "name": "u9"
+        },
+        {
+          "id": 10,
+          "name": "u10"
+        },
+        {
+          "id": 11,
+          "name": "u11"
+        },
+        {
+          "id": 12,
+          "name": "u12"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n14",
+      "category": "objects.array.bulk",
+      "desc": "14 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8),(9,u9),(10,u10),(11,u11),(12,u12),(13,u13)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        },
+        {
+          "id": 9,
+          "name": "u9"
+        },
+        {
+          "id": 10,
+          "name": "u10"
+        },
+        {
+          "id": 11,
+          "name": "u11"
+        },
+        {
+          "id": 12,
+          "name": "u12"
+        },
+        {
+          "id": 13,
+          "name": "u13"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n15",
+      "category": "objects.array.bulk",
+      "desc": "15 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8),(9,u9),(10,u10),(11,u11),(12,u12),(13,u13),(14,u14)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        },
+        {
+          "id": 9,
+          "name": "u9"
+        },
+        {
+          "id": 10,
+          "name": "u10"
+        },
+        {
+          "id": 11,
+          "name": "u11"
+        },
+        {
+          "id": 12,
+          "name": "u12"
+        },
+        {
+          "id": 13,
+          "name": "u13"
+        },
+        {
+          "id": 14,
+          "name": "u14"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n16",
+      "category": "objects.array.bulk",
+      "desc": "16 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8),(9,u9),(10,u10),(11,u11),(12,u12),(13,u13),(14,u14),(15,u15)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        },
+        {
+          "id": 9,
+          "name": "u9"
+        },
+        {
+          "id": 10,
+          "name": "u10"
+        },
+        {
+          "id": 11,
+          "name": "u11"
+        },
+        {
+          "id": 12,
+          "name": "u12"
+        },
+        {
+          "id": 13,
+          "name": "u13"
+        },
+        {
+          "id": 14,
+          "name": "u14"
+        },
+        {
+          "id": 15,
+          "name": "u15"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n17",
+      "category": "objects.array.bulk",
+      "desc": "17 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8),(9,u9),(10,u10),(11,u11),(12,u12),(13,u13),(14,u14),(15,u15),(16,u16)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        },
+        {
+          "id": 9,
+          "name": "u9"
+        },
+        {
+          "id": 10,
+          "name": "u10"
+        },
+        {
+          "id": 11,
+          "name": "u11"
+        },
+        {
+          "id": 12,
+          "name": "u12"
+        },
+        {
+          "id": 13,
+          "name": "u13"
+        },
+        {
+          "id": 14,
+          "name": "u14"
+        },
+        {
+          "id": 15,
+          "name": "u15"
+        },
+        {
+          "id": 16,
+          "name": "u16"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n18",
+      "category": "objects.array.bulk",
+      "desc": "18 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8),(9,u9),(10,u10),(11,u11),(12,u12),(13,u13),(14,u14),(15,u15),(16,u16),(17,u17)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        },
+        {
+          "id": 9,
+          "name": "u9"
+        },
+        {
+          "id": 10,
+          "name": "u10"
+        },
+        {
+          "id": 11,
+          "name": "u11"
+        },
+        {
+          "id": 12,
+          "name": "u12"
+        },
+        {
+          "id": 13,
+          "name": "u13"
+        },
+        {
+          "id": 14,
+          "name": "u14"
+        },
+        {
+          "id": 15,
+          "name": "u15"
+        },
+        {
+          "id": 16,
+          "name": "u16"
+        },
+        {
+          "id": 17,
+          "name": "u17"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n19",
+      "category": "objects.array.bulk",
+      "desc": "19 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8),(9,u9),(10,u10),(11,u11),(12,u12),(13,u13),(14,u14),(15,u15),(16,u16),(17,u17),(18,u18)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        },
+        {
+          "id": 9,
+          "name": "u9"
+        },
+        {
+          "id": 10,
+          "name": "u10"
+        },
+        {
+          "id": 11,
+          "name": "u11"
+        },
+        {
+          "id": 12,
+          "name": "u12"
+        },
+        {
+          "id": 13,
+          "name": "u13"
+        },
+        {
+          "id": 14,
+          "name": "u14"
+        },
+        {
+          "id": 15,
+          "name": "u15"
+        },
+        {
+          "id": 16,
+          "name": "u16"
+        },
+        {
+          "id": 17,
+          "name": "u17"
+        },
+        {
+          "id": 18,
+          "name": "u18"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n20",
+      "category": "objects.array.bulk",
+      "desc": "20 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8),(9,u9),(10,u10),(11,u11),(12,u12),(13,u13),(14,u14),(15,u15),(16,u16),(17,u17),(18,u18),(19,u19)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        },
+        {
+          "id": 9,
+          "name": "u9"
+        },
+        {
+          "id": 10,
+          "name": "u10"
+        },
+        {
+          "id": 11,
+          "name": "u11"
+        },
+        {
+          "id": 12,
+          "name": "u12"
+        },
+        {
+          "id": 13,
+          "name": "u13"
+        },
+        {
+          "id": 14,
+          "name": "u14"
+        },
+        {
+          "id": 15,
+          "name": "u15"
+        },
+        {
+          "id": 16,
+          "name": "u16"
+        },
+        {
+          "id": 17,
+          "name": "u17"
+        },
+        {
+          "id": 18,
+          "name": "u18"
+        },
+        {
+          "id": 19,
+          "name": "u19"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n21",
+      "category": "objects.array.bulk",
+      "desc": "21 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8),(9,u9),(10,u10),(11,u11),(12,u12),(13,u13),(14,u14),(15,u15),(16,u16),(17,u17),(18,u18),(19,u19),(20,u20)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        },
+        {
+          "id": 9,
+          "name": "u9"
+        },
+        {
+          "id": 10,
+          "name": "u10"
+        },
+        {
+          "id": 11,
+          "name": "u11"
+        },
+        {
+          "id": 12,
+          "name": "u12"
+        },
+        {
+          "id": 13,
+          "name": "u13"
+        },
+        {
+          "id": 14,
+          "name": "u14"
+        },
+        {
+          "id": 15,
+          "name": "u15"
+        },
+        {
+          "id": 16,
+          "name": "u16"
+        },
+        {
+          "id": 17,
+          "name": "u17"
+        },
+        {
+          "id": 18,
+          "name": "u18"
+        },
+        {
+          "id": 19,
+          "name": "u19"
+        },
+        {
+          "id": 20,
+          "name": "u20"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n22",
+      "category": "objects.array.bulk",
+      "desc": "22 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8),(9,u9),(10,u10),(11,u11),(12,u12),(13,u13),(14,u14),(15,u15),(16,u16),(17,u17),(18,u18),(19,u19),(20,u20),(21,u21)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        },
+        {
+          "id": 9,
+          "name": "u9"
+        },
+        {
+          "id": 10,
+          "name": "u10"
+        },
+        {
+          "id": 11,
+          "name": "u11"
+        },
+        {
+          "id": 12,
+          "name": "u12"
+        },
+        {
+          "id": 13,
+          "name": "u13"
+        },
+        {
+          "id": 14,
+          "name": "u14"
+        },
+        {
+          "id": 15,
+          "name": "u15"
+        },
+        {
+          "id": 16,
+          "name": "u16"
+        },
+        {
+          "id": 17,
+          "name": "u17"
+        },
+        {
+          "id": 18,
+          "name": "u18"
+        },
+        {
+          "id": 19,
+          "name": "u19"
+        },
+        {
+          "id": 20,
+          "name": "u20"
+        },
+        {
+          "id": 21,
+          "name": "u21"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n23",
+      "category": "objects.array.bulk",
+      "desc": "23 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8),(9,u9),(10,u10),(11,u11),(12,u12),(13,u13),(14,u14),(15,u15),(16,u16),(17,u17),(18,u18),(19,u19),(20,u20),(21,u21),(22,u22)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        },
+        {
+          "id": 9,
+          "name": "u9"
+        },
+        {
+          "id": 10,
+          "name": "u10"
+        },
+        {
+          "id": 11,
+          "name": "u11"
+        },
+        {
+          "id": 12,
+          "name": "u12"
+        },
+        {
+          "id": 13,
+          "name": "u13"
+        },
+        {
+          "id": 14,
+          "name": "u14"
+        },
+        {
+          "id": 15,
+          "name": "u15"
+        },
+        {
+          "id": 16,
+          "name": "u16"
+        },
+        {
+          "id": 17,
+          "name": "u17"
+        },
+        {
+          "id": 18,
+          "name": "u18"
+        },
+        {
+          "id": 19,
+          "name": "u19"
+        },
+        {
+          "id": 20,
+          "name": "u20"
+        },
+        {
+          "id": 21,
+          "name": "u21"
+        },
+        {
+          "id": 22,
+          "name": "u22"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n24",
+      "category": "objects.array.bulk",
+      "desc": "24 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8),(9,u9),(10,u10),(11,u11),(12,u12),(13,u13),(14,u14),(15,u15),(16,u16),(17,u17),(18,u18),(19,u19),(20,u20),(21,u21),(22,u22),(23,u23)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        },
+        {
+          "id": 9,
+          "name": "u9"
+        },
+        {
+          "id": 10,
+          "name": "u10"
+        },
+        {
+          "id": 11,
+          "name": "u11"
+        },
+        {
+          "id": 12,
+          "name": "u12"
+        },
+        {
+          "id": 13,
+          "name": "u13"
+        },
+        {
+          "id": 14,
+          "name": "u14"
+        },
+        {
+          "id": 15,
+          "name": "u15"
+        },
+        {
+          "id": 16,
+          "name": "u16"
+        },
+        {
+          "id": 17,
+          "name": "u17"
+        },
+        {
+          "id": 18,
+          "name": "u18"
+        },
+        {
+          "id": 19,
+          "name": "u19"
+        },
+        {
+          "id": 20,
+          "name": "u20"
+        },
+        {
+          "id": 21,
+          "name": "u21"
+        },
+        {
+          "id": 22,
+          "name": "u22"
+        },
+        {
+          "id": 23,
+          "name": "u23"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n25",
+      "category": "objects.array.bulk",
+      "desc": "25 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8),(9,u9),(10,u10),(11,u11),(12,u12),(13,u13),(14,u14),(15,u15),(16,u16),(17,u17),(18,u18),(19,u19),(20,u20),(21,u21),(22,u22),(23,u23),(24,u24)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        },
+        {
+          "id": 9,
+          "name": "u9"
+        },
+        {
+          "id": 10,
+          "name": "u10"
+        },
+        {
+          "id": 11,
+          "name": "u11"
+        },
+        {
+          "id": 12,
+          "name": "u12"
+        },
+        {
+          "id": 13,
+          "name": "u13"
+        },
+        {
+          "id": 14,
+          "name": "u14"
+        },
+        {
+          "id": 15,
+          "name": "u15"
+        },
+        {
+          "id": 16,
+          "name": "u16"
+        },
+        {
+          "id": 17,
+          "name": "u17"
+        },
+        {
+          "id": 18,
+          "name": "u18"
+        },
+        {
+          "id": 19,
+          "name": "u19"
+        },
+        {
+          "id": 20,
+          "name": "u20"
+        },
+        {
+          "id": 21,
+          "name": "u21"
+        },
+        {
+          "id": 22,
+          "name": "u22"
+        },
+        {
+          "id": 23,
+          "name": "u23"
+        },
+        {
+          "id": 24,
+          "name": "u24"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n26",
+      "category": "objects.array.bulk",
+      "desc": "26 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8),(9,u9),(10,u10),(11,u11),(12,u12),(13,u13),(14,u14),(15,u15),(16,u16),(17,u17),(18,u18),(19,u19),(20,u20),(21,u21),(22,u22),(23,u23),(24,u24),(25,u25)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        },
+        {
+          "id": 9,
+          "name": "u9"
+        },
+        {
+          "id": 10,
+          "name": "u10"
+        },
+        {
+          "id": 11,
+          "name": "u11"
+        },
+        {
+          "id": 12,
+          "name": "u12"
+        },
+        {
+          "id": 13,
+          "name": "u13"
+        },
+        {
+          "id": 14,
+          "name": "u14"
+        },
+        {
+          "id": 15,
+          "name": "u15"
+        },
+        {
+          "id": 16,
+          "name": "u16"
+        },
+        {
+          "id": 17,
+          "name": "u17"
+        },
+        {
+          "id": 18,
+          "name": "u18"
+        },
+        {
+          "id": 19,
+          "name": "u19"
+        },
+        {
+          "id": 20,
+          "name": "u20"
+        },
+        {
+          "id": 21,
+          "name": "u21"
+        },
+        {
+          "id": 22,
+          "name": "u22"
+        },
+        {
+          "id": 23,
+          "name": "u23"
+        },
+        {
+          "id": 24,
+          "name": "u24"
+        },
+        {
+          "id": 25,
+          "name": "u25"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n27",
+      "category": "objects.array.bulk",
+      "desc": "27 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8),(9,u9),(10,u10),(11,u11),(12,u12),(13,u13),(14,u14),(15,u15),(16,u16),(17,u17),(18,u18),(19,u19),(20,u20),(21,u21),(22,u22),(23,u23),(24,u24),(25,u25),(26,u26)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        },
+        {
+          "id": 9,
+          "name": "u9"
+        },
+        {
+          "id": 10,
+          "name": "u10"
+        },
+        {
+          "id": 11,
+          "name": "u11"
+        },
+        {
+          "id": 12,
+          "name": "u12"
+        },
+        {
+          "id": 13,
+          "name": "u13"
+        },
+        {
+          "id": 14,
+          "name": "u14"
+        },
+        {
+          "id": 15,
+          "name": "u15"
+        },
+        {
+          "id": 16,
+          "name": "u16"
+        },
+        {
+          "id": 17,
+          "name": "u17"
+        },
+        {
+          "id": 18,
+          "name": "u18"
+        },
+        {
+          "id": 19,
+          "name": "u19"
+        },
+        {
+          "id": 20,
+          "name": "u20"
+        },
+        {
+          "id": 21,
+          "name": "u21"
+        },
+        {
+          "id": 22,
+          "name": "u22"
+        },
+        {
+          "id": 23,
+          "name": "u23"
+        },
+        {
+          "id": 24,
+          "name": "u24"
+        },
+        {
+          "id": 25,
+          "name": "u25"
+        },
+        {
+          "id": 26,
+          "name": "u26"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n28",
+      "category": "objects.array.bulk",
+      "desc": "28 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8),(9,u9),(10,u10),(11,u11),(12,u12),(13,u13),(14,u14),(15,u15),(16,u16),(17,u17),(18,u18),(19,u19),(20,u20),(21,u21),(22,u22),(23,u23),(24,u24),(25,u25),(26,u26),(27,u27)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        },
+        {
+          "id": 9,
+          "name": "u9"
+        },
+        {
+          "id": 10,
+          "name": "u10"
+        },
+        {
+          "id": 11,
+          "name": "u11"
+        },
+        {
+          "id": 12,
+          "name": "u12"
+        },
+        {
+          "id": 13,
+          "name": "u13"
+        },
+        {
+          "id": 14,
+          "name": "u14"
+        },
+        {
+          "id": 15,
+          "name": "u15"
+        },
+        {
+          "id": 16,
+          "name": "u16"
+        },
+        {
+          "id": 17,
+          "name": "u17"
+        },
+        {
+          "id": 18,
+          "name": "u18"
+        },
+        {
+          "id": 19,
+          "name": "u19"
+        },
+        {
+          "id": 20,
+          "name": "u20"
+        },
+        {
+          "id": 21,
+          "name": "u21"
+        },
+        {
+          "id": 22,
+          "name": "u22"
+        },
+        {
+          "id": 23,
+          "name": "u23"
+        },
+        {
+          "id": 24,
+          "name": "u24"
+        },
+        {
+          "id": 25,
+          "name": "u25"
+        },
+        {
+          "id": 26,
+          "name": "u26"
+        },
+        {
+          "id": 27,
+          "name": "u27"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n29",
+      "category": "objects.array.bulk",
+      "desc": "29 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8),(9,u9),(10,u10),(11,u11),(12,u12),(13,u13),(14,u14),(15,u15),(16,u16),(17,u17),(18,u18),(19,u19),(20,u20),(21,u21),(22,u22),(23,u23),(24,u24),(25,u25),(26,u26),(27,u27),(28,u28)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        },
+        {
+          "id": 9,
+          "name": "u9"
+        },
+        {
+          "id": 10,
+          "name": "u10"
+        },
+        {
+          "id": 11,
+          "name": "u11"
+        },
+        {
+          "id": 12,
+          "name": "u12"
+        },
+        {
+          "id": 13,
+          "name": "u13"
+        },
+        {
+          "id": 14,
+          "name": "u14"
+        },
+        {
+          "id": 15,
+          "name": "u15"
+        },
+        {
+          "id": 16,
+          "name": "u16"
+        },
+        {
+          "id": 17,
+          "name": "u17"
+        },
+        {
+          "id": 18,
+          "name": "u18"
+        },
+        {
+          "id": 19,
+          "name": "u19"
+        },
+        {
+          "id": 20,
+          "name": "u20"
+        },
+        {
+          "id": 21,
+          "name": "u21"
+        },
+        {
+          "id": 22,
+          "name": "u22"
+        },
+        {
+          "id": 23,
+          "name": "u23"
+        },
+        {
+          "id": 24,
+          "name": "u24"
+        },
+        {
+          "id": 25,
+          "name": "u25"
+        },
+        {
+          "id": 26,
+          "name": "u26"
+        },
+        {
+          "id": 27,
+          "name": "u27"
+        },
+        {
+          "id": 28,
+          "name": "u28"
+        }
+      ]
+    },
+    {
+      "id": "objects.array.bulk.n30",
+      "category": "objects.array.bulk",
+      "desc": "30 rows",
+      "input": "[{id@int,name@str}]:(0,u0),(1,u1),(2,u2),(3,u3),(4,u4),(5,u5),(6,u6),(7,u7),(8,u8),(9,u9),(10,u10),(11,u11),(12,u12),(13,u13),(14,u14),(15,u15),(16,u16),(17,u17),(18,u18),(19,u19),(20,u20),(21,u21),(22,u22),(23,u23),(24,u24),(25,u25),(26,u26),(27,u27),(28,u28),(29,u29)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 0,
+          "name": "u0"
+        },
+        {
+          "id": 1,
+          "name": "u1"
+        },
+        {
+          "id": 2,
+          "name": "u2"
+        },
+        {
+          "id": 3,
+          "name": "u3"
+        },
+        {
+          "id": 4,
+          "name": "u4"
+        },
+        {
+          "id": 5,
+          "name": "u5"
+        },
+        {
+          "id": 6,
+          "name": "u6"
+        },
+        {
+          "id": 7,
+          "name": "u7"
+        },
+        {
+          "id": 8,
+          "name": "u8"
+        },
+        {
+          "id": 9,
+          "name": "u9"
+        },
+        {
+          "id": 10,
+          "name": "u10"
+        },
+        {
+          "id": 11,
+          "name": "u11"
+        },
+        {
+          "id": 12,
+          "name": "u12"
+        },
+        {
+          "id": 13,
+          "name": "u13"
+        },
+        {
+          "id": 14,
+          "name": "u14"
+        },
+        {
+          "id": 15,
+          "name": "u15"
+        },
+        {
+          "id": 16,
+          "name": "u16"
+        },
+        {
+          "id": 17,
+          "name": "u17"
+        },
+        {
+          "id": 18,
+          "name": "u18"
+        },
+        {
+          "id": 19,
+          "name": "u19"
+        },
+        {
+          "id": 20,
+          "name": "u20"
+        },
+        {
+          "id": 21,
+          "name": "u21"
+        },
+        {
+          "id": 22,
+          "name": "u22"
+        },
+        {
+          "id": 23,
+          "name": "u23"
+        },
+        {
+          "id": 24,
+          "name": "u24"
+        },
+        {
+          "id": 25,
+          "name": "u25"
+        },
+        {
+          "id": 26,
+          "name": "u26"
+        },
+        {
+          "id": 27,
+          "name": "u27"
+        },
+        {
+          "id": 28,
+          "name": "u28"
+        },
+        {
+          "id": 29,
+          "name": "u29"
+        }
+      ]
+    },
+    {
+      "id": "arrays.length.int.n1",
+      "category": "arrays.length",
+      "desc": "int array len=1",
+      "input": "[0]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        0
+      ]
+    },
+    {
+      "id": "arrays.length.int.n2",
+      "category": "arrays.length",
+      "desc": "int array len=2",
+      "input": "[0,1]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "arrays.length.int.n3",
+      "category": "arrays.length",
+      "desc": "int array len=3",
+      "input": "[0,1,2]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "id": "arrays.length.int.n5",
+      "category": "arrays.length",
+      "desc": "int array len=5",
+      "input": "[0,1,2,3,4]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "id": "arrays.length.int.n8",
+      "category": "arrays.length",
+      "desc": "int array len=8",
+      "input": "[0,1,2,3,4,5,6,7]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "id": "arrays.length.int.n13",
+      "category": "arrays.length",
+      "desc": "int array len=13",
+      "input": "[0,1,2,3,4,5,6,7,8,9,10,11,12]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ]
+    },
+    {
+      "id": "arrays.length.int.n21",
+      "category": "arrays.length",
+      "desc": "int array len=21",
+      "input": "[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20
+      ]
+    },
+    {
+      "id": "arrays.length.int.n34",
+      "category": "arrays.length",
+      "desc": "int array len=34",
+      "input": "[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33
+      ]
+    },
+    {
+      "id": "arrays.length.int.n55",
+      "category": "arrays.length",
+      "desc": "int array len=55",
+      "input": "[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54
+      ]
+    },
+    {
+      "id": "arrays.length.int.n89",
+      "category": "arrays.length",
+      "desc": "int array len=89",
+      "input": "[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88
+      ]
+    },
+    {
+      "id": "arrays.length.int.n100",
+      "category": "arrays.length",
+      "desc": "int array len=100",
+      "input": "[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99
+      ]
+    },
+    {
+      "id": "arrays.length.str.n1",
+      "category": "arrays.length",
+      "desc": "str array len=1",
+      "input": "[s0]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        "s0"
+      ]
+    },
+    {
+      "id": "arrays.length.str.n2",
+      "category": "arrays.length",
+      "desc": "str array len=2",
+      "input": "[s0,s1]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        "s0",
+        "s1"
+      ]
+    },
+    {
+      "id": "arrays.length.str.n4",
+      "category": "arrays.length",
+      "desc": "str array len=4",
+      "input": "[s0,s1,s2,s3]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        "s0",
+        "s1",
+        "s2",
+        "s3"
+      ]
+    },
+    {
+      "id": "arrays.length.str.n8",
+      "category": "arrays.length",
+      "desc": "str array len=8",
+      "input": "[s0,s1,s2,s3,s4,s5,s6,s7]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        "s0",
+        "s1",
+        "s2",
+        "s3",
+        "s4",
+        "s5",
+        "s6",
+        "s7"
+      ]
+    },
+    {
+      "id": "arrays.length.str.n16",
+      "category": "arrays.length",
+      "desc": "str array len=16",
+      "input": "[s0,s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11,s12,s13,s14,s15]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        "s0",
+        "s1",
+        "s2",
+        "s3",
+        "s4",
+        "s5",
+        "s6",
+        "s7",
+        "s8",
+        "s9",
+        "s10",
+        "s11",
+        "s12",
+        "s13",
+        "s14",
+        "s15"
+      ]
+    },
+    {
+      "id": "arrays.length.str.n32",
+      "category": "arrays.length",
+      "desc": "str array len=32",
+      "input": "[s0,s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11,s12,s13,s14,s15,s16,s17,s18,s19,s20,s21,s22,s23,s24,s25,s26,s27,s28,s29,s30,s31]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        "s0",
+        "s1",
+        "s2",
+        "s3",
+        "s4",
+        "s5",
+        "s6",
+        "s7",
+        "s8",
+        "s9",
+        "s10",
+        "s11",
+        "s12",
+        "s13",
+        "s14",
+        "s15",
+        "s16",
+        "s17",
+        "s18",
+        "s19",
+        "s20",
+        "s21",
+        "s22",
+        "s23",
+        "s24",
+        "s25",
+        "s26",
+        "s27",
+        "s28",
+        "s29",
+        "s30",
+        "s31"
+      ]
+    },
+    {
+      "id": "objects.width.k01",
+      "category": "objects.width",
+      "desc": "1-field object",
+      "input": "{f0@int}:(0)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 0
+      }
+    },
+    {
+      "id": "objects.width.k02",
+      "category": "objects.width",
+      "desc": "2-field object",
+      "input": "{f0@int,f1@int}:(0,7)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 0,
+        "f1": 7
+      }
+    },
+    {
+      "id": "objects.width.k03",
+      "category": "objects.width",
+      "desc": "3-field object",
+      "input": "{f0@int,f1@int,f2@int}:(0,7,14)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 0,
+        "f1": 7,
+        "f2": 14
+      }
+    },
+    {
+      "id": "objects.width.k04",
+      "category": "objects.width",
+      "desc": "4-field object",
+      "input": "{f0@int,f1@int,f2@int,f3@int}:(0,7,14,21)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 0,
+        "f1": 7,
+        "f2": 14,
+        "f3": 21
+      }
+    },
+    {
+      "id": "objects.width.k05",
+      "category": "objects.width",
+      "desc": "5-field object",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(0,7,14,21,28)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 0,
+        "f1": 7,
+        "f2": 14,
+        "f3": 21,
+        "f4": 28
+      }
+    },
+    {
+      "id": "objects.width.k08",
+      "category": "objects.width",
+      "desc": "8-field object",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int,f5@int,f6@int,f7@int}:(0,7,14,21,28,35,42,49)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 0,
+        "f1": 7,
+        "f2": 14,
+        "f3": 21,
+        "f4": 28,
+        "f5": 35,
+        "f6": 42,
+        "f7": 49
+      }
+    },
+    {
+      "id": "objects.width.k12",
+      "category": "objects.width",
+      "desc": "12-field object",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int,f5@int,f6@int,f7@int,f8@int,f9@int,f10@int,f11@int}:(0,7,14,21,28,35,42,49,56,63,70,77)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 0,
+        "f1": 7,
+        "f2": 14,
+        "f3": 21,
+        "f4": 28,
+        "f5": 35,
+        "f6": 42,
+        "f7": 49,
+        "f8": 56,
+        "f9": 63,
+        "f10": 70,
+        "f11": 77
+      }
+    },
+    {
+      "id": "objects.width.k16",
+      "category": "objects.width",
+      "desc": "16-field object",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int,f5@int,f6@int,f7@int,f8@int,f9@int,f10@int,f11@int,f12@int,f13@int,f14@int,f15@int}:(0,7,14,21,28,35,42,49,56,63,70,77,84,91,98,105)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 0,
+        "f1": 7,
+        "f2": 14,
+        "f3": 21,
+        "f4": 28,
+        "f5": 35,
+        "f6": 42,
+        "f7": 49,
+        "f8": 56,
+        "f9": 63,
+        "f10": 70,
+        "f11": 77,
+        "f12": 84,
+        "f13": 91,
+        "f14": 98,
+        "f15": 105
+      }
+    },
+    {
+      "id": "objects.width.k24",
+      "category": "objects.width",
+      "desc": "24-field object",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int,f5@int,f6@int,f7@int,f8@int,f9@int,f10@int,f11@int,f12@int,f13@int,f14@int,f15@int,f16@int,f17@int,f18@int,f19@int,f20@int,f21@int,f22@int,f23@int}:(0,7,14,21,28,35,42,49,56,63,70,77,84,91,98,105,112,119,126,133,140,147,154,161)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 0,
+        "f1": 7,
+        "f2": 14,
+        "f3": 21,
+        "f4": 28,
+        "f5": 35,
+        "f6": 42,
+        "f7": 49,
+        "f8": 56,
+        "f9": 63,
+        "f10": 70,
+        "f11": 77,
+        "f12": 84,
+        "f13": 91,
+        "f14": 98,
+        "f15": 105,
+        "f16": 112,
+        "f17": 119,
+        "f18": 126,
+        "f19": 133,
+        "f20": 140,
+        "f21": 147,
+        "f22": 154,
+        "f23": 161
+      }
+    },
+    {
+      "id": "objects.width.k32",
+      "category": "objects.width",
+      "desc": "32-field object",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int,f5@int,f6@int,f7@int,f8@int,f9@int,f10@int,f11@int,f12@int,f13@int,f14@int,f15@int,f16@int,f17@int,f18@int,f19@int,f20@int,f21@int,f22@int,f23@int,f24@int,f25@int,f26@int,f27@int,f28@int,f29@int,f30@int,f31@int}:(0,7,14,21,28,35,42,49,56,63,70,77,84,91,98,105,112,119,126,133,140,147,154,161,168,175,182,189,196,203,210,217)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 0,
+        "f1": 7,
+        "f2": 14,
+        "f3": 21,
+        "f4": 28,
+        "f5": 35,
+        "f6": 42,
+        "f7": 49,
+        "f8": 56,
+        "f9": 63,
+        "f10": 70,
+        "f11": 77,
+        "f12": 84,
+        "f13": 91,
+        "f14": 98,
+        "f15": 105,
+        "f16": 112,
+        "f17": 119,
+        "f18": 126,
+        "f19": 133,
+        "f20": 140,
+        "f21": 147,
+        "f22": 154,
+        "f23": 161,
+        "f24": 168,
+        "f25": 175,
+        "f26": 182,
+        "f27": 189,
+        "f28": 196,
+        "f29": 203,
+        "f30": 210,
+        "f31": 217
+      }
+    },
+    {
+      "id": "nested.depth.d1",
+      "category": "nested.depth",
+      "desc": "depth=1",
+      "input": "{a@int}:(1)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": 1
+      }
+    },
+    {
+      "id": "nested.depth.d2",
+      "category": "nested.depth",
+      "desc": "depth=2",
+      "input": "{a@{a@int}}:((1))",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": {
+          "a": 1
+        }
+      }
+    },
+    {
+      "id": "nested.depth.d3",
+      "category": "nested.depth",
+      "desc": "depth=3",
+      "input": "{a@{a@{a@int}}}:(((1)))",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": {
+          "a": {
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "nested.depth.d4",
+      "category": "nested.depth",
+      "desc": "depth=4",
+      "input": "{a@{a@{a@{a@int}}}}:((((1))))",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": {
+          "a": {
+            "a": {
+              "a": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "nested.depth.d5",
+      "category": "nested.depth",
+      "desc": "depth=5",
+      "input": "{a@{a@{a@{a@{a@int}}}}}:(((((1)))))",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": {
+          "a": {
+            "a": {
+              "a": {
+                "a": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "nested.depth.d6",
+      "category": "nested.depth",
+      "desc": "depth=6",
+      "input": "{a@{a@{a@{a@{a@{a@int}}}}}}:((((((1))))))",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": {
+          "a": {
+            "a": {
+              "a": {
+                "a": {
+                  "a": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "nested.depth.d7",
+      "category": "nested.depth",
+      "desc": "depth=7",
+      "input": "{a@{a@{a@{a@{a@{a@{a@int}}}}}}}:(((((((1)))))))",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": {
+          "a": {
+            "a": {
+              "a": {
+                "a": {
+                  "a": {
+                    "a": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "nested.depth.d8",
+      "category": "nested.depth",
+      "desc": "depth=8",
+      "input": "{a@{a@{a@{a@{a@{a@{a@{a@int}}}}}}}}:((((((((1))))))))",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": {
+          "a": {
+            "a": {
+              "a": {
+                "a": {
+                  "a": {
+                    "a": {
+                      "a": 1
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "strings.quotedEquiv.unquoted.0",
+      "category": "strings.quotedEquiv",
+      "desc": "unquoted 'hello'",
+      "input": "{x@str}:(hello)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "hello"
+      }
+    },
+    {
+      "id": "strings.quotedEquiv.quoted.0",
+      "category": "strings.quotedEquiv",
+      "desc": "quoted '\"hello\"'",
+      "input": "{x@str}:(\"hello\")",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "hello"
+      }
+    },
+    {
+      "id": "strings.quotedEquiv.unquoted.1",
+      "category": "strings.quotedEquiv",
+      "desc": "unquoted 'hello world'",
+      "input": "{x@str}:(hello world)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "hello world"
+      }
+    },
+    {
+      "id": "strings.quotedEquiv.quoted.1",
+      "category": "strings.quotedEquiv",
+      "desc": "quoted '\"hello world\"'",
+      "input": "{x@str}:(\"hello world\")",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "hello world"
+      }
+    },
+    {
+      "id": "strings.quotedEquiv.unquoted.2",
+      "category": "strings.quotedEquiv",
+      "desc": "unquoted 'abc'",
+      "input": "{x@str}:(abc)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "abc"
+      }
+    },
+    {
+      "id": "strings.quotedEquiv.quoted.2",
+      "category": "strings.quotedEquiv",
+      "desc": "quoted '\"abc\"'",
+      "input": "{x@str}:(\"abc\")",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "abc"
+      }
+    },
+    {
+      "id": "strings.quotedEquiv.unquoted.3",
+      "category": "strings.quotedEquiv",
+      "desc": "unquoted 'with-dash'",
+      "input": "{x@str}:(with-dash)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "with-dash"
+      }
+    },
+    {
+      "id": "strings.quotedEquiv.quoted.3",
+      "category": "strings.quotedEquiv",
+      "desc": "quoted '\"with-dash\"'",
+      "input": "{x@str}:(\"with-dash\")",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": "with-dash"
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m01",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 00001",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,,,,)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 1,
+        "f1": null,
+        "f2": null,
+        "f3": null,
+        "f4": null
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m02",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 00010",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,2,,,)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": null,
+        "f1": 2,
+        "f2": null,
+        "f3": null,
+        "f4": null
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m03",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 00011",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,,,)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 1,
+        "f1": 2,
+        "f2": null,
+        "f3": null,
+        "f4": null
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m04",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 00100",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,,3,,)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": null,
+        "f1": null,
+        "f2": 3,
+        "f3": null,
+        "f4": null
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m05",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 00101",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,,3,,)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 1,
+        "f1": null,
+        "f2": 3,
+        "f3": null,
+        "f4": null
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m06",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 00110",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,2,3,,)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": null,
+        "f1": 2,
+        "f2": 3,
+        "f3": null,
+        "f4": null
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m07",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 00111",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,3,,)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 1,
+        "f1": 2,
+        "f2": 3,
+        "f3": null,
+        "f4": null
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m08",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 01000",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,,,4,)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": null,
+        "f1": null,
+        "f2": null,
+        "f3": 4,
+        "f4": null
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m09",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 01001",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,,,4,)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 1,
+        "f1": null,
+        "f2": null,
+        "f3": 4,
+        "f4": null
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m10",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 01010",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,2,,4,)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": null,
+        "f1": 2,
+        "f2": null,
+        "f3": 4,
+        "f4": null
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m11",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 01011",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,,4,)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 1,
+        "f1": 2,
+        "f2": null,
+        "f3": 4,
+        "f4": null
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m12",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 01100",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,,3,4,)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": null,
+        "f1": null,
+        "f2": 3,
+        "f3": 4,
+        "f4": null
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m13",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 01101",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,,3,4,)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 1,
+        "f1": null,
+        "f2": 3,
+        "f3": 4,
+        "f4": null
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m14",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 01110",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,2,3,4,)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": null,
+        "f1": 2,
+        "f2": 3,
+        "f3": 4,
+        "f4": null
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m15",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 01111",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,3,4,)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 1,
+        "f1": 2,
+        "f2": 3,
+        "f3": 4,
+        "f4": null
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m16",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 10000",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,,,,5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": null,
+        "f1": null,
+        "f2": null,
+        "f3": null,
+        "f4": 5
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m17",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 10001",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,,,,5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 1,
+        "f1": null,
+        "f2": null,
+        "f3": null,
+        "f4": 5
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m18",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 10010",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,2,,,5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": null,
+        "f1": 2,
+        "f2": null,
+        "f3": null,
+        "f4": 5
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m19",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 10011",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,,,5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 1,
+        "f1": 2,
+        "f2": null,
+        "f3": null,
+        "f4": 5
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m20",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 10100",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,,3,,5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": null,
+        "f1": null,
+        "f2": 3,
+        "f3": null,
+        "f4": 5
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m21",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 10101",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,,3,,5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 1,
+        "f1": null,
+        "f2": 3,
+        "f3": null,
+        "f4": 5
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m22",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 10110",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,2,3,,5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": null,
+        "f1": 2,
+        "f2": 3,
+        "f3": null,
+        "f4": 5
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m23",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 10111",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,3,,5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 1,
+        "f1": 2,
+        "f2": 3,
+        "f3": null,
+        "f4": 5
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m24",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 11000",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,,,4,5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": null,
+        "f1": null,
+        "f2": null,
+        "f3": 4,
+        "f4": 5
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m25",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 11001",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,,,4,5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 1,
+        "f1": null,
+        "f2": null,
+        "f3": 4,
+        "f4": 5
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m26",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 11010",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,2,,4,5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": null,
+        "f1": 2,
+        "f2": null,
+        "f3": 4,
+        "f4": 5
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m27",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 11011",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,,4,5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 1,
+        "f1": 2,
+        "f2": null,
+        "f3": 4,
+        "f4": 5
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m28",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 11100",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,,3,4,5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": null,
+        "f1": null,
+        "f2": 3,
+        "f3": 4,
+        "f4": 5
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m29",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 11101",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,,3,4,5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 1,
+        "f1": null,
+        "f2": 3,
+        "f3": 4,
+        "f4": 5
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m30",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 11110",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,2,3,4,5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": null,
+        "f1": 2,
+        "f2": 3,
+        "f3": 4,
+        "f4": 5
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m31",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 11111",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,3,4,5)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": 1,
+        "f1": 2,
+        "f2": 3,
+        "f3": 4,
+        "f4": 5
+      }
+    }
+  ]
+}

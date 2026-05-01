@@ -1,0 +1,1245 @@
+{
+  "version": 1,
+  "spec": "../docs/SPEC.md",
+  "grammar": "GRAMMAR.abnf",
+  "count": 158,
+  "semantics": "round-trip",
+  "rule": "decode(encode(value)) deep-equals value",
+  "cases": [
+    {
+      "id": "encode.string.lookalike.zero",
+      "category": "encode.string.lookalike",
+      "desc": "string '0'",
+      "value": "0",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.posInt",
+      "category": "encode.string.lookalike",
+      "desc": "string '1'",
+      "value": "1",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.smallPos",
+      "category": "encode.string.lookalike",
+      "desc": "string '42'",
+      "value": "42",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.negInt",
+      "category": "encode.string.lookalike",
+      "desc": "string '-7'",
+      "value": "-7",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.negZero",
+      "category": "encode.string.lookalike",
+      "desc": "string '-0'",
+      "value": "-0",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.longInt",
+      "category": "encode.string.lookalike",
+      "desc": "20-digit int str",
+      "value": "12345678901234567890",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.plusSign",
+      "category": "encode.string.lookalike",
+      "desc": "string '+5' (not a valid number, but starts oddly)",
+      "value": "+5",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.leadingZero",
+      "category": "encode.string.lookalike",
+      "desc": "string '007'",
+      "value": "007",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.zeroFloat",
+      "category": "encode.string.lookalike",
+      "desc": "string '0.0'",
+      "value": "0.0",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.negZeroFloat",
+      "category": "encode.string.lookalike",
+      "desc": "string '-0.0'",
+      "value": "-0.0",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.pi",
+      "category": "encode.string.lookalike",
+      "desc": "string '3.14'",
+      "value": "3.14",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.scientific",
+      "category": "encode.string.lookalike",
+      "desc": "string '1e10'",
+      "value": "1e10",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.scientificCap",
+      "category": "encode.string.lookalike",
+      "desc": "string '1E10'",
+      "value": "1E10",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.scientificNeg",
+      "category": "encode.string.lookalike",
+      "desc": "string '1.5e-3'",
+      "value": "1.5e-3",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.noLeadDigit",
+      "category": "encode.string.lookalike",
+      "desc": "string '.5'",
+      "value": ".5",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.trailingDot",
+      "category": "encode.string.lookalike",
+      "desc": "string '5.'",
+      "value": "5.",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.twoDots",
+      "category": "encode.string.lookalike",
+      "desc": "string '1.2.3'",
+      "value": "1.2.3",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.bareTrue",
+      "category": "encode.string.lookalike",
+      "desc": "string 'true'",
+      "value": "true",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.bareFalse",
+      "category": "encode.string.lookalike",
+      "desc": "string 'false'",
+      "value": "false",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.capTrue",
+      "category": "encode.string.lookalike",
+      "desc": "string 'True'",
+      "value": "True",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.upTrue",
+      "category": "encode.string.lookalike",
+      "desc": "string 'TRUE'",
+      "value": "TRUE",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.yes",
+      "category": "encode.string.lookalike",
+      "desc": "string 'yes'",
+      "value": "yes",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.no",
+      "category": "encode.string.lookalike",
+      "desc": "string 'no'",
+      "value": "no",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.bareNull",
+      "category": "encode.string.lookalike",
+      "desc": "string 'null'",
+      "value": "null",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.capNull",
+      "category": "encode.string.lookalike",
+      "desc": "string 'Null'",
+      "value": "Null",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.nilStr",
+      "category": "encode.string.lookalike",
+      "desc": "string 'nil'",
+      "value": "nil",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.none",
+      "category": "encode.string.lookalike",
+      "desc": "string 'None'",
+      "value": "None",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.dashSpaceDigit",
+      "category": "encode.string.lookalike",
+      "desc": "string '- 5'",
+      "value": "- 5",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.dashWord",
+      "category": "encode.string.lookalike",
+      "desc": "string '-foo'",
+      "value": "-foo",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.digitsThenWord",
+      "category": "encode.string.lookalike",
+      "desc": "string '123abc'",
+      "value": "123abc",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.digitsThenSpace",
+      "category": "encode.string.lookalike",
+      "desc": "string '123 abc'",
+      "value": "123 abc",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.whitespace.empty",
+      "category": "encode.string.whitespace",
+      "desc": "empty string",
+      "value": "",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.whitespace.spaceOnly",
+      "category": "encode.string.whitespace",
+      "desc": "single space",
+      "value": " ",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.whitespace.spaces",
+      "category": "encode.string.whitespace",
+      "desc": "two spaces",
+      "value": "  ",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.whitespace.tabOnly",
+      "category": "encode.string.whitespace",
+      "desc": "single tab",
+      "value": "\t",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.whitespace.newlineOnly",
+      "category": "encode.string.whitespace",
+      "desc": "single newline",
+      "value": "\n",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.whitespace.crOnly",
+      "category": "encode.string.whitespace",
+      "desc": "single carriage return",
+      "value": "\r",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.whitespace.leadingSpace",
+      "category": "encode.string.whitespace",
+      "desc": "leading space",
+      "value": " hi",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.whitespace.trailingSpace",
+      "category": "encode.string.whitespace",
+      "desc": "trailing space",
+      "value": "hi ",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.whitespace.bothSpace",
+      "category": "encode.string.whitespace",
+      "desc": "leading and trailing space",
+      "value": " hi ",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.whitespace.doubleBoth",
+      "category": "encode.string.whitespace",
+      "desc": "double leading/trailing",
+      "value": "  hi  ",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.whitespace.internalTab",
+      "category": "encode.string.whitespace",
+      "desc": "internal tab",
+      "value": "a\tb",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.whitespace.internalNL",
+      "category": "encode.string.whitespace",
+      "desc": "internal newline",
+      "value": "a\nb",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.whitespace.internalCR",
+      "category": "encode.string.whitespace",
+      "desc": "internal CR",
+      "value": "a\rb",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.whitespace.internalSpace",
+      "category": "encode.string.whitespace",
+      "desc": "internal space (bare-OK)",
+      "value": "a b",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.comma",
+      "category": "encode.string.structural",
+      "desc": "string ','",
+      "value": ",",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.lparen",
+      "category": "encode.string.structural",
+      "desc": "string '('",
+      "value": "(",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.rparen",
+      "category": "encode.string.structural",
+      "desc": "string ')'",
+      "value": ")",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.lbracket",
+      "category": "encode.string.structural",
+      "desc": "string '['",
+      "value": "[",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.rbracket",
+      "category": "encode.string.structural",
+      "desc": "string ']'",
+      "value": "]",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.lbrace",
+      "category": "encode.string.structural",
+      "desc": "string '{'",
+      "value": "{",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.rbrace",
+      "category": "encode.string.structural",
+      "desc": "string '}'",
+      "value": "}",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.at",
+      "category": "encode.string.structural",
+      "desc": "string '@'",
+      "value": "@",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.colon",
+      "category": "encode.string.structural",
+      "desc": "string ':'",
+      "value": ":",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.lt",
+      "category": "encode.string.structural",
+      "desc": "string '<'",
+      "value": "<",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.gt",
+      "category": "encode.string.structural",
+      "desc": "string '>'",
+      "value": ">",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.dquote",
+      "category": "encode.string.structural",
+      "desc": "string '\"'",
+      "value": "\"",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.backslash",
+      "category": "encode.string.structural",
+      "desc": "string '\\\\'",
+      "value": "\\",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.slashStar",
+      "category": "encode.string.structural",
+      "desc": "string '/*'",
+      "value": "/*",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.starSlash",
+      "category": "encode.string.structural",
+      "desc": "string '*/'",
+      "value": "*/",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.commaInWord",
+      "category": "encode.string.structural",
+      "desc": "string 'a,b'",
+      "value": "a,b",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.parenInWord",
+      "category": "encode.string.structural",
+      "desc": "string 'a(b)c'",
+      "value": "a(b)c",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.brackInWord",
+      "category": "encode.string.structural",
+      "desc": "string 'a[b]c'",
+      "value": "a[b]c",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.braceInWord",
+      "category": "encode.string.structural",
+      "desc": "string 'a{b}c'",
+      "value": "a{b}c",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.atInWord",
+      "category": "encode.string.structural",
+      "desc": "string 'x@int'",
+      "value": "x@int",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.looksLikeBareTuple",
+      "category": "encode.string.structural",
+      "desc": "string '(1,2,3)'",
+      "value": "(1,2,3)",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.looksLikeArray",
+      "category": "encode.string.structural",
+      "desc": "string '[1,2,3]'",
+      "value": "[1,2,3]",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.looksLikeSchemaHead",
+      "category": "encode.string.structural",
+      "desc": "string '{x}'",
+      "value": "{x}",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.looksLikeStruct",
+      "category": "encode.string.structural",
+      "desc": "string '{a}:(1)'",
+      "value": "{a}:(1)",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.looksLikeVecStruct",
+      "category": "encode.string.structural",
+      "desc": "string '[{a}]:(1)'",
+      "value": "[{a}]:(1)",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.looksLikeSchemaWithAt",
+      "category": "encode.string.structural",
+      "desc": "string '{x@int}'",
+      "value": "{x@int}",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.emptyParens",
+      "category": "encode.string.structural",
+      "desc": "string '()'",
+      "value": "()",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.emptyBrackets",
+      "category": "encode.string.structural",
+      "desc": "string '[]'",
+      "value": "[]",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.emptyBraces",
+      "category": "encode.string.structural",
+      "desc": "string '{}'",
+      "value": "{}",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.commentOpen",
+      "category": "encode.string.structural",
+      "desc": "string starts with /*",
+      "value": "/* not a comment",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.structural.blockComment",
+      "category": "encode.string.structural",
+      "desc": "string '/* x */'",
+      "value": "/* x */",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.escape.backslash",
+      "category": "encode.string.escape",
+      "desc": "lone backslash",
+      "value": "\\",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.escape.backslashN",
+      "category": "encode.string.escape",
+      "desc": "literal '\\n' (2 chars)",
+      "value": "\\n",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.escape.backslashTimes2",
+      "category": "encode.string.escape",
+      "desc": "two backslashes",
+      "value": "\\\\",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.escape.quote",
+      "category": "encode.string.escape",
+      "desc": "lone double quote",
+      "value": "\"",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.escape.escSeq",
+      "category": "encode.string.escape",
+      "desc": "string '\\\"'",
+      "value": "\\\"",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.escape.nlInside",
+      "category": "encode.string.escape",
+      "desc": "embedded newline",
+      "value": "line1\nline2",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.escape.crlf",
+      "category": "encode.string.escape",
+      "desc": "embedded CRLF",
+      "value": "line1\r\nline2",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.escape.tabInside",
+      "category": "encode.string.escape",
+      "desc": "embedded tab",
+      "value": "col1\tcol2",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.escape.formFeed",
+      "category": "encode.string.escape",
+      "desc": "embedded form feed",
+      "value": "a\fb",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.escape.verticalTab",
+      "category": "encode.string.escape",
+      "desc": "embedded vertical tab",
+      "value": "a\u000bb",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.escape.backspace",
+      "category": "encode.string.escape",
+      "desc": "embedded backspace",
+      "value": "a\bb",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.escape.nullByte",
+      "category": "encode.string.escape",
+      "desc": "embedded NUL",
+      "value": "a\u0000b",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.escape.ctrl01",
+      "category": "encode.string.escape",
+      "desc": "control char U+0001",
+      "value": "a\u0001b",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.escape.ctrl1F",
+      "category": "encode.string.escape",
+      "desc": "control char U+001F",
+      "value": "a\u001fb",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.escape.del",
+      "category": "encode.string.escape",
+      "desc": "DEL U+007F",
+      "value": "ab",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.escape.plainEscaped",
+      "category": "encode.string.escape",
+      "desc": "string 'a\\,b' literal",
+      "value": "a\\,b",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.unicode.ascii",
+      "category": "encode.string.unicode",
+      "desc": "plain ASCII",
+      "value": "hello world",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.unicode.latin1",
+      "category": "encode.string.unicode",
+      "desc": "Latin-1 char 'café'",
+      "value": "café",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.unicode.cjk",
+      "category": "encode.string.unicode",
+      "desc": "CJK '中文'",
+      "value": "中文",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.unicode.japanese",
+      "category": "encode.string.unicode",
+      "desc": "Japanese '日本語'",
+      "value": "日本語",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.unicode.emoji",
+      "category": "encode.string.unicode",
+      "desc": "single emoji",
+      "value": "🎉",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.unicode.emojiZWJ",
+      "category": "encode.string.unicode",
+      "desc": "ZWJ family emoji",
+      "value": "👨‍👩‍👧",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.unicode.flag",
+      "category": "encode.string.unicode",
+      "desc": "regional indicator flag",
+      "value": "🇺🇸",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.unicode.rtl",
+      "category": "encode.string.unicode",
+      "desc": "RTL Arabic",
+      "value": "مرحبا",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.unicode.combining",
+      "category": "encode.string.unicode",
+      "desc": "combining mark",
+      "value": "é",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.unicode.bom",
+      "category": "encode.string.unicode",
+      "desc": "BOM at start",
+      "value": "﻿hello",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.unicode.u0080",
+      "category": "encode.string.unicode",
+      "desc": "boundary U+0080",
+      "value": "",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.unicode.u07FF",
+      "category": "encode.string.unicode",
+      "desc": "boundary U+07FF",
+      "value": "߿",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.unicode.u0800",
+      "category": "encode.string.unicode",
+      "desc": "boundary U+0800",
+      "value": "ࠀ",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.unicode.uFFFF",
+      "category": "encode.string.unicode",
+      "desc": "boundary U+FFFF",
+      "value": "￿",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.unicode.supplementary",
+      "category": "encode.string.unicode",
+      "desc": "U+1F600 grinning",
+      "value": "😀",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.number.intZero",
+      "category": "encode.number",
+      "desc": "0",
+      "value": 0,
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.number.intOne",
+      "category": "encode.number",
+      "desc": "1",
+      "value": 1,
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.number.intNegOne",
+      "category": "encode.number",
+      "desc": "-1",
+      "value": -1,
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.number.intMaxI32",
+      "category": "encode.number",
+      "desc": "i32 max",
+      "value": 2147483647,
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.number.intMinI32",
+      "category": "encode.number",
+      "desc": "i32 min",
+      "value": -2147483648,
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.number.intMaxI64",
+      "category": "encode.number",
+      "desc": "i64 max",
+      "value": 9223372036854775807,
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.number.intMinI64",
+      "category": "encode.number",
+      "desc": "i64 min",
+      "value": -9223372036854775808,
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.number.floatZero",
+      "category": "encode.number",
+      "desc": "0.0",
+      "value": 0.0,
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.number.floatHalf",
+      "category": "encode.number",
+      "desc": "0.5",
+      "value": 0.5,
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.number.floatPi",
+      "category": "encode.number",
+      "desc": "3.141592653589793",
+      "value": 3.141592653589793,
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.number.floatNeg",
+      "category": "encode.number",
+      "desc": "-2.5",
+      "value": -2.5,
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.number.floatBig",
+      "category": "encode.number",
+      "desc": "1e100",
+      "value": 1e+100,
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.number.floatSmall",
+      "category": "encode.number",
+      "desc": "1e-100",
+      "value": 1e-100,
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.number.floatTiny",
+      "category": "encode.number",
+      "desc": "5e-324 subnormal",
+      "value": 5e-324,
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.bool.true",
+      "category": "encode.bool",
+      "desc": "true",
+      "value": true,
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.bool.false",
+      "category": "encode.bool",
+      "desc": "false",
+      "value": false,
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.null.bare",
+      "category": "encode.null",
+      "desc": "null",
+      "value": null,
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.empty",
+      "category": "encode.array",
+      "desc": "empty array",
+      "value": [],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.singleInt",
+      "category": "encode.array",
+      "desc": "[1]",
+      "value": [
+        1
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.ints",
+      "category": "encode.array",
+      "desc": "[1,2,3]",
+      "value": [
+        1,
+        2,
+        3
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.floats",
+      "category": "encode.array",
+      "desc": "[1.5,2.5]",
+      "value": [
+        1.5,
+        2.5
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.bools",
+      "category": "encode.array",
+      "desc": "[true,false]",
+      "value": [
+        true,
+        false
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.strings",
+      "category": "encode.array",
+      "desc": "['a','b','c']",
+      "value": [
+        "a",
+        "b",
+        "c"
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.singleNull",
+      "category": "encode.array",
+      "desc": "[null]",
+      "value": [
+        null
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.nulls",
+      "category": "encode.array",
+      "desc": "[null,null,null]",
+      "value": [
+        null,
+        null,
+        null
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.mixed",
+      "category": "encode.array",
+      "desc": "[1,'two',true,null]",
+      "value": [
+        1,
+        "two",
+        true,
+        null
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.singleEmpty",
+      "category": "encode.array",
+      "desc": "['']",
+      "value": [
+        ""
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.severalEmpty",
+      "category": "encode.array",
+      "desc": "['','','']",
+      "value": [
+        "",
+        "",
+        ""
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.lookalike.intStrings",
+      "category": "encode.array.lookalike",
+      "desc": "['1','2','3']",
+      "value": [
+        "1",
+        "2",
+        "3"
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.lookalike.floatStrings",
+      "category": "encode.array.lookalike",
+      "desc": "['1.5','2.5']",
+      "value": [
+        "1.5",
+        "2.5"
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.lookalike.boolStrings",
+      "category": "encode.array.lookalike",
+      "desc": "['true','false']",
+      "value": [
+        "true",
+        "false"
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.lookalike.nullStrings",
+      "category": "encode.array.lookalike",
+      "desc": "['null','null']",
+      "value": [
+        "null",
+        "null"
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.lookalike.emptyStrings",
+      "category": "encode.array.lookalike",
+      "desc": "['','','']",
+      "value": [
+        "",
+        "",
+        ""
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.lookalike.commaStrings",
+      "category": "encode.array.lookalike",
+      "desc": "['a,b','c,d']",
+      "value": [
+        "a,b",
+        "c,d"
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.lookalike.parenStrings",
+      "category": "encode.array.lookalike",
+      "desc": "['(1)','(2)']",
+      "value": [
+        "(1)",
+        "(2)"
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.lookalike.bracketStrings",
+      "category": "encode.array.lookalike",
+      "desc": "['[1]','[2]']",
+      "value": [
+        "[1]",
+        "[2]"
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.lookalike.braceStrings",
+      "category": "encode.array.lookalike",
+      "desc": "['{a}','{b}']",
+      "value": [
+        "{a}",
+        "{b}"
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.lookalike.atStrings",
+      "category": "encode.array.lookalike",
+      "desc": "['x@int','y@str']",
+      "value": [
+        "x@int",
+        "y@str"
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.lookalike.backslashStrs",
+      "category": "encode.array.lookalike",
+      "desc": "['a\\\\b','c\\\\d']",
+      "value": [
+        "a\\b",
+        "c\\d"
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.lookalike.quoteStrs",
+      "category": "encode.array.lookalike",
+      "desc": "['a\"b']",
+      "value": [
+        "a\"b"
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.lookalike.nlStrings",
+      "category": "encode.array.lookalike",
+      "desc": "['line1\\nline2']",
+      "value": [
+        "line1\nline2"
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.lookalike.wsStrings",
+      "category": "encode.array.lookalike",
+      "desc": "[' a ',' b ',' ']",
+      "value": [
+        " a ",
+        " b ",
+        " "
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.lookalike.dashStrings",
+      "category": "encode.array.lookalike",
+      "desc": "['-foo','- 5']",
+      "value": [
+        "-foo",
+        "- 5"
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.lookalike.digitWord",
+      "category": "encode.array.lookalike",
+      "desc": "['123abc','7q']",
+      "value": [
+        "123abc",
+        "7q"
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.lookalike.commentLooking",
+      "category": "encode.array.lookalike",
+      "desc": "['/* x */','y']",
+      "value": [
+        "/* x */",
+        "y"
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.lookalike.mixed",
+      "category": "encode.array.lookalike",
+      "desc": "[1,'1',1.5,'1.5',true,'true']",
+      "value": [
+        1,
+        "1",
+        1.5,
+        "1.5",
+        true,
+        "true"
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.nested.depth2",
+      "category": "encode.array.nested",
+      "desc": "[[1,2],[3,4]]",
+      "value": [
+        [
+          1,
+          2
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.nested.depth3",
+      "category": "encode.array.nested",
+      "desc": "[[[1]]]",
+      "value": [
+        [
+          [
+            1
+          ]
+        ]
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.nested.empties",
+      "category": "encode.array.nested",
+      "desc": "[[],[]]",
+      "value": [
+        [],
+        []
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.nested.mixedDepth",
+      "category": "encode.array.nested",
+      "desc": "[1,[2,3],[],[[4]]]",
+      "value": [
+        1,
+        [
+          2,
+          3
+        ],
+        [],
+        [
+          [
+            4
+          ]
+        ]
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.nested.strNested",
+      "category": "encode.array.nested",
+      "desc": "[['a,b'],['c)d']]",
+      "value": [
+        [
+          "a,b"
+        ],
+        [
+          "c)d"
+        ]
+      ],
+      "kind": "round-trip"
+    }
+  ]
+}

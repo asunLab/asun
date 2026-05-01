@@ -10,3 +10,5 @@ tmp*
 tmp
 .*
 !.github
+!conformance/.gitignore
+tmp/
