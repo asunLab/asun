@@ -1,4 +1,4 @@
-# ASUN Format Specification v1.0
+# ASUN Format Specification v1.5
 
 > **ASUN** = Array-Schema Unified Notation  
 > _"The efficiency of arrays, the structure of objects."_
@@ -32,7 +32,7 @@ ASUN is a serialization format designed for large-scale data transmission and LL
 ```
 
 ```asun
-// ASUN: ~35 tokens (65% token saving)
+/* ASUN: ~35 tokens (65% token saving) */
 [{id@int, name@str, active@bool}]:
   (1, Alice, true),
   (2, Bob, false)
@@ -84,6 +84,23 @@ ASUN's design goes beyond just saving tokens; its deep architectural philosophy 
 
 ---
 
+## 1.4 Changes in v1.5
+
+| Area           | v1.4                                    | v1.5                                                        |
+| -------------- | --------------------------------------- | ----------------------------------------------------------- |
+| Commas         | Trailing comma ignored                  | Pure separator: `(a,)` = `a, null`; `(,)` = two nulls       |
+| Null           | Blank only                              | Blank or keyword `null`; `"null"` is a string               |
+| Comments       | Forbidden inside tuples                 | Layout: allowed between any tokens                          |
+| Data `@` / `:` | Should be quoted                        | Ordinary characters: `alice@example.com`, `12:30`           |
+| Keywords/types | Case unspecified                        | Case-sensitive: `TRUE`, `@INT` are not keywords/types       |
+| Scalar hints   | Optional checking                       | Authoritative: mismatches are errors                        |
+| Escapes        | Invalid escape may be kept              | JSON rules + `\/`; invalid escape / lone surrogate is an error |
+| Empty document | Unspecified                             | Error; top-level null is `null`                             |
+| Field names    | Duplicates unspecified                  | Duplicates are errors; quoted names compared after unescape |
+| Numbers        | Range unspecified                       | Overflow / truncation is an error                           |
+
+---
+
 ## 2. Core Syntax Preview
 
 ```asun
@@ -103,10 +120,12 @@ ASUN's design goes beyond just saving tokens; its deep architectural philosophy 
 | Integer         | `42`, `-100`    | Matches `-?[0-9]+`                                         |
 | Float           | `3.14`, `-0.5`  | Matches `-?[0-9]+\.[0-9]+`                                 |
 | Boolean         | `true`, `false` | Must be lowercase literals                                 |
-| Null            | _(blank)_       | Empty content between commas parses as `null`              |
+| Null            | _(blank)_, `null` | An empty slot or the keyword `null`                      |
 | Empty string    | `""`            | Explicit empty string                                      |
-| Unquoted string | `Hello World`   | Leading/trailing spaces auto-trimmed; must escape `,()[]\` |
-| Quoted string   | `" Space "`     | Spaces preserved as-is; supports `\"` escaping             |
+| Unquoted string | `Hello World`   | Leading/trailing spaces auto-trimmed; must escape `,()[]{}"\` |
+| Quoted string   | `" Space "`     | Spaces preserved as-is; JSON escaping rules                |
+
+Keywords (`true`, `false`, `null`) and type names (`int`, `float`, `str`, `bool`) are **case-sensitive**: `TRUE`, `Null` and `@INT` are not keywords or types.
 
 ### 3.1 String Rules
 
@@ -121,7 +140,7 @@ ASUN supports two string forms:
 
 - Preserve leading/trailing spaces: `" hello "`
 - Leading zeros: `"001234"` (e.g., zip codes)
-- Force string type: `"true"`, `"123"`
+- Force string type: `"true"`, `"null"`, `"123"`
 - Empty string: `""`
 
 ### 3.2 Field Binding and Optional Scalar Hints
@@ -147,10 +166,22 @@ ASUN supports two string forms:
 | Float   | `float` | `salary@float` | Floating-point number |
 | Boolean | `bool`  | `active@bool`  | Boolean value         |
 
+Type names are lowercase and case-sensitive; `@INT` or `@Str` is an error.
+
+**Hints are authoritative.** When a field carries a scalar hint, every non-null value must satisfy it, otherwise decoding fails:
+
+| Hint     | Accepts                                   | Rejects                     |
+| -------- | ----------------------------------------- | --------------------------- |
+| `@int`   | integer literals                          | `1.5`, `1e3`, `hello`       |
+| `@float` | integer or float literals (`3` → `3.0`)   | `hello`, `true`             |
+| `@bool`  | `true`, `false`                           | `True`, `1`, `yes`          |
+| `@str`   | anything: unquoted `42` / `true` → string | — (`null` stays null)       |
+
+A typed decoder must also reject a hint that contradicts the target type, e.g. `{age@str}` decoded into an integer field.
 **Example with scalar hints:**
 
 ```asun
-// Full scalar hints
+/* Full scalar hints */
 [{id@int, name@str, salary@float, active@bool}]:
   (1, Alice, 5000.50, true),
   (2, Bob, 4500.00, false),
@@ -175,7 +206,7 @@ ASUN supports two string forms:
 **Partial annotation example:**
 
 ```asun
-// Annotate only key fields (recommended style)
+/* Annotate only key fields (recommended style) */
 [{id@int, name@str, email@str, age@int, bio@str}]:
   (1, Alice, alice@example.com, 30, "Engineer"),
   (2, Bob, bob@example.com, 28, "Designer")
@@ -198,21 +229,21 @@ While `@type` for terminal scalar data (numbers, strings, etc.) is only an optio
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Schema field name | `@` is part of the structural/type marker, such as `name@str` or `users@[{id@int}]`. Here, `@` is **not field-name content**.                                                                                               |
 | Schema field name | If a field name contains spaces, starts with a digit, or contains special characters, it should be written as a quoted field name, such as `"id uuid"`, `"65"`, or `"{}[]@\\\""`.                                           |
-| Data value        | In the data section, `@` is **not a type marker**; it is just an ordinary character. However, to avoid confusion with schema syntax, any value containing `@` should be written as a quoted string, for example `"@Alice"`. |
+| Data value        | In the data section `@` and `:` have **no structural meaning**; they are ordinary characters and need no quotes: `alice@example.com`, `12:30`, `https://a.com/x`.                                                          |
 | Data value        | Unquoted strings automatically trim leading and trailing spaces. To preserve outer whitespace, use quotes, for example `"  Alice  "`.                                                                                       |
-| Data value        | If a value contains delimiters or other potentially ambiguous special characters, prefer a quoted string. Do not apply schema field-name rules directly to data values.                                                     |
+| Data value        | An unquoted string must not contain raw `,` `(` `)` `[` `]` `{` `}` `"` `\`, control characters, or the sequence `/*` (it opens a comment). Escape them or quote the value.                                                  |
 
 Example:
 
 ```text
 {"id uuid"@str,"65"@bool,"{}[]@\\\""@str}:
-("@Alice",true,"value@demo")
+(@Alice,true,value@demo)
 ```
 
 Explanation:
 
 - `"id uuid"`, `"65"`, and `"{}[]@\\\""` are **schema field names**
-- `"@Alice"` and `"value@demo"` are **data values**
+- `@Alice` and `value@demo` are **data values**
 - The same `@` character marks structure in schema, but is plain string content in value
 
 ---
@@ -221,24 +252,26 @@ Explanation:
 
 Escape special characters when they appear inside string values:
 
-| Character | Escape   | Description                        |
-| --------- | -------- | ---------------------------------- |
-| `,`       | `\,`     | Comma                              |
-| `(`       | `\(`     | Left parenthesis                   |
-| `)`       | `\)`     | Right parenthesis                  |
-| `[`       | `\[`     | Left square bracket                |
-| `]`       | `\]`     | Right square bracket               |
-| `"`       | `\"`     | Double quote                       |
-| `\`       | `\\`     | Backslash                          |
-| Newline   | `\n`     | Line feed                          |
-| Tab       | `\t`     | Horizontal tab                     |
-| Unicode   | `\uXXXX` | Unicode character (e.g., `\u4e2d`) |
+| Character      | Escape            | Description                          |
+| -------------- | ----------------- | ------------------------------------ |
+| `,`            | `\,`              | Comma                                |
+| `(` `)`        | `\(` `\)`         | Parentheses                          |
+| `[` `]`        | `\[` `\]`         | Square brackets                      |
+| `{` `}`        | `\{` `\}`         | Curly braces                         |
+| `:` `@`        | `\:` `\@`         | Optional; both are legal raw in data |
+| `"`            | `\"`              | Double quote                         |
+| `\`            | `\\`              | Backslash                            |
+| `/`            | `\/`              | Slash (as in JSON; use `a\/*b` for a literal `/*`) |
+| Control chars  | `\n` `\t` `\r` `\b` `\f` | Line feed, tab, CR, backspace, form feed |
+| Unicode        | `\uXXXX`          | UTF-16 code unit (e.g., `\u4e2d`)    |
 
 **Notes:**
 
-- ASUN uses UTF-8 encoding by default.
-- In unquoted strings, `,()[]` must be escaped.
-- In quoted strings, at minimum `"` and `\` must be escaped; control characters may use `\n`, `\t`, `\r`, `\b`, and `\f`.
+- A document is UTF-8. A single leading BOM (U+FEFF) is skipped by decoders; encoders never write it.
+- Unquoted strings must escape `,()[]{}"\` and must not contain a raw `/*`.
+- Quoted strings follow JSON (RFC 8259): `"` and `\` must be escaped, and so must every control character U+0000–U+001F (a raw newline or tab inside quotes is an error). DEL, C1 controls, U+2028/U+2029 may appear raw.
+- Characters outside the BMP are written raw or as a surrogate pair (`\ud83d\ude00` → 😀). A lone surrogate is an error.
+- Any other escape (e.g. `\x`, `\q`, `\ ` ) is an error.
 
 ## 5. Comments
 
@@ -261,17 +294,23 @@ Multi-line comments:
   (Bob,25)
 ```
 
-**Comment placement restrictions:**  
-To ensure maximum streaming parse performance, comments **may only appear at the beginning or end of a line**, or in gaps between schema definitions. **Comments inside data tuples `(...)` are strictly forbidden.**
+**Comment placement:**  
+A comment is layout, exactly like whitespace: it may appear between **any** two tokens — in the schema, around `:` and `,`, and inside data tuples and arrays. It may not appear inside a literal (quoted string, plain string, number, keyword). Comments do not nest.
 
 ```text
 ✅ Correct:
-/* username */ {name@str, age@int}:
-  (Alice, 30) /* age */
+/* username */ {name@str, age@int /* years */}:
+  (Alice /* name */, /* age */ 30)
 
-❌ Incorrect (comments inside data are forbidden):
-{name@str, age@int}:(Alice, /* age */ 30)
+[{id@int, tags@[str]}]:
+  (1, [a, /* deprecated: b, */ c]),
+  (2, [])  /* last row */
+
+❌ Incorrect:
+{name@str}:(Ali/* x */ce)       /* a comment cannot split a plain string */
 ```
+
+Outside a quoted string, `/*` **always** opens a comment, so a plain string ends where `/*` begins: `(x /* note */)` is the string `x`. Write a literal `/*` as `a\/*b` or `"a/*b"`. A lone `/` or `*` is ordinary content (`a/b*c`, `https://x`).
 
 ## 6. Syntax Rules
 
@@ -347,11 +386,15 @@ To ensure maximum streaming parse performance, comments **may only appear at the
 []
 ```
 
+`[ ]` is also empty. An array holding a single null must use the keyword: `[null]`.
+
 ### 6.10 Empty Object
 
 ```text
-()
+{}:()
 ```
+
+A zero-field schema matches `()`. Elsewhere `()` is a tuple with **one empty slot**, i.e. one null.
 
 ### 6.11 Mixed-Type Array
 
@@ -442,9 +485,9 @@ To ensure maximum streaming parse performance, comments **may only appear at the
 | Simple array field     | `field@[type]`                 | `[v1,v2,v3]`        |
 | Array-of-objects field | `field@[{f1@type,f2@type}]`    | `[(v1,v2),(v3,v4)]` |
 | Nested object field    | `field@{f1@type,f2@type}`      | `(v1,(v3,v4))`      |
-| Null value             | —                              | _(blank)_           |
+| Null value             | —                              | _(blank)_ or `null` |
 | Empty array            | —                              | `[]`                |
-| Empty object           | —                              | `()`                |
+| Empty object           | `{}:`                          | `()`                |
 
 ## 8. Detailed Rules
 
@@ -452,11 +495,15 @@ To ensure maximum streaming parse performance, comments **may only appear at the
 
 When parsing a value, the following order is attempted:
 
-1. **Blank** → `null`
+1. **Blank** or `null` → `null`
 2. **Boolean** → `true` or `false` (lowercase only)
 3. **Integer** → matches `-?[0-9]+`
-4. **Float** → matches `-?[0-9]+\.[0-9]+`
+4. **Float** → matches `-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?` with a fraction or an exponent
 5. **String** → everything else
+
+Quoted values are always strings. This order applies to values without a hint; a scalar hint overrides it (see §3.2).
+
+A typed decoder that reads an unquoted, non-null value into a **string target** takes the token text as is, exactly as if the field had `@str`: `90210` → `"90210"`, `true` → `"true"`. A blank slot or `null` is still null, so it is an error for a non-optional string.
 
 Examples:
 
@@ -468,6 +515,9 @@ Examples:
 | `3.14`    | float `3.14`      |
 | `hello`   | string `"hello"`  |
 | `123abc`  | string `"123abc"` |
+| `null`    | `null`            |
+| `"null"`  | string `"null"`   |
+| `TRUE`    | string `"TRUE"`   |
 
 ### 8.2 Null vs Empty String
 
@@ -475,6 +525,7 @@ Examples:
 | ------------------------------- | ------------------------- |
 | `{name@str,age@int}:(Alice,)`   | `age = null`              |
 | `{name@str,age@int}:(Alice,"")` | `age = ""` (empty string) |
+| `{name@str,age@int}:(Alice,null)` | `age = null`            |
 
 Example:
 
@@ -497,23 +548,26 @@ There are **three top-level forms**, determined by the first character(s):
 **Key rules:**
 
 - After `{schema}:` there can be **exactly one** `(...)` data tuple (single object).
-- After `[{schema}]:` there can be **multiple** `(...)` data tuples, comma-separated (array of objects).
+- After `[{schema}]:` there can be **zero or more** `(...)` data tuples, comma-separated (array of objects). Zero tuples is an empty array. Rows are never null and the row list has no trailing comma.
 - The parser determines format from the first character — `{` vs `[` — no need for separate `_vec`-style APIs.
-- A bare `()` at the top level is forbidden; `()` may only appear after a schema.
+- A bare tuple `(...)` at the top level is forbidden; tuples may only appear after a schema or inside data.
+- An empty document (only whitespace/comments) is **invalid**, as in JSON. A top-level null is written `null`.
 
 ### 8.4 Field Name Rules
 
-- **Allowed characters**: `a-z`, `A-Z`, `0-9`, `_`
-- **May start with a digit**: `1st`, `2name` are valid
-- **Forbidden characters**: `,`, `{`, `}`, `[`, `]`, `(`, `)`, `:`
+- **Bare names**: `a-z`, `A-Z`, `0-9`, `_`; may start with a digit (`1st`, `2name`)
+- **Anything else** (spaces, punctuation, non-ASCII) must use a quoted name: `"id uuid"`, `"中文"`, `"a,b"`
+- A quoted name is compared after unescaping, as in JSON: `{"a"}` and `{a}` name the same field. No Unicode normalization is applied.
+- **Duplicate names** in one schema (after unescaping) are an error.
 
 ### 8.5 Whitespace Handling
 
-| Location    | Rule                                  |
-| ----------- | ------------------------------------- |
-| In schema   | All whitespace ignored                |
-| In data     | Whitespace preserved (part of string) |
-| After comma | Leading whitespace ignored            |
+| Location             | Rule                                                        |
+| -------------------- | ----------------------------------------------------------- |
+| Between tokens       | Whitespace, newlines and comments are ignored               |
+| Inside a bare name   | Not allowed: `{a b}` is an error, write `{"a b"}`           |
+| Inside a plain value | Internal spaces/tabs preserved; leading/trailing trimmed    |
+| Inside a quoted value | Preserved verbatim                                         |
 
 Example:
 
@@ -567,8 +621,12 @@ The minus sign `-` must immediately precede the digit — no space allowed:
 | `{a@int,b@int,c@int}` | `(1,2)`     | ✗ Error: missing field   |
 | `{a@int,b@int,c@int}` | `(1,2,3,4)` | ✗ Error: too many fields |
 | `{a@int,b@int,c@int}` | `(1,,3)`    | ✓ Correct: `b = null`    |
+| `{a@int,b@int,c@int}` | `(1,2,)`    | ✓ Correct: `c = null`    |
+| `{a@int,b@int}`       | `(1,2,)`    | ✗ Error: 3 slots         |
+| `{a@int,b@int}`       | `(,)`       | ✓ Correct: both null     |
+| `{a@int,b@int}`       | `()`        | ✗ Error: 1 slot          |
 
-**Rationale**: ASUN is a position-sensitive format. A field-count mismatch causes data misalignment and must be reported as a parse error.
+**Rationale**: ASUN is a position-sensitive format. A field-count mismatch causes data misalignment and must be reported as a parse error. Decoders must never pad, truncate or silently skip slots.
 
 ### 8.9 Common Error Examples
 
@@ -578,18 +636,25 @@ The minus sign `-` must immediately precede the digit — no space allowed:
 | `{a@int,b@int}:(1)`         | Missing field (no null)    | `{a@int,b@int}:(1,)`                        |
 | `{a@int,b@int,c@int}:(1,2)` | Insufficient data          | `{a@int,b@int,c@int}:(1,2,)`                |
 | `(1,2,3)`                   | Bare tuple needs schema    | `{a@int,b@int,c@int}:(1,2,3)`               |
-| `{a@int,b@int}`             | Schema with no data        | `{a@int,b@int}:()` or `{a@int,b@int}:(1,2)` |
+| `{a@int,b@int}`             | Schema with no data        | `{a@int,b@int}:(,)` or `{a@int,b@int}:(1,2)` |
+| `{a@int,b@int}:(1,2,)`      | Trailing comma = 3rd slot  | `{a@int,b@int}:(1,2)`                       |
 | `{a@int,b@int}[1,2]`        | Missing colon after schema | `{a@int,b@int}:(1,2)`                       |
 
-### 8.10 Trailing Commas
+### 8.10 Commas Are Separators
 
-To facilitate version control diffs and LLM generation, ASUN **permits** trailing commas in arrays and object data. Parsers must silently ignore them — they must **not** be interpreted as `null`.
+A comma is a **pure separator**: `n` commas always delimit `n + 1` slots, and an empty slot is `null`. There is no trailing-comma rule — a comma at the end opens one more (null) slot.
 
-| Input           | Parsed result         | Note                                           |
-| --------------- | --------------------- | ---------------------------------------------- |
-| `[1, 2, 3,]`    | `[1, 2, 3]`           | Trailing comma allowed                         |
-| `(Alice, 30,)`  | `("Alice", 30)`       | Trailing comma allowed (schema has 2 fields)   |
-| `(Alice, 30,,)` | `("Alice", 30, null)` | Consecutive commas → null; final comma ignored |
+| Input           | Slots | Parsed result            |
+| --------------- | ----- | ------------------------ |
+| `()`            | 1     | `(null)`                 |
+| `(,)`           | 2     | `(null, null)`           |
+| `(Alice, 30,)`  | 3     | `("Alice", 30, null)`    |
+| `[]` / `[ ]`    | 0     | `[]`                     |
+| `[null]`        | 1     | `[null]`                 |
+| `[,]`           | 2     | `[null, null]`           |
+| `[1, 2, 3,]`    | 4     | `[1, 2, 3, null]`        |
+
+Schema field lists and row lists have no empty slots: `{a,b,}` and `[{a}]:(1),` are errors.
 
 ---
 
@@ -597,10 +662,12 @@ To facilitate version control diffs and LLM generation, ASUN **permits** trailin
 
 ### 9.1 Parser Implementation Highlights
 
-1. **Non-greedy matching**: When parsing `plain_str`, delimiters `,()[]` take priority over string content.
+1. **Non-greedy matching**: When parsing `plain_str`, delimiters `,()[]{}"` and the sequence `/*` end the value.
 2. **Lookahead**: When encountering a potential delimiter, first check whether it is preceded by an escape character.
-3. **Comment stripping**: Recommended to remove all `/* */` comments during the lexing phase.
+3. **Comments are layout**: Skip `/* */` wherever whitespace is skipped. Never strip them from inside quoted strings.
 4. **Streaming parse**: After parsing the schema, build a field index table; fill data fields by position.
+5. **Progress guarantee**: Every skip/recovery loop must consume input or fail; a malformed byte must produce an error, never a hang.
+6. **Nesting limit**: A decoder may cap structural nesting (schemas, bindings, tuples, arrays) to bound stack use; the reference implementation uses 128. The cap applies equally to values that are skipped (unknown fields), so the same document is accepted or rejected regardless of the target type.
 
 ### 9.2 Error Handling
 
@@ -610,151 +677,174 @@ To facilitate version control diffs and LLM generation, ASUN **permits** trailin
 | Unclosed quote       | `("hello)`              | Throw error                    |
 | Unclosed bracket     | `{a@int,b@int}:(1,2`    | Throw error                    |
 | Unclosed comment     | `/* comment`            | Throw error                    |
-| Invalid escape       | `\x`                    | Throw error or keep verbatim   |
+| Invalid escape       | `\x`                    | Throw error                    |
+| Hint mismatch        | `{a@int}:(1.5)`         | Throw error                    |
+| Duplicate field      | `{a,a}:(1,2)`           | Throw error                    |
+| Number out of range  | `1e309`, `{a@int}` into `u8` with `300` | Throw error    |
+| Empty document       | _(empty)_               | Throw error                    |
 
 ---
 
 ## 10. Complete Grammar BNF (Simplified)
 
+The authoritative grammar is [`conformance/GRAMMAR.abnf`](../conformance/GRAMMAR.abnf) (RFC 5234 + RFC 7405, loadable by standard ABNF tools); this is a readable summary.
+
 ```bnf
-asun        ::= object_expr | array_expr | array | value
+asun        ::= BOM? ows (object_expr | array_expr | array | scalar) ows
 
-object_expr ::= schema ":" object
-array_expr  ::= "[" schema "]" ":" object_list
-schema      ::= "{" field_list "}"
-field_list  ::= field ("," field)*
-field       ::= identifier type_hint? | identifier "@" schema
-type_hint   ::= "@" type_def
-type_def    ::= base_type | array_type
-base_type   ::= "int" | "float" | "str" | "bool"
-array_type  ::= "[" type_def "]" | "[" schema "]"
-identifier  ::= [a-zA-Z0-9_]+
+object_expr ::= schema ":" tuple
+array_expr  ::= "[" schema "]" ":" (tuple ("," tuple)*)?
+schema      ::= "{" (field ("," field)*)? "}"
+field       ::= name ("@" binding)?
+binding     ::= "int" | "float" | "str" | "bool" | schema | "[" binding? "]"
+name        ::= [a-zA-Z0-9_]+ | quoted_str
 
-object_list ::= object ("," object)*
-object      ::= "(" value_list ")"
-value_list  ::= element? ("," element?)*
-element     ::= value | array
+tuple       ::= "(" slot ("," slot)* ")"
+array       ::= "[" element? "]" | "[" slot ("," slot)+ "]"
+slot        ::= element?                       /* empty slot = null */
+element     ::= scalar | tuple | array
 
-array       ::= "[" array_items? "]"
-array_items ::= array_item ("," array_item)*
-array_item  ::= value | object | array
+scalar      ::= "true" | "false" | "null" | number | quoted_str | plain_str
+number      ::= "-"? [0-9]+ ("." [0-9]+)? ([eE] [+-]? [0-9]+)?
+quoted_str  ::= '"' (char_no_ctrl_quote_bs | escape)* '"'
+plain_str   ::= word ([ \t]+ word)*            /* no raw ,()[]{}"\ ctrl, no "/*" */
+escape      ::= "\" ( '"' | "\" | "/" | "b" | "f" | "n" | "r" | "t"
+                     | "," | "(" | ")" | "[" | "]" | "{" | "}" | ":" | "@"
+                     | "u" hex hex hex hex )
 
-value       ::= boolean | number | quoted_str | plain_str | null
-boolean     ::= "true" | "false"
-number      ::= integer | float
-integer     ::= "-"?[0-9]+
-float       ::= "-"?[0-9]+"."[0-9]+
-
-quoted_str  ::= '"' (escaped_char | [^"\\])* '"'
-plain_str   ::= (plain_char | escaped_char)+
-plain_char  ::= [^,()[\]<>:"\\]
-escaped_char::= "\\" | "\," | "\(" | "\)" | "\[" | "\]" | "\<" | "\>" | "\:" | "\"" | "\n" | "\t" | "\\u" [0-9a-fA-F]{4}
-
-null        ::= (empty)
-comment     ::= "/*" (any_char)* "*/"
+ows         ::= ( " " | "\t" | "\r" | "\n" | comment )*
+comment     ::= "/*" ... "*/"                  /* no nesting */
 ```
 
 **Notes:**
 
-- Comments `/* ... */` may only appear at the beginning or end of a line; ignored during parsing.
-- `plain_str` values are automatically trimmed of leading/trailing whitespace after parsing.
-- `quoted_str` values are preserved verbatim (including spaces).
-- Trailing commas are permitted and silently ignored.
+- All literals are case-sensitive.
+- Layout (`ows`, including comments) is allowed between any two tokens.
+- `plain_str` values never include surrounding whitespace, so they are trimmed by construction.
+- Semantic rules (slot alignment, hints, numeric range, surrogates, duplicate names) are listed at the end of `GRAMMAR.abnf`.
 
 ---
 
 ## 11. ASUN Binary Format Specification
 
-In addition to the human-readable text format, ASUN defines a compact binary wire format for high-performance serialization/deserialization.
+In addition to the human-readable text format, ASUN defines a compact binary wire format for high-performance serialization/deserialization. This section describes the format as implemented by `asun-rs`, the reference implementation.
 
 ### 11.1 Design Principles
 
-- **Zero-copy decoding**: String fields return slice references directly into the input buffer — no new memory allocated.
-- **Fixed-width scalars**: All numeric types use fixed-size little-endian encoding; no variable-length decoding required.
-- **No schema header**: The binary format contains no field names — it relies entirely on compile-time type information for positional decoding.
-- **Length-prefixed**: Variable-length data (strings, arrays) is preceded by a `u32` little-endian length.
+- **No schema header**: The binary format contains no field names or type tags — it relies entirely on the target type for positional decoding. Both sides must agree on the type definition.
+- **Variable-length integers**: Integers use LEB128 varints (signed integers are zigzag-encoded first), so small values take one byte.
+- **Length-prefixed**: Strings, byte strings and sequences are preceded by a varint length or element count.
+- **Zero-copy decoding**: String fields can borrow directly from the input buffer — no new memory allocated.
 
-### 11.2 Type Encoding Rules
+### 11.2 Varints
 
-| Type          | Bytes            | Encoding                                                     |
-| ------------- | ---------------- | ------------------------------------------------------------ |
-| `bool`        | 1                | `0x00` = false, `0x01` = true                                |
-| `i8` / `u8`   | 1                | Raw byte                                                     |
-| `i16` / `u16` | 2                | Little-endian                                                |
-| `i32` / `u32` | 4                | Little-endian                                                |
-| `i64` / `u64` | 8                | Little-endian                                                |
-| `f32`         | 4                | IEEE 754 bitcast, little-endian                              |
-| `f64`         | 8                | IEEE 754 bitcast, little-endian                              |
-| `str`         | 4 + N            | `u32 LE` byte length + N bytes UTF-8                         |
-| `Option<T>`   | 1 or 1+sizeof(T) | `u8` tag (`0x00` = null, `0x01` = some) + payload            |
-| `Array<T>`    | 4 + N×sizeof(T)  | `u32 LE` element count + N encoded elements                  |
-| `struct`      | Σ fields         | Fields encoded in declaration order; no padding or alignment |
+`uvarint` is unsigned LEB128: 7 payload bits per byte, least significant group first; the high bit (`0x80`) is set on every byte except the last. A `u64` takes at most 10 bytes.
 
-### 11.3 Single Struct vs Struct Array
+`ivarint` maps a signed value to unsigned with zigzag, `(v << 1) ^ (v >> 63)` (`0 → 0`, `-1 → 1`, `1 → 2`, `-2 → 3`, …), then writes it as a `uvarint`.
+
+Each value has exactly one valid encoding. A decoder rejects:
+
+- padded encodings: a multi-byte varint whose last byte is `0x00` (e.g. `80 00` for 0);
+- a tenth byte other than `0x01`, and any eleventh byte (more than 64 bits);
+- a value too large for the target type (e.g. 65536 for `u16`, or a code point above U+10FFFF for `char`).
+
+### 11.3 Type Encoding Rules
+
+| Type                    | Encoding                                                                |
+| ----------------------- | ----------------------------------------------------------------------- |
+| `bool`                  | 1 byte: `0x00` = false, `0x01` = true; other values are an error        |
+| `i8` / `u8`             | 1 raw byte                                                              |
+| `i16` / `i32` / `i64`   | `ivarint`                                                               |
+| `u16` / `u32` / `u64`   | `uvarint`                                                               |
+| `f32` / `f64`           | IEEE 754 bits, 4 / 8 bytes little-endian (NaN payloads and `-0.0` kept) |
+| `char`                  | `uvarint` of the Unicode scalar value (surrogates are an error)         |
+| `str`                   | `uvarint` byte length + UTF-8 bytes (invalid UTF-8 is an error)         |
+| `Option<T>`             | tag byte `0x00` = none, or `0x01` + encoding of `T`; other tags are an error |
+| `Vec<T>` / array        | `uvarint` element count + each element encoded in order                 |
+| tuple                   | elements encoded in order, no prefix                                    |
+| `struct`                | fields encoded in declaration order, no prefix, padding or alignment    |
+| `enum`                  | `uvarint` variant index (declaration order, from 0) + the variant's fields in order |
+| `()` / unit struct      | nothing (0 bytes)                                                       |
+
+Fields skipped with `#[asun(skip)]`-style attributes are omitted on both sides, so encoder and decoder stay aligned.
+
+### 11.4 Single Struct vs Struct Array
 
 **Single struct**: Fields encoded in declaration order directly, no wrapper.
 
 ```text
 struct User { id: i64, name: string, active: bool }
 
-Encoding: [i64 LE][u32 LE + UTF-8 bytes][u8]
-           8 bytes  4 + N bytes            1 byte
+Encoding: [ivarint][uvarint len + UTF-8 bytes][u8]
 ```
 
-**Struct array**: Prefixed with `u32 LE` element count, followed by each element's encoding.
+**Struct array**: Prefixed with a `uvarint` element count, followed by each element's encoding.
 
 ```text
 Array<User>
 
-Encoding: [u32 LE count][User₁][User₂]...[Userₙ]
-           4 bytes        elements in sequence
+Encoding: [uvarint count][User₁][User₂]...[Userₙ]
 ```
 
 > **Important**: Single structs and struct arrays use different binary layouts. A single struct has no count prefix; a struct array does. The decoder must know whether the target type is a single instance or an array.
 
-### 11.4 Encoding Examples
-
-```text
-struct Point { x: f32, y: f32 }
-Value: { x: 1.0, y: 2.0 }
-
-Binary (8 bytes):
-  00 00 80 3F   ← f32 LE: 1.0
-  00 00 00 40   ← f32 LE: 2.0
-```
+### 11.5 Encoding Examples
 
 ```text
 struct User { id: i64, name: string, active: bool }
 Value: { id: 42, name: "Alice", active: true }
 
-Binary (18 bytes):
-  2A 00 00 00 00 00 00 00   ← i64 LE: 42
-  05 00 00 00               ← u32 LE: string length 5
+Binary (8 bytes):
+  54                        ← ivarint: 42 (zigzag 84)
+  05                        ← uvarint: string length 5
   41 6C 69 63 65            ← UTF-8: "Alice"
   01                        ← bool: true
 ```
 
 ```text
-Array<Point> = [{ x: 1.0, y: 2.0 }, { x: 3.0, y: 4.0 }]
+Array<Point> = [{ x: 1.0, y: 2.0 }, { x: 3.0, y: 4.0 }]   (x, y: f32)
 
-Binary (20 bytes):
-  02 00 00 00               ← u32 LE: count = 2
+Binary (17 bytes):
+  02                        ← uvarint: count = 2
   00 00 80 3F 00 00 00 40   ← Point₁: (1.0, 2.0)
   00 00 40 40 00 00 80 40   ← Point₂: (3.0, 4.0)
 ```
 
-### 11.5 Correspondence with Text Format
+```text
+Integers and options:
+  i64 300          → D8 04            (zigzag 600)
+  i64 -1           → 01
+  u64 300          → AC 02
+  Option<str> "hi" → 01 02 68 69
+  Option<str> none → 00
+
+enum Shape { Unit, New(i32) }
+  Shape::Unit      → 00
+  Shape::New(-5)   → 01 09
+```
+
+### 11.6 Correspondence with Text Format
 
 | Text format                      | Binary format                       |
 | -------------------------------- | ----------------------------------- |
 | `{schema}:(data)` single object  | Fields encoded in order, no wrapper |
-| `[{schema}]:(d1),(d2),...` array | `u32 LE` count + element sequence   |
-| `[v1,v2,v3]` plain array         | `u32 LE` count + element sequence   |
+| `[{schema}]:(d1),(d2),...` array | `uvarint` count + element sequence  |
+| `[v1,v2,v3]` plain array         | `uvarint` count + element sequence  |
 | `true` / `false`                 | Single byte `0x01` / `0x00`         |
 | Null / Option null               | Single byte `0x00`                  |
 | Option some(v)                   | `0x01` + value encoding             |
 
-### 11.6 Performance Characteristics
+### 11.7 Decoding Untrusted Input
+
+A conforming decoder must fail cleanly — never crash, hang or exhaust memory — on malformed input:
+
+- Truncated input, and lengths or counts larger than the remaining input, are errors.
+- Sequence counts are capped (`asun-rs`: 16 Mi elements by default, configurable). The same budget bounds the total number of zero-sized elements in one input, since they consume no bytes.
+- Memory reserved up front for a sequence is bounded (`asun-rs`: 1 MiB); a large claimed count must not allocate before its elements arrive.
+- Sequence nesting is limited to 128 levels, so recursive types cannot overflow the stack.
+- Trailing bytes after a value may be rejected (`asun-rs` `decode_binary_exact`) or left for the caller (`decode_binary`).
+
+### 11.8 Performance Characteristics
 
 | Characteristic   | Text Format                        | Binary Format                           |
 | ---------------- | ---------------------------------- | --------------------------------------- |
@@ -765,9 +855,9 @@ Binary (20 bytes):
 | Zero-copy decode | ✗                                  | ✓ (strings reference input buffer)      |
 | Use cases        | API communication, LLM, debug      | RPC, IPC, high-frequency data pipelines |
 
-### 11.7 Byte Order Conventions
+### 11.9 Byte Order and Layout
 
-- All multi-byte integers and floats use **little-endian** byte order.
+- Fixed-width floats use **little-endian** byte order; integers are varints and have no byte order.
 - String content uses **UTF-8** encoding.
 - No alignment padding.
 - No metadata or magic numbers.
@@ -908,18 +998,18 @@ Validate format (field count, alignment, types)
 
 ### A.2 Type Assertion Examples
 
-> **Note**: Strict scalar-hint assertions are an optional spec-level extension. In current implementations, parsers may skip these scalar hints and leave type validation to the target struct's type system at the serde layer. The examples below illustrate what a parser with strict checking enabled might do:
+> **Note**: Scalar hints are authoritative (§3.2): a value that does not satisfy its hint is a decode error.
 
 ```asun
-// Correctly typed data
+/* Correctly typed data */
 [{id@int, score@float, pass@bool, name@str}]:
   (1, 95.5, true, Alice),      ✅ All types match
   (2, 87.0, false, Bob),       ✅ All types match
   (3, 76, true, "Carol Sue")   ✅ 76 auto-promoted to 76.0
 
-// Type mismatches (parser may optionally enforce strict checking)
-  ("1", 95.5, true, Alice),    ⚠️ id should be int, not string
-  (1, "95.5", true, Alice)     ⚠️ score should be float, not string
+/* Type mismatches — decoding fails */
+  ("1", 95.5, true, Alice),    ❌ id must be int, not string
+  (1, "95.5", true, Alice)     ❌ score must be float, not string
 ```
 
 ---
@@ -946,7 +1036,7 @@ id,name,role,active
 ```
 
 ```asun
-// ASUN (35 tokens, with type information)
+/* ASUN (35 tokens, with type information) */
 [{id@int, name@str, role@str, active@bool}]:
   (1, Alice, engineer, true),
   (2, Bob, designer, false)
@@ -964,7 +1054,7 @@ id,name,role,active
 ```
 
 ```asun
-// ASUN — more compact
+/* ASUN — more compact */
 {employees@[{id@int, name@str, dept@{name@str, budget@int}}]}:
   ([(1, Alice, (Eng, 500000))])
 ```
@@ -1057,7 +1147,7 @@ Compared to JSON's indented readability, token savings and LLM friendliness take
 
 ---
 
-**Document version**: v1.4.0  
-**Last updated**: 2026-02-20  
+**Document version**: v1.5.0  
+**Last updated**: 2026-10-06  
 **License**: MIT  
 **GitHub**: https://github.com/asunLab/asun

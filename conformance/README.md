@@ -9,11 +9,12 @@ all language implementations (`asun-rs`, `asun-c`, `asun-cpp`, `asun-go`,
 
 | Path                  | Purpose                                                          |
 | --------------------- | ---------------------------------------------------------------- |
-| `GRAMMAR.abnf`        | Formal grammar (RFC 5234 ABNF). Authoritative.                   |
-| `cases.json`          | Generated input/output test vectors (264 cases as of v1).        |
+| `GRAMMAR.abnf`        | Formal grammar (RFC 5234 + RFC 7405 ABNF, v1.5). Authoritative.  |
+| `cases.json`          | Generated input/output test vectors (347 cases, version 2).      |
 | `encode-cases.json`   | Encode round-trip vectors: `decode(encode(value)) == value`.      |
 | `generate.py`         | Generator for `cases.json`. Re-run after editing.                |
-| `runners/rust/`       | Reference runner against `asun-rs`.                              |
+| `runners/abnf/`       | Checks every case in `cases.json` against `GRAMMAR.abnf`.        |
+| `runners/rust/`       | Reference runner against `asun-rs` (see status below).           |
 | `runners/<lang>/`     | (To be added) Per-language runner that loads `cases.json`.       |
 
 ## Test-case schema
@@ -43,7 +44,12 @@ A conforming runner MUST:
    comparison: integers compare exactly; floats compare with relative epsilon).
 4. **kind == "error"**: decoder must return / throw / raise an error. The
    specific error category (`errorHint`) is advisory only — runners SHOULD NOT
-   match on it.
+   match on it. Its prefix tells where the error comes from:
+   - `parse.*` other than `parse.field_count` — the input is not derivable
+     from `GRAMMAR.abnf`;
+   - `parse.field_count`, `semantic.S<n>.*`, `type.*` — the input parses but
+     violates a semantic rule (S1–S10 at the end of `GRAMMAR.abnf`) or the
+     target type.
 5. Exit non-zero when any case is mishandled.
 
 ## Encode runner contract
@@ -82,7 +88,28 @@ Cases are flagged with `schemaDriven`:
   typed harness for a given case can mark it "skipped (needs typed harness)";
   this is not a conformance failure of the format.
 
+## Grammar runner
+
+`runners/abnf/check.py` loads `GRAMMAR.abnf` with the Python
+[`abnf`](https://pypi.org/project/abnf/) package and checks that every `ok`
+case is derivable and every `error` case is either rejected by the grammar or
+carries a semantic / type `errorHint` (see above):
+
+```bash
+pip install abnf
+python3 conformance/runners/abnf/check.py            # all of cases.json
+python3 conformance/runners/abnf/check.py '{a}:(x)'   # classify ad-hoc inputs
+```
+
+Current result: 347/347 cases consistent with the grammar.
+
 ## Reference runner: asun-rs
+
+> **Status:** `runners/rust` does not build against the current serde-free
+> `asun-rs` (it needs an untyped `Value: AsunDecode`). The numbers below are
+> from v1.0.1 and the v1 suite and are kept for history. `asun-rs` itself is
+> verified by its own `tests/` (including `tests/adversarial_test.rs`) and by
+> checking its encoder output with the grammar runner.
 
 ```bash
 cd conformance/runners/rust

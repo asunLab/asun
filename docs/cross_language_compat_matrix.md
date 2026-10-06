@@ -341,7 +341,7 @@ Expected:
 ### `N4-T`
 
 ```text
-[{id@int,profile@{name@str,nick@str?,score@float?},active@bool}]:(1,(Alice,ally,9.5),true),(2,(Bob,,),false)
+[{id@int,profile@{name@str,nick@str,score@float},active@bool}]:(1,(Alice,ally,9.5),true),(2,(Bob,,),false)
 ```
 
 Target:
@@ -375,7 +375,7 @@ Expected:
 ### `O1-T`
 
 ```text
-[{id@int,label@str?,score@float?,flag@bool}]:(1,hello,95.5,true),(2,,,false)
+[{id@int,label@str,score@float,flag@bool}]:(1,hello,95.5,true),(2,,,false)
 ```
 
 Target:

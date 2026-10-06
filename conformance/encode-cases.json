@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "spec": "../docs/SPEC.md",
   "grammar": "GRAMMAR.abnf",
   "count": 158,

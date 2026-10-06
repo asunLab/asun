@@ -1,8 +1,8 @@
 {
-  "version": 1,
+  "version": 2,
   "spec": "../docs/SPEC.md",
   "grammar": "GRAMMAR.abnf",
-  "count": 277,
+  "count": 347,
   "cases": [
     {
       "id": "primitives.bare.int.zero",
@@ -210,6 +210,96 @@
       "kind": "ok",
       "schemaDriven": false,
       "expected": false
+    },
+    {
+      "id": "primitives.bare.null",
+      "category": "primitives.bare",
+      "desc": "keyword null",
+      "input": "null",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": null
+    },
+    {
+      "id": "primitives.bare.case.TRUE",
+      "category": "primitives.bare",
+      "desc": "keywords are case-sensitive: TRUE is a string",
+      "input": "TRUE",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "TRUE"
+    },
+    {
+      "id": "primitives.bare.case.Null",
+      "category": "primitives.bare",
+      "desc": "keywords are case-sensitive: Null is a string",
+      "input": "Null",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "Null"
+    },
+    {
+      "id": "primitives.bare.string.quoted.null",
+      "category": "primitives.bare",
+      "desc": "quoted null is a string",
+      "input": "\"null\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "null"
+    },
+    {
+      "id": "primitives.bare.string.email",
+      "category": "primitives.bare",
+      "desc": "@ is plain content in data",
+      "input": "alice@example.com",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "alice@example.com"
+    },
+    {
+      "id": "primitives.bare.string.time",
+      "category": "primitives.bare",
+      "desc": ": is plain content in data",
+      "input": "12:30",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "12:30"
+    },
+    {
+      "id": "primitives.bare.string.url",
+      "category": "primitives.bare",
+      "desc": "URL needs no quotes",
+      "input": "https://a.com/x?y=1",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "https://a.com/x?y=1"
+    },
+    {
+      "id": "primitives.bare.string.slashStar",
+      "category": "primitives.bare",
+      "desc": "lone / and * are plain content",
+      "input": "a/b*c",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a/b*c"
+    },
+    {
+      "id": "primitives.bare.string.internalTab",
+      "category": "primitives.bare",
+      "desc": "internal tab kept",
+      "input": "a\tb",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a\tb"
+    },
+    {
+      "id": "primitives.bare.string.bomSkipped",
+      "category": "primitives.bare",
+      "desc": "leading BOM is skipped",
+      "input": "﻿hello",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "hello"
     },
     {
       "id": "primitives.bare.string.plain",
@@ -437,6 +527,159 @@
       "expected": "a]b"
     },
     {
+      "id": "strings.escape.bs.slash",
+      "category": "strings.escape",
+      "desc": "JSON \\/ escape",
+      "input": "\"a\\/b\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a/b"
+    },
+    {
+      "id": "strings.escape.bs.backspace",
+      "category": "strings.escape",
+      "desc": "\\b escape",
+      "input": "\"a\\bb\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a\bb"
+    },
+    {
+      "id": "strings.escape.bs.formfeed",
+      "category": "strings.escape",
+      "desc": "\\f escape",
+      "input": "\"a\\fb\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a\fb"
+    },
+    {
+      "id": "strings.escape.bs.braces",
+      "category": "strings.escape",
+      "desc": "escaped { }",
+      "input": "\"\\{\\}\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "{}"
+    },
+    {
+      "id": "strings.escape.bs.colonAt",
+      "category": "strings.escape",
+      "desc": "escaped : @",
+      "input": "\"\\:\\@\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": ":@"
+    },
+    {
+      "id": "strings.escape.bs.unicode.upperHex",
+      "category": "strings.escape",
+      "desc": "uppercase hex",
+      "input": "\"\\u4E2D\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "中"
+    },
+    {
+      "id": "strings.escape.bs.unicode.nul",
+      "category": "strings.escape",
+      "desc": "escaped NUL",
+      "input": "\"a\\u0000b\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a\u0000b"
+    },
+    {
+      "id": "strings.escape.bs.unicode.pair",
+      "category": "strings.escape",
+      "desc": "surrogate pair",
+      "input": "\"\\ud83d\\ude00\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "😀"
+    },
+    {
+      "id": "strings.escape.raw.del",
+      "category": "strings.escape",
+      "desc": "raw DEL allowed (as JSON)",
+      "input": "\"ab\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "ab"
+    },
+    {
+      "id": "strings.escape.raw.u2028",
+      "category": "strings.escape",
+      "desc": "raw U+2028 allowed (as JSON)",
+      "input": "\"a b\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a b"
+    },
+    {
+      "id": "strings.escape.err.loneHigh",
+      "category": "strings.escape",
+      "desc": "lone high surrogate",
+      "input": "\"\\ud83d\"",
+      "kind": "error",
+      "schemaDriven": false,
+      "errorHint": "semantic.S5.lone_surrogate"
+    },
+    {
+      "id": "strings.escape.err.loneLow",
+      "category": "strings.escape",
+      "desc": "lone low surrogate",
+      "input": "\"\\ude00x\"",
+      "kind": "error",
+      "schemaDriven": false,
+      "errorHint": "semantic.S5.lone_surrogate"
+    },
+    {
+      "id": "strings.escape.err.shortUnicode",
+      "category": "strings.escape",
+      "desc": "\\u needs 4 hex digits",
+      "input": "\"\\u12\"",
+      "kind": "error",
+      "schemaDriven": false,
+      "errorHint": "lex.bad_escape"
+    },
+    {
+      "id": "strings.escape.err.rawNewline",
+      "category": "strings.escape",
+      "desc": "raw LF inside quotes",
+      "input": "\"a\nb\"",
+      "kind": "error",
+      "schemaDriven": false,
+      "errorHint": "lex.control_char"
+    },
+    {
+      "id": "strings.escape.err.rawTab",
+      "category": "strings.escape",
+      "desc": "raw TAB inside quotes",
+      "input": "\"a\tb\"",
+      "kind": "error",
+      "schemaDriven": false,
+      "errorHint": "lex.control_char"
+    },
+    {
+      "id": "strings.escape.err.rawNul",
+      "category": "strings.escape",
+      "desc": "raw NUL inside quotes",
+      "input": "\"a\u0000b\"",
+      "kind": "error",
+      "schemaDriven": false,
+      "errorHint": "lex.control_char"
+    },
+    {
+      "id": "strings.escape.err.unknown",
+      "category": "strings.escape",
+      "desc": "unknown escape \\q",
+      "input": "\"a\\qb\"",
+      "kind": "error",
+      "schemaDriven": false,
+      "errorHint": "lex.bad_escape"
+    },
+    {
       "id": "strings.plainEscape.comma",
       "category": "strings.plainEscape",
       "desc": "plain string \\,",
@@ -489,6 +732,51 @@
       "kind": "ok",
       "schemaDriven": false,
       "expected": "a\\b"
+    },
+    {
+      "id": "strings.plainEscape.slashStar",
+      "category": "strings.plainEscape",
+      "desc": "plain string \\/* is not a comment",
+      "input": "a\\/*b",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a/*b"
+    },
+    {
+      "id": "strings.plainEscape.trailingBackslash",
+      "category": "strings.plainEscape",
+      "desc": "trailing backslash",
+      "input": "{a}:(abc\\)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "lex.bad_escape"
+    },
+    {
+      "id": "strings.plainEscape.rawQuote",
+      "category": "strings.plainEscape",
+      "desc": "raw quote inside plain string",
+      "input": "{a}:(5\" screen)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "lex.raw_quote"
+    },
+    {
+      "id": "strings.plainEscape.rawNewline",
+      "category": "strings.plainEscape",
+      "desc": "raw LF inside plain string",
+      "input": "{a}:(a\nb)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "lex.control_char"
+    },
+    {
+      "id": "strings.plainEscape.quotedThenJunk",
+      "category": "strings.plainEscape",
+      "desc": "quoted string followed by more text",
+      "input": "{a}:(\"a\"b)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.unexpected"
     },
     {
       "id": "objects.single.basic",
@@ -623,6 +911,102 @@
       }
     },
     {
+      "id": "objects.single.nullKeyword",
+      "category": "objects.single",
+      "desc": "null keyword in a slot",
+      "input": "{a,b}:(null,1)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": null,
+        "b": 1
+      }
+    },
+    {
+      "id": "objects.single.quotedNull",
+      "category": "objects.single",
+      "desc": "quoted null is a string",
+      "input": "{a}:(\"null\")",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": "null"
+      }
+    },
+    {
+      "id": "objects.single.strHintMakesString",
+      "category": "objects.single",
+      "desc": "@str: unquoted 42 / true are strings",
+      "input": "{a@str,b@str,c@str}:(42,true,null)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": "42",
+        "b": "true",
+        "c": null
+      }
+    },
+    {
+      "id": "objects.single.floatHintAcceptsInt",
+      "category": "objects.single",
+      "desc": "@float accepts an integer literal",
+      "input": "{x@float}:(3)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "x": 3.0
+      }
+    },
+    {
+      "id": "objects.single.quotedFieldName",
+      "category": "objects.single",
+      "desc": "quoted field name equals bare name",
+      "input": "{\"id\",name}:(1,Alice)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "id": 1,
+        "name": "Alice"
+      }
+    },
+    {
+      "id": "objects.single.quotedFieldNameSpecial",
+      "category": "objects.single",
+      "desc": "quoted field names with specials",
+      "input": "{\"id uuid\",\"a,b\",\"q\\\"q\",\"\"}:(1,2,3,4)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "id uuid": 1,
+        "a,b": 2,
+        "q\"q": 3,
+        "": 4
+      }
+    },
+    {
+      "id": "objects.single.emptySchema",
+      "category": "objects.single",
+      "desc": "zero-field schema matches ()",
+      "input": "{}:()",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {}
+    },
+    {
+      "id": "objects.single.untypedArrayBinding",
+      "category": "objects.single",
+      "desc": "@[] binding without element type",
+      "input": "{tags@[]}:([a,b])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "tags": [
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
       "id": "objects.single.fieldNameUnderscore",
       "category": "objects.single",
       "desc": "field name with underscore",
@@ -680,18 +1064,34 @@
     {
       "id": "objects.array.trailingComma",
       "category": "objects.array",
-      "desc": "trailing comma between rows",
+      "desc": "rows have no trailing comma (S9)",
       "input": "[{id@int,name@str}]:(1,Alice),(2,Bob),",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.trailing_comma"
+    },
+    {
+      "id": "objects.array.emptyRow",
+      "category": "objects.array",
+      "desc": "rows are never null (S9)",
+      "input": "[{id@int}]:(1),,(2)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.empty_row"
+    },
+    {
+      "id": "objects.array.spaced",
+      "category": "objects.array",
+      "desc": "layout around [ { } ] :",
+      "input": "[ {id@int} ] : (1) , (2)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": [
         {
-          "id": 1,
-          "name": "Alice"
+          "id": 1
         },
         {
-          "id": 2,
-          "name": "Bob"
+          "id": 2
         }
       ]
     },
@@ -1031,7 +1431,7 @@
       "id": "nested.deep",
       "category": "nested",
       "desc": "deeply nested",
-      "input": "{a@{b@{c@{d@int}}}}:(((((42)))))",
+      "input": "{a@{b@{c@{d@int}}}}:((((42))))",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -1176,14 +1576,59 @@
     {
       "id": "arrays.plain.trailingComma",
       "category": "arrays.plain",
-      "desc": "trailing comma",
+      "desc": "comma is a separator: [1,2,3,] ends with null",
       "input": "[1,2,3,]",
       "kind": "ok",
       "schemaDriven": false,
       "expected": [
         1,
         2,
-        3
+        3,
+        null
+      ]
+    },
+    {
+      "id": "arrays.plain.emptySpaced",
+      "category": "arrays.plain",
+      "desc": "[ ] is empty",
+      "input": "[ ]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": []
+    },
+    {
+      "id": "arrays.plain.twoNulls",
+      "category": "arrays.plain",
+      "desc": "[,] is two nulls",
+      "input": "[,]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        null,
+        null
+      ]
+    },
+    {
+      "id": "arrays.plain.singleNull",
+      "category": "arrays.plain",
+      "desc": "[null] is one null",
+      "input": "[null]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        null
+      ]
+    },
+    {
+      "id": "arrays.plain.leadingNull",
+      "category": "arrays.plain",
+      "desc": "[,1] leading null",
+      "input": "[,1]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        null,
+        1
       ]
     },
     {
@@ -1571,6 +2016,82 @@
       }
     },
     {
+      "id": "comments.insideTuple",
+      "category": "comments",
+      "desc": "comments are layout inside tuples",
+      "input": "{a@int,b@int}:(1, /* b */ 2)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": 1,
+        "b": 2
+      }
+    },
+    {
+      "id": "comments.afterPlainString",
+      "category": "comments",
+      "desc": "/* ends a plain string",
+      "input": "{a,b}:(x /* c */,y/*d*/)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": "x",
+        "b": "y"
+      }
+    },
+    {
+      "id": "comments.insideArray",
+      "category": "comments",
+      "desc": "comments inside arrays",
+      "input": "[/* first */ 1, 2 /* last */]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "comments.special",
+      "category": "comments",
+      "desc": "+, emoji and stars inside a comment",
+      "input": "/* a+b 😀 ** */{a}:(1)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": 1
+      }
+    },
+    {
+      "id": "comments.starsOnly",
+      "category": "comments",
+      "desc": "/***/ is a complete comment",
+      "input": "/***/{a}:(1)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": 1
+      }
+    },
+    {
+      "id": "comments.splitsPlainString",
+      "category": "comments",
+      "desc": "a comment cannot sit inside a plain string",
+      "input": "{a}:(x/*c*/y)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.unexpected"
+    },
+    {
+      "id": "comments.nested",
+      "category": "comments",
+      "desc": "comments do not nest",
+      "input": "/* /* */ */{a}:(1)",
+      "kind": "error",
+      "schemaDriven": false,
+      "errorHint": "parse.unexpected"
+    },
+    {
       "id": "comments.betweenRows",
       "category": "comments",
       "desc": "comment between rows",
@@ -1589,14 +2110,55 @@
     {
       "id": "commas.trail",
       "category": "commas",
-      "desc": "trailing comma absorbed",
+      "desc": "(1,2,) has three slots",
       "input": "{a@int,b@int}:(1,2,)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.field_count"
+    },
+    {
+      "id": "commas.trailIsNull",
+      "category": "commas",
+      "desc": "final empty slot is null",
+      "input": "{a@int,b@int}:(1,)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
         "a": 1,
-        "b": 2
+        "b": null
       }
+    },
+    {
+      "id": "commas.twoNulls",
+      "category": "commas",
+      "desc": "(,) is two nulls",
+      "input": "{a@int,b@int}:(,)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": null,
+        "b": null
+      }
+    },
+    {
+      "id": "commas.emptyTupleOneNull",
+      "category": "commas",
+      "desc": "() is one null slot",
+      "input": "{a@int}:()",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": null
+      }
+    },
+    {
+      "id": "commas.emptyTupleTwoFields",
+      "category": "commas",
+      "desc": "() has one slot, schema has two",
+      "input": "{a@int,b@int}:()",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.field_count"
     },
     {
       "id": "commas.consec",
@@ -1614,15 +2176,11 @@
     {
       "id": "commas.consecAndTrail",
       "category": "commas",
-      "desc": "null then trailing",
+      "desc": "(1,2,,) has four slots",
       "input": "{a@int,b@int,c@int}:(1,2,,)",
-      "kind": "ok",
+      "kind": "error",
       "schemaDriven": true,
-      "expected": {
-        "a": 1,
-        "b": 2,
-        "c": null
-      }
+      "errorHint": "parse.field_count"
     },
     {
       "id": "commas.allNull",
@@ -1719,13 +2277,121 @@
       "errorHint": "lex.bad_escape"
     },
     {
-      "id": "errors.commentInsideTuple",
+      "id": "errors.emptyDocument",
       "category": "errors",
-      "desc": "comment inside data tuple is forbidden",
-      "input": "{a@int,b@int}:(1,/*x*/2)",
+      "desc": "an empty document is not valid",
+      "input": "",
+      "kind": "error",
+      "schemaDriven": false,
+      "errorHint": "parse.empty"
+    },
+    {
+      "id": "errors.blankDocument",
+      "category": "errors",
+      "desc": "a whitespace/comment-only document is not valid",
+      "input": "  /* c */ \n",
+      "kind": "error",
+      "schemaDriven": false,
+      "errorHint": "parse.empty"
+    },
+    {
+      "id": "errors.schemaTrailingComma",
+      "category": "errors",
+      "desc": "schema fields have no trailing comma",
+      "input": "{a,b,}:(1,2)",
       "kind": "error",
       "schemaDriven": true,
-      "errorHint": "parse.comment_in_data"
+      "errorHint": "parse.trailing_comma"
+    },
+    {
+      "id": "errors.duplicateField",
+      "category": "errors",
+      "desc": "duplicate field name (S6)",
+      "input": "{a,a}:(1,2)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "semantic.S6.duplicate_field"
+    },
+    {
+      "id": "errors.duplicateQuotedField",
+      "category": "errors",
+      "desc": "duplicate after unescaping (S6)",
+      "input": "{a,\"a\"}:(1,2)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "semantic.S6.duplicate_field"
+    },
+    {
+      "id": "errors.typeUppercase",
+      "category": "errors",
+      "desc": "type names are case-sensitive",
+      "input": "{a@INT}:(1)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.bad_type"
+    },
+    {
+      "id": "errors.unknownType",
+      "category": "errors",
+      "desc": "unknown scalar type",
+      "input": "{a@integer}:(1)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.bad_type"
+    },
+    {
+      "id": "errors.intHintFloat",
+      "category": "errors",
+      "desc": "@int rejects a fractional literal",
+      "input": "{a@int}:(1.5)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "type.coercion"
+    },
+    {
+      "id": "errors.intHintExp",
+      "category": "errors",
+      "desc": "@int rejects an exponent literal",
+      "input": "{a@int}:(1e3)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "type.coercion"
+    },
+    {
+      "id": "errors.floatOverflow",
+      "category": "errors",
+      "desc": "float literal overflowing to infinity (S4)",
+      "input": "1e309",
+      "kind": "error",
+      "schemaDriven": false,
+      "errorHint": "semantic.S4.overflow"
+    },
+    {
+      "id": "errors.intHintSpacedDigits",
+      "category": "errors",
+      "desc": "4 2 is the string '4 2', not an int (S3)",
+      "input": "{a@int}:(4 2)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "type.coercion"
+    },
+    {
+      "id": "errors.twoDocuments",
+      "category": "errors",
+      "desc": "only one top-level form",
+      "input": "{a}:(1)\n{a}:(2)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.trailing"
+    },
+    {
+      "id": "errors.objectBeforeMoreTuples",
+      "category": "errors",
+      "desc": "single-object form takes exactly one tuple",
+      "input": "{a}:(1),(2)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.trailing"
     },
     {
       "id": "errors.typeMismatch",
@@ -5524,6 +6190,21 @@
       "schemaDriven": true,
       "expected": {
         "x": "with-dash"
+      }
+    },
+    {
+      "id": "objects.nullPatterns.m00",
+      "category": "objects.nullPatterns",
+      "desc": "null-mask 00000",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,,,,)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "f0": null,
+        "f1": null,
+        "f2": null,
+        "f3": null,
+        "f4": null
       }
     },
     {

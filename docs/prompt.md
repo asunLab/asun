@@ -40,10 +40,11 @@ For scalar types (int, str, bool), the `@type` portion is an optional hint (`nam
 
 ## 5. Value and Edge Case Rules
 
-- Strings do not need quotes unless they need to preserve leading/trailing spaces, or contain structural characters like `, ( ) [ ] \ :`
-- Boolean values must be lowercase (`true`, `false`).
-- Null / Optional fields are represented by empty space between commas: `(Alice, , 30)` means the middle field is `null`.
-- Trailing commas are allowed and ignored by the parser: `(1, 2,)` = `(1, 2)`.
+- Strings do not need quotes unless they need to preserve leading/trailing spaces, or contain structural characters like `, ( ) [ ] { } " \`. `@` and `:` are fine unquoted (`alice@example.com`, `12:30`).
+- Keywords are lowercase and case-sensitive (`true`, `false`, `null`). Quote strings that look like keywords or numbers: `"true"`, `"null"`, `"007"`.
+- Null / Optional fields are an empty slot or `null`: `(Alice, , 30)` means the middle field is `null`.
+- A comma is a pure separator: the number of values is always commas + 1. `(1, 2,)` has THREE values (the last is null), so never add a trailing comma.
+- Comments `/* ... */` may appear between values; `//` comments are not supported.
 
 ## Summary Examples for AI Generation
 

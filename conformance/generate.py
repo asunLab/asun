@@ -134,6 +134,16 @@ def gen_bare_values():
     add(f"{cat}.float.expBig",        cat, "scientific notation with positive sign",          "-2.0E+10", -2.0e10)
     add(f"{cat}.bool.true",       cat, "boolean true",       "true",       True)
     add(f"{cat}.bool.false",      cat, "boolean false",      "false",      False)
+    add(f"{cat}.null",            cat, "keyword null",       "null",       None)
+    add(f"{cat}.case.TRUE",       cat, "keywords are case-sensitive: TRUE is a string", "TRUE", "TRUE")
+    add(f"{cat}.case.Null",       cat, "keywords are case-sensitive: Null is a string", "Null", "Null")
+    add(f"{cat}.string.quoted.null", cat, "quoted null is a string", '"null"', "null")
+    add(f"{cat}.string.email",    cat, "@ is plain content in data", "alice@example.com", "alice@example.com")
+    add(f"{cat}.string.time",     cat, ": is plain content in data", "12:30", "12:30")
+    add(f"{cat}.string.url",      cat, "URL needs no quotes",  "https://a.com/x?y=1", "https://a.com/x?y=1")
+    add(f"{cat}.string.slashStar", cat, "lone / and * are plain content", "a/b*c", "a/b*c")
+    add(f"{cat}.string.internalTab", cat, "internal tab kept", "a\tb", "a\tb")
+    add(f"{cat}.string.bomSkipped", cat, "leading BOM is skipped", "\ufeffhello", "hello")
     add(f"{cat}.string.plain",    cat, "bare plain string",  "hello",      "hello")
     add(f"{cat}.string.alphanum", cat, "alphanumeric",       "abc123",     "abc123")
     add(f"{cat}.string.startsDigit", cat, "starts with digit (mixed)", "123abc", "123abc")
@@ -170,6 +180,23 @@ def gen_escapes():
     add(f"{cat}.bs.delim.rparen",  cat, "escaped )",      r'"a\)b"',     "a)b")
     add(f"{cat}.bs.delim.lbrack",  cat, "escaped [",      r'"a\[b"',     "a[b")
     add(f"{cat}.bs.delim.rbrack",  cat, "escaped ]",      r'"a\]b"',     "a]b")
+    add(f"{cat}.bs.slash",         cat, "JSON \\/ escape",  r'"a\/b"',     "a/b")
+    add(f"{cat}.bs.backspace",     cat, "\\b escape",       r'"a\bb"',     "a\bb")
+    add(f"{cat}.bs.formfeed",      cat, "\\f escape",       r'"a\fb"',     "a\fb")
+    add(f"{cat}.bs.braces",        cat, "escaped { }",    r'"\{\}"',     "{}")
+    add(f"{cat}.bs.colonAt",       cat, "escaped : @",    r'"\:\@"',     ":@")
+    add(f"{cat}.bs.unicode.upperHex", cat, "uppercase hex",  r'"\u4E2D"',  "中")
+    add(f"{cat}.bs.unicode.nul",   cat, "escaped NUL",    r'"a\u0000b"', "a\u0000b")
+    add(f"{cat}.bs.unicode.pair",  cat, "surrogate pair", r'"\ud83d\ude00"', "😀")
+    add(f"{cat}.raw.del",          cat, "raw DEL allowed (as JSON)", '"a\x7fb"', "a\x7fb")
+    add(f"{cat}.raw.u2028",        cat, "raw U+2028 allowed (as JSON)", '"a\u2028b"', "a\u2028b")
+    err(f"{cat}.err.loneHigh",     cat, "lone high surrogate", r'"\ud83d"',   "semantic.S5.lone_surrogate")
+    err(f"{cat}.err.loneLow",      cat, "lone low surrogate",  r'"\ude00x"',  "semantic.S5.lone_surrogate")
+    err(f"{cat}.err.shortUnicode", cat, "\\u needs 4 hex digits", r'"\u12"', "lex.bad_escape")
+    err(f"{cat}.err.rawNewline",   cat, "raw LF inside quotes", '"a\nb"',  "lex.control_char")
+    err(f"{cat}.err.rawTab",       cat, "raw TAB inside quotes", '"a\tb"', "lex.control_char")
+    err(f"{cat}.err.rawNul",       cat, "raw NUL inside quotes", '"a\x00b"', "lex.control_char")
+    err(f"{cat}.err.unknown",      cat, "unknown escape \\q",  r'"a\qb"', "lex.bad_escape")
 
     # Plain-string escapes
     cat2 = "strings.plainEscape"
@@ -179,6 +206,11 @@ def gen_escapes():
     add(f"{cat2}.lbrack",   cat2, "plain string \\[",   r"a\[b",   "a[b")
     add(f"{cat2}.rbrack",   cat2, "plain string \\]",   r"a\]b",   "a]b")
     add(f"{cat2}.bsbs",     cat2, "plain string \\\\",  r"a\\b",   "a\\b")
+    add(f"{cat2}.slashStar", cat2, "plain string \\/* is not a comment", r"a\/*b", "a/*b")
+    err(f"{cat2}.trailingBackslash", cat2, "trailing backslash", "{a}:(abc\\)", "lex.bad_escape")
+    err(f"{cat2}.rawQuote", cat2, "raw quote inside plain string", '{a}:(5" screen)', "lex.raw_quote")
+    err(f"{cat2}.rawNewline", cat2, "raw LF inside plain string", "{a}:(a\nb)", "lex.control_char")
+    err(f"{cat2}.quotedThenJunk", cat2, "quoted string followed by more text", '{a}:("a"b)', "parse.unexpected")
 
 # ---------------------------------------------------------------------------
 # 3. Single object
@@ -230,6 +262,38 @@ def gen_single_object():
         cat, "field name starts with digit",
         "{1st@int,2nd@int}:(10,20)",
         {"1st": 10, "2nd": 20})
+    add(f"{cat}.nullKeyword",
+        cat, "null keyword in a slot",
+        "{a,b}:(null,1)",
+        {"a": None, "b": 1})
+    add(f"{cat}.quotedNull",
+        cat, "quoted null is a string",
+        '{a}:("null")',
+        {"a": "null"})
+    add(f"{cat}.strHintMakesString",
+        cat, "@str: unquoted 42 / true are strings",
+        "{a@str,b@str,c@str}:(42,true,null)",
+        {"a": "42", "b": "true", "c": None})
+    add(f"{cat}.floatHintAcceptsInt",
+        cat, "@float accepts an integer literal",
+        "{x@float}:(3)",
+        {"x": 3.0})
+    add(f"{cat}.quotedFieldName",
+        cat, "quoted field name equals bare name",
+        '{"id",name}:(1,Alice)',
+        {"id": 1, "name": "Alice"})
+    add(f"{cat}.quotedFieldNameSpecial",
+        cat, "quoted field names with specials",
+        r'{"id uuid","a,b","q\"q",""}:(1,2,3,4)',
+        {"id uuid": 1, "a,b": 2, 'q"q': 3, "": 4})
+    add(f"{cat}.emptySchema",
+        cat, "zero-field schema matches ()",
+        "{}:()",
+        {})
+    add(f"{cat}.untypedArrayBinding",
+        cat, "@[] binding without element type",
+        "{tags@[]}:([a,b])",
+        {"tags": ["a", "b"]})
     add(f"{cat}.fieldNameUnderscore",
         cat, "field name with underscore",
         "{_id@int,user_name@str}:(7,bob)",
@@ -254,10 +318,18 @@ def gen_array_of_objects():
         cat, "single row in array form",
         "[{id@int,name@str}]:(1,Alice)",
         [{"id": 1, "name": "Alice"}])
-    add(f"{cat}.trailingComma",
-        cat, "trailing comma between rows",
+    err(f"{cat}.trailingComma",
+        cat, "rows have no trailing comma (S9)",
         "[{id@int,name@str}]:(1,Alice),(2,Bob),",
-        [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}])
+        "parse.trailing_comma")
+    err(f"{cat}.emptyRow",
+        cat, "rows are never null (S9)",
+        "[{id@int}]:(1),,(2)",
+        "parse.empty_row")
+    add(f"{cat}.spaced",
+        cat, "layout around [ { } ] :",
+        "[ {id@int} ] : (1) , (2)",
+        [{"id": 1}, {"id": 2}])
     add(f"{cat}.multilineIndented",
         cat, "indented multi-line",
         "[{id@int,name@str,active@bool}]:\n  (1, Alice, true),\n  (2, Bob, false)",
@@ -291,7 +363,7 @@ def gen_nested():
         {"team": "Dev", "users": [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]})
     add(f"{cat}.deep",
         cat, "deeply nested",
-        "{a@{b@{c@{d@int}}}}:(((((42))))" + ")",
+        "{a@{b@{c@{d@int}}}}:((((42))))",
         {"a": {"b": {"c": {"d": 42}}}})
     add(f"{cat}.complexBig",
         cat, "company example",
@@ -317,7 +389,11 @@ def gen_plain_arrays():
     add(f"{cat}.strings", cat, "plain strings",     "[a,b,c]",      ["a", "b", "c"])
     add(f"{cat}.mixed",   cat, "mixed types",       "[1,hello,true,3.14]", [1, "hello", True, 3.14])
     add(f"{cat}.nested",  cat, "nested arrays",     "[[1,2],[3,4]]", [[1, 2], [3, 4]])
-    add(f"{cat}.trailingComma", cat, "trailing comma", "[1,2,3,]",   [1, 2, 3])
+    add(f"{cat}.trailingComma", cat, "comma is a separator: [1,2,3,] ends with null", "[1,2,3,]", [1, 2, 3, None])
+    add(f"{cat}.emptySpaced", cat, "[ ] is empty",      "[ ]",          [])
+    add(f"{cat}.twoNulls",    cat, "[,] is two nulls",  "[,]",          [None, None])
+    add(f"{cat}.singleNull",  cat, "[null] is one null", "[null]",      [None])
+    add(f"{cat}.leadingNull", cat, "[,1] leading null", "[,1]",         [None, 1])
     add(f"{cat}.singletonString", cat, "single string", "[hello]",   ["hello"])
     add(f"{cat}.boolArray", cat, "bool array",      "[true,false,true]", [True, False, True])
     add(f"{cat}.sparseNull", cat, "sparse with null",  "[1,,3]",     [1, None, 3])
@@ -382,6 +458,34 @@ def gen_comments():
         cat, "multiline comment",
         "/*\n  doc\n*/\n{id@int}:(1)",
         {"id": 1})
+    add(f"{cat}.insideTuple",
+        cat, "comments are layout inside tuples",
+        "{a@int,b@int}:(1, /* b */ 2)",
+        {"a": 1, "b": 2})
+    add(f"{cat}.afterPlainString",
+        cat, "/* ends a plain string",
+        "{a,b}:(x /* c */,y/*d*/)",
+        {"a": "x", "b": "y"})
+    add(f"{cat}.insideArray",
+        cat, "comments inside arrays",
+        "[/* first */ 1, 2 /* last */]",
+        [1, 2])
+    add(f"{cat}.special",
+        cat, "+, emoji and stars inside a comment",
+        "/* a+b 😀 ** */{a}:(1)",
+        {"a": 1})
+    add(f"{cat}.starsOnly",
+        cat, "/***/ is a complete comment",
+        "/***/{a}:(1)",
+        {"a": 1})
+    err(f"{cat}.splitsPlainString",
+        cat, "a comment cannot sit inside a plain string",
+        "{a}:(x/*c*/y)",
+        "parse.unexpected")
+    err(f"{cat}.nested",
+        cat, "comments do not nest",
+        "/* /* */ */{a}:(1)",
+        "parse.unexpected")
     add(f"{cat}.betweenRows",
         cat, "comment between rows",
         "[{id@int}]:(1) /* row1 */ ,(2)",
@@ -393,18 +497,34 @@ def gen_comments():
 
 def gen_commas():
     cat = "commas"
-    add(f"{cat}.trail",
-        cat, "trailing comma absorbed",
+    err(f"{cat}.trail",
+        cat, "(1,2,) has three slots",
         "{a@int,b@int}:(1,2,)",
-        {"a": 1, "b": 2})
+        "parse.field_count")
+    add(f"{cat}.trailIsNull",
+        cat, "final empty slot is null",
+        "{a@int,b@int}:(1,)",
+        {"a": 1, "b": None})
+    add(f"{cat}.twoNulls",
+        cat, "(,) is two nulls",
+        "{a@int,b@int}:(,)",
+        {"a": None, "b": None})
+    add(f"{cat}.emptyTupleOneNull",
+        cat, "() is one null slot",
+        "{a@int}:()",
+        {"a": None})
+    err(f"{cat}.emptyTupleTwoFields",
+        cat, "() has one slot, schema has two",
+        "{a@int,b@int}:()",
+        "parse.field_count")
     add(f"{cat}.consec",
         cat, "consecutive commas -> null",
         "{a@int,b@int,c@int}:(1,,3)",
         {"a": 1, "b": None, "c": 3})
-    add(f"{cat}.consecAndTrail",
-        cat, "null then trailing",
+    err(f"{cat}.consecAndTrail",
+        cat, "(1,2,,) has four slots",
         "{a@int,b@int,c@int}:(1,2,,)",
-        {"a": 1, "b": 2, "c": None})
+        "parse.field_count")
     add(f"{cat}.allNull",
         cat, "all nulls",
         "{a@int,b@int,c@int}:(,,)",
@@ -452,10 +572,58 @@ def gen_errors():
         cat, "invalid escape sequence",
         r'{a@str}:("a\xb")',
         "lex.bad_escape")
-    err(f"{cat}.commentInsideTuple",
-        cat, "comment inside data tuple is forbidden",
-        "{a@int,b@int}:(1,/*x*/2)",
-        "parse.comment_in_data")
+    err(f"{cat}.emptyDocument",
+        cat, "an empty document is not valid",
+        "",
+        "parse.empty")
+    err(f"{cat}.blankDocument",
+        cat, "a whitespace/comment-only document is not valid",
+        "  /* c */ \n",
+        "parse.empty")
+    err(f"{cat}.schemaTrailingComma",
+        cat, "schema fields have no trailing comma",
+        "{a,b,}:(1,2)",
+        "parse.trailing_comma")
+    err(f"{cat}.duplicateField",
+        cat, "duplicate field name (S6)",
+        "{a,a}:(1,2)",
+        "semantic.S6.duplicate_field")
+    err(f"{cat}.duplicateQuotedField",
+        cat, "duplicate after unescaping (S6)",
+        '{a,"a"}:(1,2)',
+        "semantic.S6.duplicate_field")
+    err(f"{cat}.typeUppercase",
+        cat, "type names are case-sensitive",
+        "{a@INT}:(1)",
+        "parse.bad_type")
+    err(f"{cat}.unknownType",
+        cat, "unknown scalar type",
+        "{a@integer}:(1)",
+        "parse.bad_type")
+    err(f"{cat}.intHintFloat",
+        cat, "@int rejects a fractional literal",
+        "{a@int}:(1.5)",
+        "type.coercion")
+    err(f"{cat}.intHintExp",
+        cat, "@int rejects an exponent literal",
+        "{a@int}:(1e3)",
+        "type.coercion")
+    err(f"{cat}.floatOverflow",
+        cat, "float literal overflowing to infinity (S4)",
+        "1e309",
+        "semantic.S4.overflow")
+    err(f"{cat}.intHintSpacedDigits",
+        cat, "4 2 is the string '4 2', not an int (S3)",
+        "{a@int}:(4 2)",
+        "type.coercion")
+    err(f"{cat}.twoDocuments",
+        cat, "only one top-level form",
+        "{a}:(1)\n{a}:(2)",
+        "parse.trailing")
+    err(f"{cat}.objectBeforeMoreTuples",
+        cat, "single-object form takes exactly one tuple",
+        "{a}:(1),(2)",
+        "parse.trailing")
     err(f"{cat}.typeMismatch",
         cat, "string in @int field",
         "{a@int}:(hello)",
@@ -614,7 +782,7 @@ def gen_quoted_equiv():
 
 def gen_null_patterns():
     cat = "objects.nullPatterns"
-    for mask in range(1, 32):  # skip 0 (would be ",,,," — all null, covered)
+    for mask in range(0, 32):
         bits = [(mask >> i) & 1 for i in range(5)]
         vals = []
         expected = {}
@@ -941,7 +1109,7 @@ def main():
 
     out_path = os.path.join(os.path.dirname(__file__), "cases.json")
     manifest = {
-        "version": 1,
+        "version": 2,  # v2: comma-as-separator, null keyword, comments as layout
         "spec":    "../docs/SPEC.md",
         "grammar": "GRAMMAR.abnf",
         "count":   len(CASES),
@@ -960,7 +1128,7 @@ def main():
         enc_seen.add(c["id"])
     enc_path = os.path.join(os.path.dirname(__file__), "encode-cases.json")
     enc_manifest = {
-        "version": 1,
+        "version": 2,
         "spec":    "../docs/SPEC.md",
         "grammar": "GRAMMAR.abnf",
         "count":   len(ENC_CASES),
