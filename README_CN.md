@@ -142,15 +142,15 @@ Schema 声明一次，每条数据为元组：
 ### 可选字段
 
 ```
-{id@int, label@str}:(1,hello),(2,)
+[{id@int, label@str}]:(1,hello),(2,_)
 ```
 
-_（空值 = `None` / `null`）_
+_（`_` 表示空值：`None` / `null`）_
 
-### 数组与键值条目
+### 数组与 Map
 
 ```
-{name@str, scores@[int], attrs@[{key@str, value@int}]}:(Alice,[90,85,92],[(age,30),(score,95)])
+{name@str, scores@[int], attrs@[str:int]}:(Alice,[90,85,92],[age:30,score:95])
 ```
 
 ---

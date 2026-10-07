@@ -49,7 +49,7 @@ target" scenarios below.
 | `N3-U`  | Three-level nested object drops fields | untyped single | deep target has fewer fields           | extra fields ignored at each level                  |
 | `N4-T`  | Nested optional fields                 | typed vec      | nested target keeps optional subset    | nested optionals preserved, trailing fields ignored |
 | `N4-U`  | Nested optional fields                 | untyped vec    | nested target keeps optional subset    | nested optionals preserved, trailing fields ignored |
-| `O1-T`  | Optional present/null                  | typed vec      | optional field on target               | present values decoded, blank -> null               |
+| `O1-T`  | Optional present/null                  | typed vec      | optional field on target               | present values decoded, _ -> null               |
 | `O1-U`  | Optional present/null                  | untyped vec    | optional field on target               | untyped decode semantics preserved                  |
 
 ## Canonical Text Inputs
@@ -341,7 +341,7 @@ Expected:
 ### `N4-T`
 
 ```text
-[{id@int,profile@{name@str,nick@str,score@float},active@bool}]:(1,(Alice,ally,9.5),true),(2,(Bob,,),false)
+[{id@int,profile@{name@str,nick@str,score@float},active@bool}]:(1,(Alice,ally,9.5),true),(2,(Bob,_,_),false)
 ```
 
 Target:
@@ -359,7 +359,7 @@ Expected:
 ### `N4-U`
 
 ```text
-[{id,profile@{name,nick,score},active}]:(1,(Alice,ally,9.5),true),(2,(Bob,,),false)
+[{id,profile@{name,nick,score},active}]:(1,(Alice,ally,9.5),true),(2,(Bob,_,_),false)
 ```
 
 Target:
@@ -375,7 +375,7 @@ Expected:
 ### `O1-T`
 
 ```text
-[{id@int,label@str,score@float,flag@bool}]:(1,hello,95.5,true),(2,,,false)
+[{id@int,label@str,score@float,flag@bool}]:(1,hello,95.5,true),(2,_,_,false)
 ```
 
 Target:
@@ -393,7 +393,7 @@ Expected:
 ### `O1-U`
 
 ```text
-[{id,label,score,flag}]:(1,hello,95.5,true),(2,,,false)
+[{id,label,score,flag}]:(1,hello,95.5,true),(2,_,_,false)
 ```
 
 Target:

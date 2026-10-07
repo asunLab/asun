@@ -1,8 +1,8 @@
 {
-  "version": 2,
+  "version": 3,
   "spec": "../docs/SPEC.md",
   "grammar": "GRAMMAR.abnf",
-  "count": 347,
+  "count": 413,
   "cases": [
     {
       "id": "primitives.bare.int.zero",
@@ -214,11 +214,119 @@
     {
       "id": "primitives.bare.null",
       "category": "primitives.bare",
-      "desc": "keyword null",
+      "desc": "_ is null",
+      "input": "_",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": null
+    },
+    {
+      "id": "primitives.bare.nullKeyword",
+      "category": "primitives.bare",
+      "desc": "keyword null is still accepted",
       "input": "null",
       "kind": "ok",
       "schemaDriven": false,
       "expected": null
+    },
+    {
+      "id": "primitives.bare.string.quoted.underscore",
+      "category": "primitives.bare",
+      "desc": "quoted _ is a string",
+      "input": "\"_\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "_"
+    },
+    {
+      "id": "primitives.bare.string.underscoreWord",
+      "category": "primitives.bare",
+      "desc": "only the exact token _ is null",
+      "input": "_foo",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "_foo"
+    },
+    {
+      "id": "primitives.bare.string.doubleUnderscore",
+      "category": "primitives.bare",
+      "desc": "__ is a string",
+      "input": "__",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "__"
+    },
+    {
+      "id": "primitives.bare.string.underscoreSpaced",
+      "category": "primitives.bare",
+      "desc": "'_ _' is a string",
+      "input": "_ _",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "_ _"
+    },
+    {
+      "id": "primitives.bare.leadingZero.int",
+      "category": "primitives.bare",
+      "desc": "007 is not a number -> string",
+      "input": "007",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "007"
+    },
+    {
+      "id": "primitives.bare.leadingZero.neg",
+      "category": "primitives.bare",
+      "desc": "-007 is not a number -> string",
+      "input": "-007",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "-007"
+    },
+    {
+      "id": "primitives.bare.leadingZero.double",
+      "category": "primitives.bare",
+      "desc": "00 is not a number -> string",
+      "input": "00",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "00"
+    },
+    {
+      "id": "primitives.bare.leadingZero.float",
+      "category": "primitives.bare",
+      "desc": "01.5 is not a number -> string",
+      "input": "01.5",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "01.5"
+    },
+    {
+      "id": "primitives.bare.leadingZero.exp",
+      "category": "primitives.bare",
+      "desc": "01e3 is not a number -> string",
+      "input": "01e3",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "01e3"
+    },
+    {
+      "id": "primitives.bare.zeroFraction",
+      "category": "primitives.bare",
+      "desc": "0.5 is a number",
+      "input": "0.5",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": 0.5
+    },
+    {
+      "id": "primitives.bare.zeroExp",
+      "category": "primitives.bare",
+      "desc": "0e3 is a number",
+      "input": "0e3",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": 0.0
     },
     {
       "id": "primitives.bare.case.TRUE",
@@ -482,49 +590,67 @@
       "expected": "A"
     },
     {
-      "id": "strings.escape.bs.delim.comma",
+      "id": "strings.escape.raw.delims",
       "category": "strings.escape",
-      "desc": "escaped comma in quoted",
+      "desc": "structural chars are raw in quoted",
+      "input": "\"a,b(c)[d]{e}:f@g\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a,b(c)[d]{e}:f@g"
+    },
+    {
+      "id": "strings.escape.raw.slashStar",
+      "category": "strings.escape",
+      "desc": "/* inside quotes is content",
+      "input": "\"a/*b\"",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": "a/*b"
+    },
+    {
+      "id": "strings.escape.err.delim.comma",
+      "category": "strings.escape",
+      "desc": "\\, is not a JSON escape",
       "input": "\"a\\,b\"",
-      "kind": "ok",
+      "kind": "error",
       "schemaDriven": false,
-      "expected": "a,b"
+      "errorHint": "lex.bad_escape"
     },
     {
-      "id": "strings.escape.bs.delim.lparen",
+      "id": "strings.escape.err.delim.lparen",
       "category": "strings.escape",
-      "desc": "escaped (",
+      "desc": "\\( is not a JSON escape",
       "input": "\"a\\(b\"",
-      "kind": "ok",
+      "kind": "error",
       "schemaDriven": false,
-      "expected": "a(b"
+      "errorHint": "lex.bad_escape"
     },
     {
-      "id": "strings.escape.bs.delim.rparen",
+      "id": "strings.escape.err.delim.rparen",
       "category": "strings.escape",
-      "desc": "escaped )",
+      "desc": "\\) is not a JSON escape",
       "input": "\"a\\)b\"",
-      "kind": "ok",
+      "kind": "error",
       "schemaDriven": false,
-      "expected": "a)b"
+      "errorHint": "lex.bad_escape"
     },
     {
-      "id": "strings.escape.bs.delim.lbrack",
+      "id": "strings.escape.err.delim.lbrack",
       "category": "strings.escape",
-      "desc": "escaped [",
+      "desc": "\\[ is not a JSON escape",
       "input": "\"a\\[b\"",
-      "kind": "ok",
+      "kind": "error",
       "schemaDriven": false,
-      "expected": "a[b"
+      "errorHint": "lex.bad_escape"
     },
     {
-      "id": "strings.escape.bs.delim.rbrack",
+      "id": "strings.escape.err.delim.rbrack",
       "category": "strings.escape",
-      "desc": "escaped ]",
+      "desc": "\\] is not a JSON escape",
       "input": "\"a\\]b\"",
-      "kind": "ok",
+      "kind": "error",
       "schemaDriven": false,
-      "expected": "a]b"
+      "errorHint": "lex.bad_escape"
     },
     {
       "id": "strings.escape.bs.slash",
@@ -554,22 +680,22 @@
       "expected": "a\fb"
     },
     {
-      "id": "strings.escape.bs.braces",
+      "id": "strings.escape.err.braces",
       "category": "strings.escape",
-      "desc": "escaped { }",
+      "desc": "\\{ \\} are not JSON escapes",
       "input": "\"\\{\\}\"",
-      "kind": "ok",
+      "kind": "error",
       "schemaDriven": false,
-      "expected": "{}"
+      "errorHint": "lex.bad_escape"
     },
     {
-      "id": "strings.escape.bs.colonAt",
+      "id": "strings.escape.err.colonAt",
       "category": "strings.escape",
-      "desc": "escaped : @",
+      "desc": "\\: \\@ are not JSON escapes",
       "input": "\"\\:\\@\"",
-      "kind": "ok",
+      "kind": "error",
       "schemaDriven": false,
-      "expected": ":@"
+      "errorHint": "lex.bad_escape"
     },
     {
       "id": "strings.escape.bs.unicode.upperHex",
@@ -680,71 +806,62 @@
       "errorHint": "lex.bad_escape"
     },
     {
-      "id": "strings.plainEscape.comma",
-      "category": "strings.plainEscape",
-      "desc": "plain string \\,",
-      "input": "a\\,b",
-      "kind": "ok",
-      "schemaDriven": false,
-      "expected": "a,b"
+      "id": "strings.plainBackslash.comma",
+      "category": "strings.plainBackslash",
+      "desc": "plain string a\\,b",
+      "input": "{a}:(a\\,b)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "lex.bad_escape"
     },
     {
-      "id": "strings.plainEscape.lparen",
-      "category": "strings.plainEscape",
-      "desc": "plain string \\(",
-      "input": "a\\(b",
-      "kind": "ok",
-      "schemaDriven": false,
-      "expected": "a(b"
+      "id": "strings.plainBackslash.lparen",
+      "category": "strings.plainBackslash",
+      "desc": "plain string a\\(b",
+      "input": "{a}:(a\\(b)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "lex.bad_escape"
     },
     {
-      "id": "strings.plainEscape.rparen",
-      "category": "strings.plainEscape",
-      "desc": "plain string \\)",
-      "input": "a\\)b",
-      "kind": "ok",
+      "id": "strings.plainBackslash.rbrack",
+      "category": "strings.plainBackslash",
+      "desc": "plain string a\\]b",
+      "input": "[a\\]b]",
+      "kind": "error",
       "schemaDriven": false,
-      "expected": "a)b"
+      "errorHint": "lex.bad_escape"
     },
     {
-      "id": "strings.plainEscape.lbrack",
-      "category": "strings.plainEscape",
-      "desc": "plain string \\[",
-      "input": "a\\[b",
-      "kind": "ok",
-      "schemaDriven": false,
-      "expected": "a[b"
-    },
-    {
-      "id": "strings.plainEscape.rbrack",
-      "category": "strings.plainEscape",
-      "desc": "plain string \\]",
-      "input": "a\\]b",
-      "kind": "ok",
-      "schemaDriven": false,
-      "expected": "a]b"
-    },
-    {
-      "id": "strings.plainEscape.bsbs",
-      "category": "strings.plainEscape",
-      "desc": "plain string \\\\",
+      "id": "strings.plainBackslash.bsbs",
+      "category": "strings.plainBackslash",
+      "desc": "plain string a\\\\b",
       "input": "a\\\\b",
-      "kind": "ok",
+      "kind": "error",
       "schemaDriven": false,
-      "expected": "a\\b"
+      "errorHint": "lex.bad_escape"
     },
     {
-      "id": "strings.plainEscape.slashStar",
-      "category": "strings.plainEscape",
-      "desc": "plain string \\/* is not a comment",
+      "id": "strings.plainBackslash.slashStar",
+      "category": "strings.plainBackslash",
+      "desc": "plain string a\\/*b",
       "input": "a\\/*b",
-      "kind": "ok",
+      "kind": "error",
       "schemaDriven": false,
-      "expected": "a/*b"
+      "errorHint": "lex.bad_escape"
     },
     {
-      "id": "strings.plainEscape.trailingBackslash",
-      "category": "strings.plainEscape",
+      "id": "strings.plainBackslash.lone",
+      "category": "strings.plainBackslash",
+      "desc": "lone backslash in a plain string",
+      "input": "a\\b",
+      "kind": "error",
+      "schemaDriven": false,
+      "errorHint": "lex.bad_escape"
+    },
+    {
+      "id": "strings.plainBackslash.trailingBackslash",
+      "category": "strings.plainBackslash",
       "desc": "trailing backslash",
       "input": "{a}:(abc\\)",
       "kind": "error",
@@ -752,8 +869,20 @@
       "errorHint": "lex.bad_escape"
     },
     {
-      "id": "strings.plainEscape.rawQuote",
-      "category": "strings.plainEscape",
+      "id": "strings.plainBackslash.quotedInstead",
+      "category": "strings.plainBackslash",
+      "desc": "quote the value instead",
+      "input": "{a,b}:(\"a,b\",\"x\\\\y\")",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": "a,b",
+        "b": "x\\y"
+      }
+    },
+    {
+      "id": "strings.plainBackslash.rawQuote",
+      "category": "strings.plainBackslash",
       "desc": "raw quote inside plain string",
       "input": "{a}:(5\" screen)",
       "kind": "error",
@@ -761,8 +890,8 @@
       "errorHint": "lex.raw_quote"
     },
     {
-      "id": "strings.plainEscape.rawNewline",
-      "category": "strings.plainEscape",
+      "id": "strings.plainBackslash.rawNewline",
+      "category": "strings.plainBackslash",
       "desc": "raw LF inside plain string",
       "input": "{a}:(a\nb)",
       "kind": "error",
@@ -770,8 +899,8 @@
       "errorHint": "lex.control_char"
     },
     {
-      "id": "strings.plainEscape.quotedThenJunk",
-      "category": "strings.plainEscape",
+      "id": "strings.plainBackslash.quotedThenJunk",
+      "category": "strings.plainBackslash",
       "desc": "quoted string followed by more text",
       "input": "{a}:(\"a\"b)",
       "kind": "error",
@@ -819,14 +948,23 @@
     {
       "id": "objects.single.nullField",
       "category": "objects.single",
-      "desc": "missing -> null",
-      "input": "{name@str,age@int}:(Alice,)",
+      "desc": "_ -> null",
+      "input": "{name@str,age@int}:(Alice,_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
         "name": "Alice",
         "age": null
       }
+    },
+    {
+      "id": "objects.single.blankField",
+      "category": "objects.single",
+      "desc": "a blank slot is an error, write _",
+      "input": "{name@str,age@int}:(Alice,)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.empty_slot"
     },
     {
       "id": "objects.single.emptyString",
@@ -923,6 +1061,30 @@
       }
     },
     {
+      "id": "objects.single.underscoreNull",
+      "category": "objects.single",
+      "desc": "_ in a slot",
+      "input": "{a,b}:(_,1)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": null,
+        "b": 1
+      }
+    },
+    {
+      "id": "objects.single.quotedUnderscore",
+      "category": "objects.single",
+      "desc": "quoted _ is a string",
+      "input": "{a,b@str}:(\"_\",\"_\")",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": "_",
+        "b": "_"
+      }
+    },
+    {
       "id": "objects.single.quotedNull",
       "category": "objects.single",
       "desc": "quoted null is a string",
@@ -937,13 +1099,36 @@
       "id": "objects.single.strHintMakesString",
       "category": "objects.single",
       "desc": "@str: unquoted 42 / true are strings",
-      "input": "{a@str,b@str,c@str}:(42,true,null)",
+      "input": "{a@str,b@str,c@str,d@str}:(42,true,_,null)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
         "a": "42",
         "b": "true",
-        "c": null
+        "c": null,
+        "d": null
+      }
+    },
+    {
+      "id": "objects.single.strHintLeadingZero",
+      "category": "objects.single",
+      "desc": "@str: unquoted 007 keeps its zeros",
+      "input": "{zip@str}:(007)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "zip": "007"
+      }
+    },
+    {
+      "id": "objects.single.untypedLeadingZero",
+      "category": "objects.single",
+      "desc": "no hint: 007 is a string",
+      "input": "{zip}:(001234)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "zip": "001234"
       }
     },
     {
@@ -986,7 +1171,7 @@
     {
       "id": "objects.single.emptySchema",
       "category": "objects.single",
-      "desc": "zero-field schema matches ()",
+      "desc": "zero-field schema matches the zero-element tuple ()",
       "input": "{}:()",
       "kind": "ok",
       "schemaDriven": true,
@@ -1576,16 +1761,11 @@
     {
       "id": "arrays.plain.trailingComma",
       "category": "arrays.plain",
-      "desc": "comma is a separator: [1,2,3,] ends with null",
+      "desc": "no trailing comma",
       "input": "[1,2,3,]",
-      "kind": "ok",
+      "kind": "error",
       "schemaDriven": false,
-      "expected": [
-        1,
-        2,
-        3,
-        null
-      ]
+      "errorHint": "parse.empty_slot"
     },
     {
       "id": "arrays.plain.emptySpaced",
@@ -1597,10 +1777,19 @@
       "expected": []
     },
     {
+      "id": "arrays.plain.twoBlanks",
+      "category": "arrays.plain",
+      "desc": "[,] has blank elements",
+      "input": "[,]",
+      "kind": "error",
+      "schemaDriven": false,
+      "errorHint": "parse.empty_slot"
+    },
+    {
       "id": "arrays.plain.twoNulls",
       "category": "arrays.plain",
-      "desc": "[,] is two nulls",
-      "input": "[,]",
+      "desc": "[_,_] is two nulls",
+      "input": "[_,_]",
       "kind": "ok",
       "schemaDriven": false,
       "expected": [
@@ -1611,6 +1800,17 @@
     {
       "id": "arrays.plain.singleNull",
       "category": "arrays.plain",
+      "desc": "[_] is one null",
+      "input": "[_]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        null
+      ]
+    },
+    {
+      "id": "arrays.plain.singleNullKeyword",
+      "category": "arrays.plain",
       "desc": "[null] is one null",
       "input": "[null]",
       "kind": "ok",
@@ -1620,10 +1820,19 @@
       ]
     },
     {
+      "id": "arrays.plain.leadingComma",
+      "category": "arrays.plain",
+      "desc": "no leading comma",
+      "input": "[,1]",
+      "kind": "error",
+      "schemaDriven": false,
+      "errorHint": "parse.empty_slot"
+    },
+    {
       "id": "arrays.plain.leadingNull",
       "category": "arrays.plain",
-      "desc": "[,1] leading null",
-      "input": "[,1]",
+      "desc": "[_,1] leading null",
+      "input": "[_,1]",
       "kind": "ok",
       "schemaDriven": false,
       "expected": [
@@ -1658,14 +1867,35 @@
     {
       "id": "arrays.plain.sparseNull",
       "category": "arrays.plain",
-      "desc": "sparse with null",
-      "input": "[1,,3]",
+      "desc": "null in the middle",
+      "input": "[1,_,3]",
       "kind": "ok",
       "schemaDriven": false,
       "expected": [
         1,
         null,
         3
+      ]
+    },
+    {
+      "id": "arrays.plain.doubleComma",
+      "category": "arrays.plain",
+      "desc": "[1,,3] has a blank element",
+      "input": "[1,,3]",
+      "kind": "error",
+      "schemaDriven": false,
+      "errorHint": "parse.empty_slot"
+    },
+    {
+      "id": "arrays.plain.colonIsContent",
+      "category": "arrays.plain",
+      "desc": "without a map binding : is content",
+      "input": "[a:1,12:30]",
+      "kind": "ok",
+      "schemaDriven": false,
+      "expected": [
+        "a:1",
+        "12:30"
       ]
     },
     {
@@ -2110,17 +2340,26 @@
     {
       "id": "commas.trail",
       "category": "commas",
-      "desc": "(1,2,) has three slots",
+      "desc": "(1,2,) has a blank element",
       "input": "{a@int,b@int}:(1,2,)",
       "kind": "error",
       "schemaDriven": true,
-      "errorHint": "parse.field_count"
+      "errorHint": "parse.empty_slot"
+    },
+    {
+      "id": "commas.trailBlank",
+      "category": "commas",
+      "desc": "(1,) has a blank element",
+      "input": "{a@int,b@int}:(1,)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.empty_slot"
     },
     {
       "id": "commas.trailIsNull",
       "category": "commas",
-      "desc": "final empty slot is null",
-      "input": "{a@int,b@int}:(1,)",
+      "desc": "final null is written _",
+      "input": "{a@int,b@int}:(1,_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -2129,10 +2368,19 @@
       }
     },
     {
+      "id": "commas.onlyComma",
+      "category": "commas",
+      "desc": "(,) has blank elements",
+      "input": "{a@int,b@int}:(,)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.empty_slot"
+    },
+    {
       "id": "commas.twoNulls",
       "category": "commas",
-      "desc": "(,) is two nulls",
-      "input": "{a@int,b@int}:(,)",
+      "desc": "(_,_) is two nulls",
+      "input": "{a@int,b@int}:(_,_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -2141,20 +2389,18 @@
       }
     },
     {
-      "id": "commas.emptyTupleOneNull",
+      "id": "commas.emptyTupleOneField",
       "category": "commas",
-      "desc": "() is one null slot",
+      "desc": "() has zero elements, schema has one",
       "input": "{a@int}:()",
-      "kind": "ok",
+      "kind": "error",
       "schemaDriven": true,
-      "expected": {
-        "a": null
-      }
+      "errorHint": "parse.field_count"
     },
     {
       "id": "commas.emptyTupleTwoFields",
       "category": "commas",
-      "desc": "() has one slot, schema has two",
+      "desc": "() has zero elements, schema has two",
       "input": "{a@int,b@int}:()",
       "kind": "error",
       "schemaDriven": true,
@@ -2163,8 +2409,17 @@
     {
       "id": "commas.consec",
       "category": "commas",
-      "desc": "consecutive commas -> null",
+      "desc": "consecutive commas are an error",
       "input": "{a@int,b@int,c@int}:(1,,3)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.empty_slot"
+    },
+    {
+      "id": "commas.middleNull",
+      "category": "commas",
+      "desc": "null in the middle is written _",
+      "input": "{a@int,b@int,c@int}:(1,_,3)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -2174,25 +2429,49 @@
       }
     },
     {
-      "id": "commas.consecAndTrail",
+      "id": "commas.leading",
       "category": "commas",
-      "desc": "(1,2,,) has four slots",
-      "input": "{a@int,b@int,c@int}:(1,2,,)",
+      "desc": "leading comma is an error",
+      "input": "{a@int,b@int}:(,1)",
       "kind": "error",
       "schemaDriven": true,
-      "errorHint": "parse.field_count"
+      "errorHint": "parse.empty_slot"
     },
     {
       "id": "commas.allNull",
       "category": "commas",
       "desc": "all nulls",
-      "input": "{a@int,b@int,c@int}:(,,)",
+      "input": "{a@int,b@int,c@int}:(_,_,_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
         "a": null,
         "b": null,
         "c": null
+      }
+    },
+    {
+      "id": "commas.spacedNull",
+      "category": "commas",
+      "desc": "layout around _",
+      "input": "{a@int,b@int}:( _ , 2 )",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": null,
+        "b": 2
+      }
+    },
+    {
+      "id": "commas.nestedNull",
+      "category": "commas",
+      "desc": "_ for a whole nested object or array",
+      "input": "{a@{x,y},b@[int]}:(_,_)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "a": null,
+        "b": null
       }
     },
     {
@@ -2243,7 +2522,7 @@
     {
       "id": "errors.tooFew",
       "category": "errors",
-      "desc": "too few values (no trailing comma)",
+      "desc": "too few values",
       "input": "{a@int,b@int}:(1)",
       "kind": "error",
       "schemaDriven": true,
@@ -2365,6 +2644,24 @@
       "kind": "error",
       "schemaDriven": false,
       "errorHint": "semantic.S4.overflow"
+    },
+    {
+      "id": "errors.intHintLeadingZero",
+      "category": "errors",
+      "desc": "007 is a string, so @int rejects it (S3)",
+      "input": "{a@int}:(007)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "type.coercion"
+    },
+    {
+      "id": "errors.floatHintLeadingZero",
+      "category": "errors",
+      "desc": "01.5 is a string, so @float rejects it (S3)",
+      "input": "{a@float}:(01.5)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "type.coercion"
     },
     {
       "id": "errors.intHintSpacedDigits",
@@ -2976,7 +3273,7 @@
       "id": "optionals.noneInt",
       "category": "optionals",
       "desc": "None(int)",
-      "input": "{x@int}:()",
+      "input": "{x@int}:(_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -2998,7 +3295,7 @@
       "id": "optionals.noneStr",
       "category": "optionals",
       "desc": "None(str)",
-      "input": "{x@str}:()",
+      "input": "{x@str}:(_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -3020,7 +3317,7 @@
       "id": "optionals.middleNone",
       "category": "optionals",
       "desc": "middle field is null",
-      "input": "{a@int,b@int,c@int}:(1,,3)",
+      "input": "{a@int,b@int,c@int}:(1,_,3)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6196,7 +6493,7 @@
       "id": "objects.nullPatterns.m00",
       "category": "objects.nullPatterns",
       "desc": "null-mask 00000",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,,,,)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(_,_,_,_,_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6211,7 +6508,7 @@
       "id": "objects.nullPatterns.m01",
       "category": "objects.nullPatterns",
       "desc": "null-mask 00001",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,,,,)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,_,_,_,_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6226,7 +6523,7 @@
       "id": "objects.nullPatterns.m02",
       "category": "objects.nullPatterns",
       "desc": "null-mask 00010",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,2,,,)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(_,2,_,_,_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6241,7 +6538,7 @@
       "id": "objects.nullPatterns.m03",
       "category": "objects.nullPatterns",
       "desc": "null-mask 00011",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,,,)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,_,_,_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6256,7 +6553,7 @@
       "id": "objects.nullPatterns.m04",
       "category": "objects.nullPatterns",
       "desc": "null-mask 00100",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,,3,,)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(_,_,3,_,_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6271,7 +6568,7 @@
       "id": "objects.nullPatterns.m05",
       "category": "objects.nullPatterns",
       "desc": "null-mask 00101",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,,3,,)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,_,3,_,_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6286,7 +6583,7 @@
       "id": "objects.nullPatterns.m06",
       "category": "objects.nullPatterns",
       "desc": "null-mask 00110",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,2,3,,)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(_,2,3,_,_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6301,7 +6598,7 @@
       "id": "objects.nullPatterns.m07",
       "category": "objects.nullPatterns",
       "desc": "null-mask 00111",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,3,,)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,3,_,_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6316,7 +6613,7 @@
       "id": "objects.nullPatterns.m08",
       "category": "objects.nullPatterns",
       "desc": "null-mask 01000",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,,,4,)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(_,_,_,4,_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6331,7 +6628,7 @@
       "id": "objects.nullPatterns.m09",
       "category": "objects.nullPatterns",
       "desc": "null-mask 01001",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,,,4,)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,_,_,4,_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6346,7 +6643,7 @@
       "id": "objects.nullPatterns.m10",
       "category": "objects.nullPatterns",
       "desc": "null-mask 01010",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,2,,4,)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(_,2,_,4,_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6361,7 +6658,7 @@
       "id": "objects.nullPatterns.m11",
       "category": "objects.nullPatterns",
       "desc": "null-mask 01011",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,,4,)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,_,4,_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6376,7 +6673,7 @@
       "id": "objects.nullPatterns.m12",
       "category": "objects.nullPatterns",
       "desc": "null-mask 01100",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,,3,4,)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(_,_,3,4,_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6391,7 +6688,7 @@
       "id": "objects.nullPatterns.m13",
       "category": "objects.nullPatterns",
       "desc": "null-mask 01101",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,,3,4,)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,_,3,4,_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6406,7 +6703,7 @@
       "id": "objects.nullPatterns.m14",
       "category": "objects.nullPatterns",
       "desc": "null-mask 01110",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,2,3,4,)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(_,2,3,4,_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6421,7 +6718,7 @@
       "id": "objects.nullPatterns.m15",
       "category": "objects.nullPatterns",
       "desc": "null-mask 01111",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,3,4,)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,3,4,_)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6436,7 +6733,7 @@
       "id": "objects.nullPatterns.m16",
       "category": "objects.nullPatterns",
       "desc": "null-mask 10000",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,,,,5)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(_,_,_,_,5)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6451,7 +6748,7 @@
       "id": "objects.nullPatterns.m17",
       "category": "objects.nullPatterns",
       "desc": "null-mask 10001",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,,,,5)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,_,_,_,5)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6466,7 +6763,7 @@
       "id": "objects.nullPatterns.m18",
       "category": "objects.nullPatterns",
       "desc": "null-mask 10010",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,2,,,5)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(_,2,_,_,5)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6481,7 +6778,7 @@
       "id": "objects.nullPatterns.m19",
       "category": "objects.nullPatterns",
       "desc": "null-mask 10011",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,,,5)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,_,_,5)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6496,7 +6793,7 @@
       "id": "objects.nullPatterns.m20",
       "category": "objects.nullPatterns",
       "desc": "null-mask 10100",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,,3,,5)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(_,_,3,_,5)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6511,7 +6808,7 @@
       "id": "objects.nullPatterns.m21",
       "category": "objects.nullPatterns",
       "desc": "null-mask 10101",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,,3,,5)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,_,3,_,5)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6526,7 +6823,7 @@
       "id": "objects.nullPatterns.m22",
       "category": "objects.nullPatterns",
       "desc": "null-mask 10110",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,2,3,,5)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(_,2,3,_,5)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6541,7 +6838,7 @@
       "id": "objects.nullPatterns.m23",
       "category": "objects.nullPatterns",
       "desc": "null-mask 10111",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,3,,5)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,3,_,5)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6556,7 +6853,7 @@
       "id": "objects.nullPatterns.m24",
       "category": "objects.nullPatterns",
       "desc": "null-mask 11000",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,,,4,5)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(_,_,_,4,5)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6571,7 +6868,7 @@
       "id": "objects.nullPatterns.m25",
       "category": "objects.nullPatterns",
       "desc": "null-mask 11001",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,,,4,5)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,_,_,4,5)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6586,7 +6883,7 @@
       "id": "objects.nullPatterns.m26",
       "category": "objects.nullPatterns",
       "desc": "null-mask 11010",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,2,,4,5)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(_,2,_,4,5)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6601,7 +6898,7 @@
       "id": "objects.nullPatterns.m27",
       "category": "objects.nullPatterns",
       "desc": "null-mask 11011",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,,4,5)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,2,_,4,5)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6616,7 +6913,7 @@
       "id": "objects.nullPatterns.m28",
       "category": "objects.nullPatterns",
       "desc": "null-mask 11100",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,,3,4,5)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(_,_,3,4,5)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6631,7 +6928,7 @@
       "id": "objects.nullPatterns.m29",
       "category": "objects.nullPatterns",
       "desc": "null-mask 11101",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,,3,4,5)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(1,_,3,4,5)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6646,7 +6943,7 @@
       "id": "objects.nullPatterns.m30",
       "category": "objects.nullPatterns",
       "desc": "null-mask 11110",
-      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(,2,3,4,5)",
+      "input": "{f0@int,f1@int,f2@int,f3@int,f4@int}:(_,2,3,4,5)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
@@ -6671,6 +6968,431 @@
         "f3": 4,
         "f4": 5
       }
+    },
+    {
+      "id": "maps.basic",
+      "category": "maps",
+      "desc": "str -> int map",
+      "input": "{user@str,attrs@[str:int]}:(Alice,[age:30,score:95])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "user": "Alice",
+        "attrs": {
+          "age": 30,
+          "score": 95
+        }
+      }
+    },
+    {
+      "id": "maps.empty",
+      "category": "maps",
+      "desc": "[] is the empty map",
+      "input": "{attrs@[str:int]}:([])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "attrs": {}
+      }
+    },
+    {
+      "id": "maps.single",
+      "category": "maps",
+      "desc": "one entry",
+      "input": "{attrs@[str:str]}:([lang:zh])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "attrs": {
+          "lang": "zh"
+        }
+      }
+    },
+    {
+      "id": "maps.spaced",
+      "category": "maps",
+      "desc": "layout around : and ,",
+      "input": "{attrs@[str:int]}:([ age : 30 , score:95 ])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "attrs": {
+          "age": 30,
+          "score": 95
+        }
+      }
+    },
+    {
+      "id": "maps.keyWithSpace",
+      "category": "maps",
+      "desc": "plain key with internal space",
+      "input": "{pop@[str:int]}:([New York:8,Los Angeles:4])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "pop": {
+          "New York": 8,
+          "Los Angeles": 4
+        }
+      }
+    },
+    {
+      "id": "maps.quotedKey",
+      "category": "maps",
+      "desc": "a key containing : must be quoted",
+      "input": "{m@[str:int]}:([\"12:30\":1,\"a,b\":2])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "m": {
+          "12:30": 1,
+          "a,b": 2
+        }
+      }
+    },
+    {
+      "id": "maps.valueWithColon",
+      "category": "maps",
+      "desc": "the first : splits; the value may contain :",
+      "input": "{m@[str:str]}:([start:12:30,url:https://a.com])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "m": {
+          "start": "12:30",
+          "url": "https://a.com"
+        }
+      }
+    },
+    {
+      "id": "maps.numericStrKey",
+      "category": "maps",
+      "desc": "@[str:...] keys take the token text",
+      "input": "{m@[str:int]}:([1:10,007:20])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "m": {
+          "1": 10,
+          "007": 20
+        }
+      }
+    },
+    {
+      "id": "maps.intKey",
+      "category": "maps",
+      "desc": "int keys (shown as decimal text)",
+      "input": "{m@[int:str]}:([1:one,-2:minus two])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "m": {
+          "1": "one",
+          "-2": "minus two"
+        }
+      }
+    },
+    {
+      "id": "maps.nullValue",
+      "category": "maps",
+      "desc": "_ is a null value",
+      "input": "{m@[str:int]}:([a:_,b:2])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "m": {
+          "a": null,
+          "b": 2
+        }
+      }
+    },
+    {
+      "id": "maps.nullMap",
+      "category": "maps",
+      "desc": "_ for the whole map",
+      "input": "{m@[str:int]}:(_)",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "m": null
+      }
+    },
+    {
+      "id": "maps.structValue",
+      "category": "maps",
+      "desc": "struct values",
+      "input": "{pts@[str:{x@int,y@int}]}:([a:(1,2),b:(3,4)])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "pts": {
+          "a": {
+            "x": 1,
+            "y": 2
+          },
+          "b": {
+            "x": 3,
+            "y": 4
+          }
+        }
+      }
+    },
+    {
+      "id": "maps.arrayValue",
+      "category": "maps",
+      "desc": "array values",
+      "input": "{m@[str:[int]]}:([a:[1,2],b:[]])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "m": {
+          "a": [
+            1,
+            2
+          ],
+          "b": []
+        }
+      }
+    },
+    {
+      "id": "maps.mapValue",
+      "category": "maps",
+      "desc": "map of maps",
+      "input": "{m@[str:[str:int]]}:([a:[x:1],b:[]])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "m": {
+          "a": {
+            "x": 1
+          },
+          "b": {}
+        }
+      }
+    },
+    {
+      "id": "maps.arrayOfMaps",
+      "category": "maps",
+      "desc": "array of maps",
+      "input": "{m@[[str:int]]}:([[a:1],[b:2,c:3]])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "m": [
+          {
+            "a": 1
+          },
+          {
+            "b": 2,
+            "c": 3
+          }
+        ]
+      }
+    },
+    {
+      "id": "maps.untyped",
+      "category": "maps",
+      "desc": "@[:] untyped map: keys and values by S2",
+      "input": "{m@[:]}:([a:1,b:x,1:true])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "m": {
+          "a": 1,
+          "b": "x",
+          "1": true
+        }
+      }
+    },
+    {
+      "id": "maps.valueTypeOnly",
+      "category": "maps",
+      "desc": "@[:int] untyped key",
+      "input": "{m@[:int]}:([a:1])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "m": {
+          "a": 1
+        }
+      }
+    },
+    {
+      "id": "maps.inRows",
+      "category": "maps",
+      "desc": "maps inside rows",
+      "input": "[{id@int,tags@[str:str]}]:(1,[env:prod]),(2,[])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": [
+        {
+          "id": 1,
+          "tags": {
+            "env": "prod"
+          }
+        },
+        {
+          "id": 2,
+          "tags": {}
+        }
+      ]
+    },
+    {
+      "id": "maps.comments",
+      "category": "maps",
+      "desc": "comments are layout inside maps",
+      "input": "{m@[str:int]}:([a /* k */ : /* v */ 1])",
+      "kind": "ok",
+      "schemaDriven": true,
+      "expected": {
+        "m": {
+          "a": 1
+        }
+      }
+    },
+    {
+      "id": "maps.duplicateKey",
+      "category": "maps",
+      "desc": "duplicate key",
+      "input": "{m@[str:int]}:([a:1,a:2])",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "semantic.S11.duplicate_key"
+    },
+    {
+      "id": "maps.duplicateAfterResolve",
+      "category": "maps",
+      "desc": "1 and \"1\" are the same str key",
+      "input": "{m@[str:int]}:([1:1,\"1\":2])",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "semantic.S11.duplicate_key"
+    },
+    {
+      "id": "maps.nullKey",
+      "category": "maps",
+      "desc": "_ is not a valid key",
+      "input": "{m@[str:int]}:([_:1])",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "semantic.S11.bad_key"
+    },
+    {
+      "id": "maps.boolKeyUntyped",
+      "category": "maps",
+      "desc": "untyped key true is a boolean, not allowed",
+      "input": "{m@[:]}:([true:1])",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "semantic.S11.bad_key"
+    },
+    {
+      "id": "maps.floatKeyUntyped",
+      "category": "maps",
+      "desc": "untyped key 1.5 is a float, not allowed",
+      "input": "{m@[:]}:([1.5:1])",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "semantic.S11.bad_key"
+    },
+    {
+      "id": "maps.intKeyNotInt",
+      "category": "maps",
+      "desc": "@[int:...] rejects a non-integer key",
+      "input": "{m@[int:str]}:([a:x])",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "type.coercion"
+    },
+    {
+      "id": "maps.valueTypeMismatch",
+      "category": "maps",
+      "desc": "value must satisfy the value type",
+      "input": "{m@[str:int]}:([a:x])",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "type.coercion"
+    },
+    {
+      "id": "maps.entryWithoutColon",
+      "category": "maps",
+      "desc": "a map entry needs key:value",
+      "input": "{m@[str:int]}:([1,2])",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "semantic.S11.not_map"
+    },
+    {
+      "id": "maps.blankEntry",
+      "category": "maps",
+      "desc": "no blank entries",
+      "input": "{m@[str:int]}:([a:1,,b:2])",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.empty_slot"
+    },
+    {
+      "id": "maps.trailingComma",
+      "category": "maps",
+      "desc": "no trailing comma",
+      "input": "{m@[str:int]}:([a:1,])",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.empty_slot"
+    },
+    {
+      "id": "maps.missingValue",
+      "category": "maps",
+      "desc": "a null value is written _",
+      "input": "{m@[str:int]}:([a:])",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "semantic.S11.not_map"
+    },
+    {
+      "id": "maps.bareColonKey",
+      "category": "maps",
+      "desc": "plain key cannot be empty",
+      "input": "{m@[str:int]}:([:1])",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "semantic.S11.not_map"
+    },
+    {
+      "id": "maps.mapWithoutBinding",
+      "category": "maps",
+      "desc": "a map value needs a map binding (S8)",
+      "input": "{m@[]}:([a:(1)])",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "semantic.S11.not_map"
+    },
+    {
+      "id": "maps.topLevel",
+      "category": "maps",
+      "desc": "a map is never a top-level form",
+      "input": "[a:(1)]",
+      "kind": "error",
+      "schemaDriven": false,
+      "errorHint": "parse.unexpected"
+    },
+    {
+      "id": "maps.badKeyType",
+      "category": "maps",
+      "desc": "key type must be str or int",
+      "input": "{m@[float:int]}:([])",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.bad_type"
+    },
+    {
+      "id": "maps.structKeyType",
+      "category": "maps",
+      "desc": "key type cannot be a struct",
+      "input": "{m@[{x}:int]}:([])",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "parse.bad_type"
     }
   ]
 }

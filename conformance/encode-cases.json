@@ -1,8 +1,8 @@
 {
-  "version": 2,
+  "version": 3,
   "spec": "../docs/SPEC.md",
   "grammar": "GRAMMAR.abnf",
-  "count": 158,
+  "count": 162,
   "semantics": "round-trip",
   "rule": "decode(encode(value)) deep-equals value",
   "cases": [
@@ -172,6 +172,20 @@
       "category": "encode.string.lookalike",
       "desc": "string 'null'",
       "value": "null",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.underscore",
+      "category": "encode.string.lookalike",
+      "desc": "string '_'",
+      "value": "_",
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.string.lookalike.underscoreWord",
+      "category": "encode.string.lookalike",
+      "desc": "string '_x'",
+      "value": "_x",
       "kind": "round-trip"
     },
     {
@@ -1022,6 +1036,26 @@
       "value": [
         "null",
         "null"
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.lookalike.underscoreStrs",
+      "category": "encode.array.lookalike",
+      "desc": "['_','_']",
+      "value": [
+        "_",
+        "_"
+      ],
+      "kind": "round-trip"
+    },
+    {
+      "id": "encode.array.lookalike.nullAndUnderscore",
+      "category": "encode.array.lookalike",
+      "desc": "[null,'_']",
+      "value": [
+        null,
+        "_"
       ],
       "kind": "round-trip"
     },

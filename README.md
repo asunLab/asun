@@ -103,9 +103,9 @@ users[2]{id,name,active}:
 ### When to Choose ASUN
 
 - You want **fewer tokens and smaller payloads** without losing structure
-- You need **rich structured data** — optional fields, arrays, nested structs, keyed entry lists
+- You need **rich structured data** — optional fields, arrays, nested structs, maps
 - You want one format to work across **LLMs, APIs, storage, and service-to-service transport**
-- Your data has **rich structure** — optional fields, arrays, nested structs, keyed entry lists
+- Your data has **rich structure** — optional fields, arrays, nested structs, maps
 - You need **binary encoding** alongside text
 - You work in **multiple languages** or need a language-neutral wire format
 - You want the schema to act as a **self-documenting API contract** for LLM prompts, with `@` binding fields to structural descriptions and optional scalar hints
@@ -142,15 +142,15 @@ Schema declared once, each row is a tuple:
 ### Optional Fields
 
 ```
-{id@int, label@str}:(1,hello),(2,)
+[{id@int, label@str}]:(1,hello),(2,_)
 ```
 
-_(blank value = `None`/`null`)_
+_(`_` is null: `None` / `null`)_
 
-### Arrays and Keyed Entries
+### Arrays and Maps
 
 ```
-{name@str, scores@[int], attrs@[{key@str, value@int}]}:(Alice,[90,85,92],[(age,30),(score,95)])
+{name@str, scores@[int], attrs@[str:int]}:(Alice,[90,85,92],[age:30,score:95])
 ```
 
 ---

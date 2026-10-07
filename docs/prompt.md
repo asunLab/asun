@@ -33,17 +33,17 @@ For scalar types (int, str, bool), the `@type` portion is an optional hint (`nam
 
 - **Nested Object**: `dept@{title@str, level@int}` or `dept@{title, level}` (Notice `@` and `{}` must remain even without scalar types).
 - **Array Field**: `tags@[str]` or `tags@[]`
-- **Map/Dict Representation**: Maps are represented as arrays of key-value tuples: `attrs@[{key@str, value@int}] : ( [(age,30), (score,95)] )`
+- **Map/Dict Field**: `attrs@[str:int]` with value `[age:30, score:95]`. Quote a key that contains `:`.
 
 ✅ **Correct Nested**: `{user, metadata@{created_at}} : (Alice, (2024))`
 ❌ **Fatal Error**: `{user, metadata} : (Alice, (2024))` (Parser will fail because it wasn't told `metadata` expects a nested tuple).
 
 ## 5. Value and Edge Case Rules
 
-- Strings do not need quotes unless they need to preserve leading/trailing spaces, or contain structural characters like `, ( ) [ ] { } " \`. `@` and `:` are fine unquoted (`alice@example.com`, `12:30`).
-- Keywords are lowercase and case-sensitive (`true`, `false`, `null`). Quote strings that look like keywords or numbers: `"true"`, `"null"`, `"007"`.
-- Null / Optional fields are an empty slot or `null`: `(Alice, , 30)` means the middle field is `null`.
-- A comma is a pure separator: the number of values is always commas + 1. `(1, 2,)` has THREE values (the last is null), so never add a trailing comma.
+- Strings do not need quotes unless they need to preserve leading/trailing spaces, or contain structural characters like `, ( ) [ ] { } " \` (there are no backslash escapes outside quotes). `@` and `:` are fine unquoted (`alice@example.com`, `12:30`).
+- Keywords are lowercase and case-sensitive (`true`, `false`, `_`). Quote strings that look like keywords or numbers: `"true"`, `"_"`, `"42"`.
+- Null is written `_`: `(Alice, _, 30)` means the middle field is null. Never leave a position blank.
+- Commas only separate values: no leading, trailing or doubled commas. `(1, 2,)` and `(1,,3)` are errors.
 - Comments `/* ... */` may appear between values; `//` comments are not supported.
 
 ## Summary Examples for AI Generation

@@ -1,4 +1,4 @@
-# ASUN Format Specification v1.5
+# ASUN Format Specification v1.6
 
 > **ASUN** = Array-Schema Unified Notation  
 > _"The efficiency of arrays, the structure of objects."_
@@ -80,24 +80,20 @@ ASUN's design goes beyond just saving tokens; its deep architectural philosophy 
 
 3. **Native Immunity to Key Collisions**
    - JSON syntax allows ambiguous key duplications (e.g., `{"age": 30, "age": 40}`), often leading to the latter covering the former.
-   - By confining keys exclusively to the Schema header, ASUN data regions consist solely of compact values (`(30), (40)`), completely insulating the format from key collisions at the syntactic source. By reducing Maps/Dictionaries to arrays of key-value tuples (e.g., `[{key, value}]: ((age,30))`), ASUN perfectly extends this high-performance, collision-free design abstraction.
+   - By confining keys exclusively to the Schema header, ASUN data regions consist solely of compact values (`(30), (40)`), completely insulating the format from key collisions at the syntactic source. Maps/Dictionaries are a first-class type declared in the schema (`attrs@[str:int]`) and written as `[age:30,score:95]`; duplicate map keys are an error too, so the format stays collision-free.
 
 ---
 
-## 1.4 Changes in v1.5
+## 1.4 Changes in v1.6
 
-| Area           | v1.4                                    | v1.5                                                        |
-| -------------- | --------------------------------------- | ----------------------------------------------------------- |
-| Commas         | Trailing comma ignored                  | Pure separator: `(a,)` = `a, null`; `(,)` = two nulls       |
-| Null           | Blank only                              | Blank or keyword `null`; `"null"` is a string               |
-| Comments       | Forbidden inside tuples                 | Layout: allowed between any tokens                          |
-| Data `@` / `:` | Should be quoted                        | Ordinary characters: `alice@example.com`, `12:30`           |
-| Keywords/types | Case unspecified                        | Case-sensitive: `TRUE`, `@INT` are not keywords/types       |
-| Scalar hints   | Optional checking                       | Authoritative: mismatches are errors                        |
-| Escapes        | Invalid escape may be kept              | JSON rules + `\/`; invalid escape / lone surrogate is an error |
-| Empty document | Unspecified                             | Error; top-level null is `null`                             |
-| Field names    | Duplicates unspecified                  | Duplicates are errors; quoted names compared after unescape |
-| Numbers        | Range unspecified                       | Overflow / truncation is an error                           |
+| Area              | v1.5                                          | v1.6                                                              |
+| ----------------- | --------------------------------------------- | ----------------------------------------------------------------- |
+| Null              | Blank slot or `null`                          | `_`; decoders still accept `null`, encoders always emit `_`; `"_"` is a string |
+| Empty slots       | `(a,)` = `a, null`; `(,)` = two nulls         | Error: every position holds a value; `()` is zero elements        |
+| Plain strings     | Backslash escapes (`a\,b`)                    | No escapes; a string with `,()[]{}"\` or `/*` must be quoted       |
+| Quoted strings    | JSON escapes + `\,` `\(` `\)` `\[` `\]` `\{` `\}` `\:` `\@` | JSON escapes only                                                 |
+| Numbers           | `-?[0-9]+…` (leading zeros allowed)           | JSON number grammar: `007` is the string `"007"`                  |
+| Maps              | Arrays of `{key,value}` tuples                | First-class: schema `attrs@[str:int]`, data `[age:30,score:95]`   |
 
 ---
 
@@ -117,15 +113,15 @@ ASUN's design goes beyond just saving tokens; its deep architectural philosophy 
 
 | Type            | Example         | Description                                                |
 | --------------- | --------------- | ---------------------------------------------------------- |
-| Integer         | `42`, `-100`    | Matches `-?[0-9]+`                                         |
-| Float           | `3.14`, `-0.5`  | Matches `-?[0-9]+\.[0-9]+`                                 |
+| Integer         | `42`, `-100`    | JSON integer: `-?(0\|[1-9][0-9]*)`                          |
+| Float           | `3.14`, `1e10`  | JSON number with a fraction and/or exponent                |
 | Boolean         | `true`, `false` | Must be lowercase literals                                 |
-| Null            | _(blank)_, `null` | An empty slot or the keyword `null`                      |
+| Null            | `_`             | Decoders also accept the keyword `null`                    |
 | Empty string    | `""`            | Explicit empty string                                      |
-| Unquoted string | `Hello World`   | Leading/trailing spaces auto-trimmed; must escape `,()[]{}"\` |
+| Unquoted string | `Hello World`   | Leading/trailing spaces auto-trimmed; no escapes           |
 | Quoted string   | `" Space "`     | Spaces preserved as-is; JSON escaping rules                |
 
-Keywords (`true`, `false`, `null`) and type names (`int`, `float`, `str`, `bool`) are **case-sensitive**: `TRUE`, `Null` and `@INT` are not keywords or types.
+Keywords (`true`, `false`, `_`, `null`) and type names (`int`, `float`, `str`, `bool`) are **case-sensitive**: `TRUE`, `Null` and `@INT` are not keywords or types.
 
 ### 3.1 String Rules
 
@@ -139,8 +135,10 @@ ASUN supports two string forms:
 **When to use quotes:**
 
 - Preserve leading/trailing spaces: `" hello "`
-- Leading zeros: `"001234"` (e.g., zip codes)
-- Force string type: `"true"`, `"null"`, `"123"`
+- Contains `,` `(` `)` `[` `]` `{` `}` `"` `\` or `/*`: `"a,b"`, `"f(x)"`
+- Force string type: `"true"`, `"_"`, `"null"`, `"123"`
+
+`001234` is not a JSON number, so it is already the string `"001234"` without quotes.
 - Empty string: `""`
 
 ### 3.2 Field Binding and Optional Scalar Hints
@@ -172,10 +170,10 @@ Type names are lowercase and case-sensitive; `@INT` or `@Str` is an error.
 
 | Hint     | Accepts                                   | Rejects                     |
 | -------- | ----------------------------------------- | --------------------------- |
-| `@int`   | integer literals                          | `1.5`, `1e3`, `hello`       |
+| `@int`   | integer literals                          | `1.5`, `1e3`, `007`, `hello` |
 | `@float` | integer or float literals (`3` → `3.0`)   | `hello`, `true`             |
 | `@bool`  | `true`, `false`                           | `True`, `1`, `yes`          |
-| `@str`   | anything: unquoted `42` / `true` → string | — (`null` stays null)       |
+| `@str`   | anything: unquoted `42` / `true` → string | — (`_` stays null)          |
 
 A typed decoder must also reject a hint that contradicts the target type, e.g. `{age@str}` decoded into an integer field.
 **Example with scalar hints:**
@@ -231,7 +229,7 @@ While `@type` for terminal scalar data (numbers, strings, etc.) is only an optio
 | Schema field name | If a field name contains spaces, starts with a digit, or contains special characters, it should be written as a quoted field name, such as `"id uuid"`, `"65"`, or `"{}[]@\\\""`.                                           |
 | Data value        | In the data section `@` and `:` have **no structural meaning**; they are ordinary characters and need no quotes: `alice@example.com`, `12:30`, `https://a.com/x`.                                                          |
 | Data value        | Unquoted strings automatically trim leading and trailing spaces. To preserve outer whitespace, use quotes, for example `"  Alice  "`.                                                                                       |
-| Data value        | An unquoted string must not contain raw `,` `(` `)` `[` `]` `{` `}` `"` `\`, control characters, or the sequence `/*` (it opens a comment). Escape them or quote the value.                                                  |
+| Data value        | An unquoted string must not contain raw `,` `(` `)` `[` `]` `{` `}` `"` `\`, control characters, or the sequence `/*` (it opens a comment). Quote the value instead; plain strings have no escapes.                                                  |
 
 Example:
 
@@ -250,28 +248,27 @@ Explanation:
 
 ## 4. Escape Rules
 
-Escape special characters when they appear inside string values:
+Escapes exist **only inside quoted strings**, and they are exactly the JSON escapes. A plain (unquoted) string has no escapes: it is the source text as written, and a `\` outside quotes is an error. A value that contains a structural character is written as a quoted string.
 
 | Character      | Escape            | Description                          |
 | -------------- | ----------------- | ------------------------------------ |
-| `,`            | `\,`              | Comma                                |
-| `(` `)`        | `\(` `\)`         | Parentheses                          |
-| `[` `]`        | `\[` `\]`         | Square brackets                      |
-| `{` `}`        | `\{` `\}`         | Curly braces                         |
-| `:` `@`        | `\:` `\@`         | Optional; both are legal raw in data |
 | `"`            | `\"`              | Double quote                         |
 | `\`            | `\\`              | Backslash                            |
-| `/`            | `\/`              | Slash (as in JSON; use `a\/*b` for a literal `/*`) |
+| `/`            | `\/`              | Slash (optional, as in JSON)         |
 | Control chars  | `\n` `\t` `\r` `\b` `\f` | Line feed, tab, CR, backspace, form feed |
 | Unicode        | `\uXXXX`          | UTF-16 code unit (e.g., `\u4e2d`)    |
+
+```text
+{title@str,expr@str}:("Hello, World", "f(x) = [a, b]")
+```
 
 **Notes:**
 
 - A document is UTF-8. A single leading BOM (U+FEFF) is skipped by decoders; encoders never write it.
-- Unquoted strings must escape `,()[]{}"\` and must not contain a raw `/*`.
-- Quoted strings follow JSON (RFC 8259): `"` and `\` must be escaped, and so must every control character U+0000–U+001F (a raw newline or tab inside quotes is an error). DEL, C1 controls, U+2028/U+2029 may appear raw.
+- Unquoted strings must not contain raw `,()[]{}"\` or `/*`; quote such values.
+- Quoted strings follow JSON (RFC 8259): `"` and `\` must be escaped, and so must every control character U+0000–U+001F (a raw newline or tab inside quotes is an error). DEL, C1 controls, U+2028/U+2029 may appear raw. Structural characters (`,()[]{}:@`) and `/*` are ordinary content inside quotes.
 - Characters outside the BMP are written raw or as a surrogate pair (`\ud83d\ude00` → 😀). A lone surrogate is an error.
-- Any other escape (e.g. `\x`, `\q`, `\ ` ) is an error.
+- Any other escape (e.g. `\,`, `\(`, `\x`, `\q`, `\ ` ) is an error.
 
 ## 5. Comments
 
@@ -310,7 +307,7 @@ A comment is layout, exactly like whitespace: it may appear between **any** two 
 {name@str}:(Ali/* x */ce)       /* a comment cannot split a plain string */
 ```
 
-Outside a quoted string, `/*` **always** opens a comment, so a plain string ends where `/*` begins: `(x /* note */)` is the string `x`. Write a literal `/*` as `a\/*b` or `"a/*b"`. A lone `/` or `*` is ordinary content (`a/b*c`, `https://x`).
+Outside a quoted string, `/*` **always** opens a comment, so a plain string ends where `/*` begins: `(x /* note */)` is the string `x`. Write a literal `/*` inside quotes: `"a/*b"`. A lone `/` or `*` is ordinary content (`a/b*c`, `https://x`).
 
 ## 6. Syntax Rules
 
@@ -335,10 +332,12 @@ Outside a quoted string, `/*` **always** opens a comment, so a plain string ends
 ### 6.3 Null / Optional Fields
 
 ```text
-{name@str,age@int,email@str}:(Alice,30,)
+{name@str,age@int,email@str}:(Alice,30,_)
 ```
 
 → `{name: "Alice", age: 30, email: null}`
+
+`_` stands for null in any position and for any type, including a whole nested object, array or map. A position is never left blank: `(Alice,30,)` is an error.
 
 ### 6.4 Nested Object
 
@@ -386,7 +385,7 @@ Outside a quoted string, `/*` **always** opens a comment, so a plain string ends
 []
 ```
 
-`[ ]` is also empty. An array holding a single null must use the keyword: `[null]`.
+`[ ]` is also empty. An array holding a single null is `[_]`.
 
 ### 6.10 Empty Object
 
@@ -394,7 +393,7 @@ Outside a quoted string, `/*` **always** opens a comment, so a plain string ends
 {}:()
 ```
 
-A zero-field schema matches `()`. Elsewhere `()` is a tuple with **one empty slot**, i.e. one null.
+A zero-field schema matches `()`, the tuple with zero elements.
 
 ### 6.11 Mixed-Type Array
 
@@ -432,7 +431,7 @@ A zero-field schema matches `()`. Elsewhere `()` is a tuple with **one empty slo
 | ----- | ------------------------------------------- | ---------------------------------------------- |
 | name  | `"Alice"` (unquoted, auto-trimmed)          | `"Bob"` (unquoted, auto-trimmed)               |
 | city  | `"New York"` (unquoted, auto-trimmed)       | `"  Los Angeles  "` (quoted, spaces preserved) |
-| zip   | `"001234"` (string, leading zero preserved) | `90210` (all digits → parsed as integer)       |
+| zip   | `"001234"` (quoted string)                  | `"90210"` (`@str` takes the token text)        |
 | note  | `"hello world"` (unquoted, auto-trimmed)    | `"say \"hi\""` (quoted, escape supported)      |
 
 ### 6.14 Real-World Example: Database Query Results
@@ -474,6 +473,33 @@ A zero-field schema matches `()`. Elsewhere `()` is a tuple with **one empty slo
 
 **Token savings:** ASUN ~65 tokens vs JSON ~180 tokens — **64% reduction** 🌟
 
+### 6.15 Map Field
+
+A map is declared in the schema as `@[K:V]` and written as `[key:value, ...]`:
+
+```text
+{user@str,attrs@[str:int]}:(Alice,[age:30,score:95])
+```
+
+→ `{user: "Alice", attrs: {age: 30, score: 95}}`
+
+| Schema              | Data                        | Meaning                              |
+| ------------------- | --------------------------- | ------------------------------------ |
+| `m@[str:int]`       | `[a:1,b:2]`                 | string keys, integer values          |
+| `m@[int:str]`       | `[1:one,2:two]`             | integer keys                         |
+| `m@[str:{x,y}]`     | `[a:(1,2),b:(3,4)]`         | struct values                        |
+| `m@[str:[int]]`     | `[a:[1,2],b:[]]`            | array values                         |
+| `m@[:]`             | `[a:1,b:x]`                 | untyped keys and values (resolved like any untyped value) |
+| `m@[str:int]`       | `[]`                        | empty map                            |
+
+**Rules:**
+
+- A value is a map **only** when its binding is `@[K:V]`. Everywhere else `[` starts an array and `:` is ordinary content, so `[a:1,12:30]` with an array binding is `["a:1", "12:30"]`.
+- The key type `K` is `str`, `int`, or omitted. Keys are never null, boolean or float.
+- The first `:` ends the key. A key that contains `:` must be quoted (`["12:30":5]`); the value may contain `:` freely (`[start:12:30]` → `start` = `"12:30"`).
+- Duplicate keys are an error. Entry order is preserved but has no meaning.
+- A map is not a top-level form; wrap it in an object.
+
 ---
 
 ## 7. Syntax Quick Reference
@@ -485,8 +511,9 @@ A zero-field schema matches `()`. Elsewhere `()` is a tuple with **one empty slo
 | Simple array field     | `field@[type]`                 | `[v1,v2,v3]`        |
 | Array-of-objects field | `field@[{f1@type,f2@type}]`    | `[(v1,v2),(v3,v4)]` |
 | Nested object field    | `field@{f1@type,f2@type}`      | `(v1,(v3,v4))`      |
-| Null value             | —                              | _(blank)_ or `null` |
-| Empty array            | —                              | `[]`                |
+| Map field              | `field@[ktype:vtype]`          | `[k1:v1,k2:v2]`     |
+| Null value             | —                              | `_`                 |
+| Empty array / map      | —                              | `[]`                |
 | Empty object           | `{}:`                          | `()`                |
 
 ## 8. Detailed Rules
@@ -495,27 +522,29 @@ A zero-field schema matches `()`. Elsewhere `()` is a tuple with **one empty slo
 
 When parsing a value, the following order is attempted:
 
-1. **Blank** or `null` → `null`
+1. `_` or `null` → `null`
 2. **Boolean** → `true` or `false` (lowercase only)
-3. **Integer** → matches `-?[0-9]+`
-4. **Float** → matches `-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?` with a fraction or an exponent
+3. **Integer** → matches `-?(0|[1-9][0-9]*)`
+4. **Float** → a JSON number with a fraction or an exponent: `-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?`
 5. **String** → everything else
 
 Quoted values are always strings. This order applies to values without a hint; a scalar hint overrides it (see §3.2).
 
-A typed decoder that reads an unquoted, non-null value into a **string target** takes the token text as is, exactly as if the field had `@str`: `90210` → `"90210"`, `true` → `"true"`. A blank slot or `null` is still null, so it is an error for a non-optional string.
+A typed decoder that reads an unquoted, non-null value into a **string target** takes the token text as is, exactly as if the field had `@str`: `90210` → `"90210"`, `true` → `"true"`. `_` is still null, so it is an error for a non-optional string.
 
 Examples:
 
 | Value     | Parsed as         |
 | --------- | ----------------- |
-| _(blank)_ | `null`            |
+| `_`       | `null`            |
+| `"_"`     | string `"_"`      |
 | `true`    | boolean `true`    |
 | `123`     | integer `123`     |
 | `3.14`    | float `3.14`      |
 | `hello`   | string `"hello"`  |
 | `123abc`  | string `"123abc"` |
-| `null`    | `null`            |
+| `007`     | string `"007"`    |
+| `null`    | `null` (accepted; encoders emit `_`) |
 | `"null"`  | string `"null"`   |
 | `TRUE`    | string `"TRUE"`   |
 
@@ -523,14 +552,15 @@ Examples:
 
 | ASUN                            | Parse result              |
 | ------------------------------- | ------------------------- |
-| `{name@str,age@int}:(Alice,)`   | `age = null`              |
-| `{name@str,age@int}:(Alice,"")` | `age = ""` (empty string) |
-| `{name@str,age@int}:(Alice,null)` | `age = null`            |
+| `{name@str,bio@str}:(Alice,_)`  | `bio = null`              |
+| `{name@str,bio@str}:(Alice,"")` | `bio = ""` (empty string) |
+| `{name@str,bio@str}:(Alice,"_")` | `bio = "_"` (string)     |
+| `{name@str,bio@str}:(Alice,)`   | Error: blank position     |
 
 Example:
 
 ```text
-{name@str,bio@str}:(Alice,)         /* bio = null */
+{name@str,bio@str}:(Alice,_)        /* bio = null */
 {name@str,bio@str}:(Alice,"")       /* bio = "" (empty string) */
 ```
 
@@ -551,7 +581,7 @@ There are **three top-level forms**, determined by the first character(s):
 - After `[{schema}]:` there can be **zero or more** `(...)` data tuples, comma-separated (array of objects). Zero tuples is an empty array. Rows are never null and the row list has no trailing comma.
 - The parser determines format from the first character — `{` vs `[` — no need for separate `_vec`-style APIs.
 - A bare tuple `(...)` at the top level is forbidden; tuples may only appear after a schema or inside data.
-- An empty document (only whitespace/comments) is **invalid**, as in JSON. A top-level null is written `null`.
+- An empty document (only whitespace/comments) is **invalid**, as in JSON. A top-level null is written `_`.
 
 ### 8.4 Field Name Rules
 
@@ -610,6 +640,7 @@ The minus sign `-` must immediately precede the digit — no space allowed:
 | `- 123` | string `"- 123"` | ✗ Space → parsed as string |
 | `-3.14` | float `-3.14`    | ✓ Correct                  |
 | `-0`    | integer `0`      | ✓ Special case             |
+| `007`   | string `"007"`   | Leading zeros: not a number |
 
 ### 8.8 Data Alignment Rule (Strict Mode)
 
@@ -620,41 +651,43 @@ The minus sign `-` must immediately precede the digit — no space allowed:
 | `{a@int,b@int,c@int}` | `(1,2,3)`   | ✓ Correct                |
 | `{a@int,b@int,c@int}` | `(1,2)`     | ✗ Error: missing field   |
 | `{a@int,b@int,c@int}` | `(1,2,3,4)` | ✗ Error: too many fields |
-| `{a@int,b@int,c@int}` | `(1,,3)`    | ✓ Correct: `b = null`    |
-| `{a@int,b@int,c@int}` | `(1,2,)`    | ✓ Correct: `c = null`    |
-| `{a@int,b@int}`       | `(1,2,)`    | ✗ Error: 3 slots         |
-| `{a@int,b@int}`       | `(,)`       | ✓ Correct: both null     |
-| `{a@int,b@int}`       | `()`        | ✗ Error: 1 slot          |
+| `{a@int,b@int,c@int}` | `(1,_,3)`   | ✓ Correct: `b = null`    |
+| `{a@int,b@int,c@int}` | `(1,,3)`    | ✗ Error: blank position  |
+| `{a@int,b@int,c@int}` | `(1,2,)`    | ✗ Error: blank position  |
+| `{a@int,b@int}`       | `(_,_)`     | ✓ Correct: both null     |
+| `{a@int,b@int}`       | `()`        | ✗ Error: 0 elements      |
 
-**Rationale**: ASUN is a position-sensitive format. A field-count mismatch causes data misalignment and must be reported as a parse error. Decoders must never pad, truncate or silently skip slots.
+**Rationale**: ASUN is a position-sensitive format. A field-count mismatch causes data misalignment and must be reported as a parse error. Decoders must never pad, truncate or silently skip values; a missing value is written `_`.
 
 ### 8.9 Common Error Examples
 
 | Incorrect                   | Reasun                     | Correct                                     |
 | --------------------------- | -------------------------- | ------------------------------------------- |
 | `{a@int,b@int}:(1,2,3)`     | Too many values            | `{a@int,b@int,c@int}:(1,2,3)`               |
-| `{a@int,b@int}:(1)`         | Missing field (no null)    | `{a@int,b@int}:(1,)`                        |
-| `{a@int,b@int,c@int}:(1,2)` | Insufficient data          | `{a@int,b@int,c@int}:(1,2,)`                |
+| `{a@int,b@int}:(1)`         | Missing field              | `{a@int,b@int}:(1,_)`                       |
+| `{a@int,b@int,c@int}:(1,2)` | Insufficient data          | `{a@int,b@int,c@int}:(1,2,_)`               |
+| `{a@int,b@int}:(1,)`        | Blank position             | `{a@int,b@int}:(1,_)`                       |
 | `(1,2,3)`                   | Bare tuple needs schema    | `{a@int,b@int,c@int}:(1,2,3)`               |
-| `{a@int,b@int}`             | Schema with no data        | `{a@int,b@int}:(,)` or `{a@int,b@int}:(1,2)` |
-| `{a@int,b@int}:(1,2,)`      | Trailing comma = 3rd slot  | `{a@int,b@int}:(1,2)`                       |
+| `{a@int,b@int}`             | Schema with no data        | `{a@int,b@int}:(_,_)` or `{a@int,b@int}:(1,2)` |
+| `{a@int,b@int}:(1,2,)`      | Trailing comma             | `{a@int,b@int}:(1,2)`                       |
+| `{a@str}:(a\,b)`            | No escapes in plain strings | `{a@str}:("a,b")`                          |
 | `{a@int,b@int}[1,2]`        | Missing colon after schema | `{a@int,b@int}:(1,2)`                       |
 
-### 8.10 Commas Are Separators
+### 8.10 No Blank Positions
 
-A comma is a **pure separator**: `n` commas always delimit `n + 1` slots, and an empty slot is `null`. There is no trailing-comma rule — a comma at the end opens one more (null) slot.
+A comma only separates two values. Every position in a tuple, array or map holds exactly one value, and null is written `_`. A leading, trailing or doubled comma is an error.
 
-| Input           | Slots | Parsed result            |
-| --------------- | ----- | ------------------------ |
-| `()`            | 1     | `(null)`                 |
-| `(,)`           | 2     | `(null, null)`           |
-| `(Alice, 30,)`  | 3     | `("Alice", 30, null)`    |
-| `[]` / `[ ]`    | 0     | `[]`                     |
-| `[null]`        | 1     | `[null]`                 |
-| `[,]`           | 2     | `[null, null]`           |
-| `[1, 2, 3,]`    | 4     | `[1, 2, 3, null]`        |
+| Input           | Elements | Parsed result            |
+| --------------- | -------- | ------------------------ |
+| `()`            | 0        | `()` (matches `{}`)      |
+| `(_)`           | 1        | `(null)`                 |
+| `(Alice, 30, _)`| 3        | `("Alice", 30, null)`    |
+| `[]` / `[ ]`    | 0        | `[]`                     |
+| `[_]`           | 1        | `[null]`                 |
+| `[1, _, 3]`     | 3        | `[1, null, 3]`           |
+| `(a,)`, `(,)`, `[1,,3]`, `[1,2,]` | — | Error         |
 
-Schema field lists and row lists have no empty slots: `{a,b,}` and `[{a}]:(1),` are errors.
+Schema field lists and row lists have no blank positions either: `{a,b,}` and `[{a}]:(1),` are errors.
 
 ---
 
@@ -662,8 +695,8 @@ Schema field lists and row lists have no empty slots: `{a,b,}` and `[{a}]:(1),` 
 
 ### 9.1 Parser Implementation Highlights
 
-1. **Non-greedy matching**: When parsing `plain_str`, delimiters `,()[]{}"` and the sequence `/*` end the value.
-2. **Lookahead**: When encountering a potential delimiter, first check whether it is preceded by an escape character.
+1. **Non-greedy matching**: When parsing `plain_str`, delimiters `,()[]{}"` and the sequence `/*` end the value (inside a map entry's key, `:` too). A `\` in a plain value is an error.
+2. **Zero-copy plain values**: Plain strings have no escapes, so after trimming a plain value is exactly a slice of the input.
 3. **Comments are layout**: Skip `/* */` wherever whitespace is skipped. Never strip them from inside quoted strings.
 4. **Streaming parse**: After parsing the schema, build a field index table; fill data fields by position.
 5. **Progress guarantee**: Every skip/recovery loop must consume input or fail; a malformed byte must produce an error, never a hang.
@@ -677,7 +710,9 @@ Schema field lists and row lists have no empty slots: `{a,b,}` and `[{a}]:(1),` 
 | Unclosed quote       | `("hello)`              | Throw error                    |
 | Unclosed bracket     | `{a@int,b@int}:(1,2`    | Throw error                    |
 | Unclosed comment     | `/* comment`            | Throw error                    |
-| Invalid escape       | `\x`                    | Throw error                    |
+| Invalid escape       | `"\x"`, `"\,"`, `a\,b`  | Throw error                    |
+| Blank position       | `(1,,3)`, `[1,]`        | Throw error                    |
+| Duplicate map key    | `[a:1,a:2]`             | Throw error                    |
 | Hint mismatch        | `{a@int}:(1.5)`         | Throw error                    |
 | Duplicate field      | `{a,a}:(1,2)`           | Throw error                    |
 | Number out of range  | `1e309`, `{a@int}` into `u8` with `300` | Throw error    |
@@ -696,21 +731,23 @@ object_expr ::= schema ":" tuple
 array_expr  ::= "[" schema "]" ":" (tuple ("," tuple)*)?
 schema      ::= "{" (field ("," field)*)? "}"
 field       ::= name ("@" binding)?
-binding     ::= "int" | "float" | "str" | "bool" | schema | "[" binding? "]"
+binding     ::= "int" | "float" | "str" | "bool" | schema
+              | "[" binding? "]"                      /* array */
+              | "[" ("str" | "int")? ":" binding? "]" /* map   */
 name        ::= [a-zA-Z0-9_]+ | quoted_str
 
-tuple       ::= "(" slot ("," slot)* ")"
-array       ::= "[" element? "]" | "[" slot ("," slot)+ "]"
-slot        ::= element?                       /* empty slot = null */
-element     ::= scalar | tuple | array
+tuple       ::= "(" (element ("," element)*)? ")"
+array       ::= "[" (element ("," element)*)? "]"
+map         ::= "[" entry ("," entry)* "]"            /* only under a map binding */
+entry       ::= key ":" element
+key         ::= number | quoted_str | plain_str_without_colon
+element     ::= scalar | tuple | array | map
 
-scalar      ::= "true" | "false" | "null" | number | quoted_str | plain_str
-number      ::= "-"? [0-9]+ ("." [0-9]+)? ([eE] [+-]? [0-9]+)?
+scalar      ::= "true" | "false" | "_" | "null" | number | quoted_str | plain_str
+number      ::= "-"? ("0" | [1-9][0-9]*) ("." [0-9]+)? ([eE] [+-]? [0-9]+)?
 quoted_str  ::= '"' (char_no_ctrl_quote_bs | escape)* '"'
-plain_str   ::= word ([ \t]+ word)*            /* no raw ,()[]{}"\ ctrl, no "/*" */
-escape      ::= "\" ( '"' | "\" | "/" | "b" | "f" | "n" | "r" | "t"
-                     | "," | "(" | ")" | "[" | "]" | "{" | "}" | ":" | "@"
-                     | "u" hex hex hex hex )
+plain_str   ::= word ([ \t]+ word)*            /* no raw ,()[]{}"\ ctrl, no "/*", no escapes */
+escape      ::= "\" ( '"' | "\" | "/" | "b" | "f" | "n" | "r" | "t" | "u" hex hex hex hex )
 
 ows         ::= ( " " | "\t" | "\r" | "\n" | comment )*
 comment     ::= "/*" ... "*/"                  /* no nesting */
@@ -721,7 +758,7 @@ comment     ::= "/*" ... "*/"                  /* no nesting */
 - All literals are case-sensitive.
 - Layout (`ows`, including comments) is allowed between any two tokens.
 - `plain_str` values never include surrounding whitespace, so they are trimmed by construction.
-- Semantic rules (slot alignment, hints, numeric range, surrogates, duplicate names) are listed at the end of `GRAMMAR.abnf`.
+- Semantic rules (element alignment, hints, numeric range, surrogates, duplicate names, maps) are listed at the end of `GRAMMAR.abnf`.
 
 ---
 
@@ -761,6 +798,7 @@ Each value has exactly one valid encoding. A decoder rejects:
 | `str`                   | `uvarint` byte length + UTF-8 bytes (invalid UTF-8 is an error)         |
 | `Option<T>`             | tag byte `0x00` = none, or `0x01` + encoding of `T`; other tags are an error |
 | `Vec<T>` / array        | `uvarint` element count + each element encoded in order                 |
+| map                     | `uvarint` entry count + each entry as key encoding then value encoding  |
 | tuple                   | elements encoded in order, no prefix                                    |
 | `struct`                | fields encoded in declaration order, no prefix, padding or alignment    |
 | `enum`                  | `uvarint` variant index (declaration order, from 0) + the variant's fields in order |
@@ -830,8 +868,9 @@ enum Shape { Unit, New(i32) }
 | `{schema}:(data)` single object  | Fields encoded in order, no wrapper |
 | `[{schema}]:(d1),(d2),...` array | `uvarint` count + element sequence  |
 | `[v1,v2,v3]` plain array         | `uvarint` count + element sequence  |
+| `[k1:v1,k2:v2]` map              | `uvarint` count + key/value pairs   |
 | `true` / `false`                 | Single byte `0x01` / `0x00`         |
-| Null / Option null               | Single byte `0x00`                  |
+| `_` / Option null                | Single byte `0x00`                  |
 | Option some(v)                   | `0x01` + value encoding             |
 
 ### 11.7 Decoding Untrusted Input
@@ -888,12 +927,14 @@ Core ASUN rules:
 3. Type annotations are optional: `{field1@int, field2@str, ...}`
 4. Supported types: `int`, `float`, `str`, `bool`, arrays, nested objects
 5. Array fields: `name@[str]` is a string array with value `[item1, item2, ...]`; array-of-objects is `users@[{id@int}]`
+6. Map fields: `attrs@[str:int]` with value `[key1:1, key2:2]`
 
 You must follow:
 - Single objects use `{schema}:` prefix; arrays of objects use `[{schema}]:` prefix
 - Number of data items = number of schema fields (strict alignment)
 - Strings generally need no quotes (unless they contain special characters)
-- Null values are represented by blank content (empty between commas)
+- Null values are written `_`; never leave a position blank
+- Quote any string containing , ( ) [ ] { } " or \
 - Nested objects use parentheses: outer@{inner@type}:(val1,(nested_val))
 
 Output ASUN only, no additional explanation.
@@ -994,6 +1035,8 @@ Validate format (field count, alignment, types)
 | Boolean                      | `{active@bool}`    | `(true)`    | Boolean             |
 | Array                        | `{tags@[str]}`     | `([a,b,c])` | Array type          |
 | Nested                       | `{user@{id@int}}`  | `((1))`     | Nested object       |
+| Map                          | `{m@[str:int]}`    | `([a:1])`   | Map type            |
+| Null                         | `{id@int}`         | `(_)`       | Null value          |
 | Mixed                        | `{id@int,bio@str}` | `(1,Bio)`   | Partial annotations |
 
 ### A.2 Type Assertion Examples
@@ -1068,7 +1111,9 @@ id,name,role,active
 - [ ] Lexer: recognize all symbols (`{`, `}`, `(`, `)`, `[`, `]`, `:`, `,`)
 - [ ] Comment handling: support `/* */` block comments
 - [ ] String parsing: support both quoted and unquoted forms
-- [ ] Escape rules: handle `\,`, `\"`, `\\`, etc.
+- [ ] Escape rules: JSON escapes inside quoted strings only; reject `\` in plain strings
+- [ ] Null and blanks: `_` / `null` are null; reject blank positions
+- [ ] Maps: parse `[k:v,...]` under `@[K:V]` bindings; reject duplicate keys
 - [ ] Type annotation parsing: recognize `@int`, `@str`, etc.
 - [ ] Schema parsing: recursively parse nested structures
 - [ ] Alignment check: verify data field count matches schema field count
@@ -1147,7 +1192,7 @@ Compared to JSON's indented readability, token savings and LLM friendliness take
 
 ---
 
-**Document version**: v1.5.0  
-**Last updated**: 2026-10-06  
+**Document version**: v1.6.0  
+**Last updated**: 2026-10-07  
 **License**: MIT  
 **GitHub**: https://github.com/asunLab/asun

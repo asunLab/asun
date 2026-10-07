@@ -3,7 +3,7 @@
 
 Every `kind: ok` case must be derivable from <asun-document>. A `kind: error`
 case must either be rejected by the grammar or carry an `errorHint` naming a
-semantic rule (S1-S10), since those errors are outside what ABNF can express.
+semantic rule (S1-S11), since those errors are outside what ABNF can express.
 
     pip install abnf
     python3 conformance/runners/abnf/check.py            # check cases.json

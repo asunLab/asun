@@ -9,8 +9,8 @@ all language implementations (`asun-rs`, `asun-c`, `asun-cpp`, `asun-go`,
 
 | Path                  | Purpose                                                          |
 | --------------------- | ---------------------------------------------------------------- |
-| `GRAMMAR.abnf`        | Formal grammar (RFC 5234 + RFC 7405 ABNF, v1.5). Authoritative.  |
-| `cases.json`          | Generated input/output test vectors (347 cases, version 2).      |
+| `GRAMMAR.abnf`        | Formal grammar (RFC 5234 + RFC 7405 ABNF, v1.6). Authoritative.  |
+| `cases.json`          | Generated input/output test vectors (413 cases, version 3).      |
 | `encode-cases.json`   | Encode round-trip vectors: `decode(encode(value)) == value`.      |
 | `generate.py`         | Generator for `cases.json`. Re-run after editing.                |
 | `runners/abnf/`       | Checks every case in `cases.json` against `GRAMMAR.abnf`.        |
@@ -48,7 +48,7 @@ A conforming runner MUST:
    - `parse.*` other than `parse.field_count` — the input is not derivable
      from `GRAMMAR.abnf`;
    - `parse.field_count`, `semantic.S<n>.*`, `type.*` — the input parses but
-     violates a semantic rule (S1–S10 at the end of `GRAMMAR.abnf`) or the
+     violates a semantic rule (S1–S11 at the end of `GRAMMAR.abnf`) or the
      target type.
 5. Exit non-zero when any case is mishandled.
 
@@ -101,7 +101,7 @@ python3 conformance/runners/abnf/check.py            # all of cases.json
 python3 conformance/runners/abnf/check.py '{a}:(x)'   # classify ad-hoc inputs
 ```
 
-Current result: 347/347 cases consistent with the grammar.
+Current result: 413/413 cases consistent with the grammar.
 
 ## Reference runner: asun-rs
 

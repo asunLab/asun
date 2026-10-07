@@ -1,5 +1,5 @@
 ; ============================================================================
-; ASUN - Array-Schema Unified Notation - text grammar, version 1.5
+; ASUN - Array-Schema Unified Notation - text grammar, version 1.6
 ;
 ; This file is the SINGLE SOURCE OF TRUTH for the textual ASUN syntax.
 ; Every implementation MUST accept exactly the documents derivable from
@@ -51,46 +51,58 @@ bare-name       = 1*( ALPHA / DIGIT / "_" )
 binding         = scalar-type
                 / schema                            ; addr@{city,zip}
                 / array-type                        ; tags@[str], users@[{id}]
+                / map-type                          ; attrs@[str:int]
 scalar-type     = %s"int" / %s"float" / %s"str" / %s"bool"
 array-type      = "[" ows [ binding ows ] "]"       ; tags@[] = untyped array
+map-type        = "[" ows [ key-type ows ] ":" ows [ binding ows ] "]"
+                ; attrs@[:] = untyped map; key and value types are optional
+key-type        = %s"str" / %s"int"
 
 ; ----------------------------------------------------------------------------
 ; Data
 ;
-; A comma is a pure separator: n commas always delimit n+1 slots, and an
-; empty slot is null. There is no trailing-comma rule.
-;   ()      one slot  (null)            [ ]     empty array (zero slots)
-;   (,)     two slots (null, null)      [,]     two slots (null, null)
-;   (a,)    a, null                     [a,]    a, null
-;   [null]  one slot  (null) - an empty array is "[]", so a single null
-;           element must use the keyword
+; Every position holds exactly one element; there are no empty slots.
+; Null is written "_". A comma only separates two elements, so a leading,
+; trailing or doubled comma is an error.
+;   ()      zero elements (matches the zero-field schema "{}")
+;   (_)     one element, null           []      empty array or empty map
+;   (a,_)   a, null                     [_]     one null element
+;   (a,)  (,)  [1,,3]  [,]              all errors
 ; ----------------------------------------------------------------------------
 
-tuple           = "(" slot *( "," slot ) ")"
+tuple           = "(" ows [ element *( ows "," ows element ) ows ] ")"
 
-array           = "[" ows [ element ows ] "]"       ; zero or one element
-                / "[" slot 1*( "," slot ) "]"       ; two or more slots
+array           = "[" ows [ element *( ows "," ows element ) ows ] "]"
 
-slot            = ows [ element ows ]               ; empty slot = null
-element         = scalar / tuple / array
+; A map is only valid where the binding is a <map-type> (see S11). The empty
+; map is written "[]", which is the <array> production.
+map             = "[" ows entry *( ows "," ows entry ) ows "]"
+entry           = map-key ows ":" ows element
+map-key         = keyword / number / quoted-string / key-string
+
+element         = scalar / tuple / array / map
 
 ; ----------------------------------------------------------------------------
 ; Scalars
 ; ----------------------------------------------------------------------------
 
 scalar          = keyword / number / quoted-string / plain-string
-keyword         = %s"true" / %s"false" / %s"null"
+keyword         = %s"true" / %s"false" / "_" / %s"null"
+                ; "_" is null; decoders also accept "null" (see S7)
 
 ; -- Numbers -----------------------------------------------------------------
-; A leading "-" must touch the first digit. ".5", "5.", "+5", "1e", "1e+",
-; "- 5" are not numbers; unquoted they are plain strings (see S2).
+; Exactly the JSON number grammar (RFC 8259 section 6). A leading "-" must
+; touch the first digit and the integer part has no leading zeros. ".5",
+; "5.", "+5", "1e", "1e+", "- 5", "007", "01.5" are not numbers; unquoted
+; they are plain strings (see S2).
 
-number          = [ "-" ] 1*DIGIT [ fraction ] [ exponent ]
+number          = [ "-" ] int [ fraction ] [ exponent ]
+int             = "0" / %x31-39 *DIGIT
 fraction        = "." 1*DIGIT
 exponent        = ( %s"e" / %s"E" ) [ "+" / "-" ] 1*DIGIT
 
 ; -- Quoted strings ----------------------------------------------------------
-; Same rules as JSON (RFC 8259 section 7) plus the ASUN structural escapes.
+; Exactly the JSON string grammar (RFC 8259 section 7).
 ; Raw control characters U+0000-U+001F must be escaped; DEL, C1 controls,
 ; U+2028 and U+2029 may appear raw.
 
@@ -99,19 +111,19 @@ qchar           = %x20-21 / %x23-5B / %x5D-D7FF / %xE000-10FFFF
 
 escape          = "\" ( DQUOTE / "\" / "/"
                       / %s"b" / %s"f" / %s"n" / %s"r" / %s"t"
-                      / "," / "(" / ")" / "[" / "]" / "{" / "}"
-                      / ":" / "@"
                       / %s"u" 4HEXDIG )             ; see S5 for surrogates
 
 ; -- Plain (unquoted) strings ------------------------------------------------
 ; Words separated by runs of SP/HTAB. Leading and trailing whitespace is not
 ; part of the string: it is matched by the surrounding <ows>, which is how
-; trimming falls out of the grammar.
+; trimming falls out of the grammar. A plain string has no escapes: it is
+; exactly the source text.
 ;
 ; Raw characters that are NOT allowed in a plain string:
 ;     , ( ) [ ] { } " \     control characters U+0000-U+001F
 ;     the two-character sequence "/*"  (it always opens a comment)
-; Everything else is allowed raw, in particular ":" "@" "/" "*" "#" "'":
+; A string that needs any of them must be quoted. Everything else is allowed
+; raw, in particular ":" "@" "/" "*" "#" "'":
 ;     alice@example.com   12:30   https://a.com/x   2024-01-01T10:00:00Z
 ;
 ; <word> is the regular language (P|T)* (S+ P (P|T)*)* S* without the empty
@@ -123,11 +135,20 @@ word            = 1*pstar *( 1*"/" pchar *pstar ) *"/"
                 / 1*( 1*"/" pchar *pstar ) *"/"
                 / 1*"/"
 pstar           = pchar / "*"
-pchar           = psafe / escape
-psafe           = %x21 / %x23-27 / %x2B / %x2D-2E / %x30-5A
+pchar           = kchar / ":"
+
+; A map key written as a plain string additionally excludes ":" (the first
+; ":" ends the key). A key containing ":" must be quoted.
+
+key-string      = kword *( 1*WSP kword )
+kword           = 1*kstar *( 1*"/" kchar *kstar ) *"/"
+                / 1*( 1*"/" kchar *kstar ) *"/"
+                / 1*"/"
+kstar           = kchar / "*"
+kchar           = %x21 / %x23-27 / %x2B / %x2D-2E / %x30-39 / %x3B-5A
                 / %x5E-7A / %x7C / %x7E-D7FF / %xE000-10FFFF
                 ; every scalar value except controls, SP, and
-                ; " ( ) * , / [ \ ] { }
+                ; " ( ) * , / : [ \ ] { }
 
 ; ----------------------------------------------------------------------------
 ; Layout: whitespace and comments
@@ -147,34 +168,32 @@ cnoend          = %x00-29 / %x2B-2E / %x30-D7FF / %xE000-10FFFF
 ; Semantic rules (enforced by conformance tests, not expressible in ABNF)
 ; ============================================================================
 ;
-; S1. Slot alignment.
-;     A tuple MUST have exactly as many slots as its schema has fields.
-;     Fewer or more slots is an error - decoders MUST NOT pad, truncate or
-;     silently skip. The single exception: a zero-field schema "{}" matches
-;     the tuple "()".
+; S1. Element alignment.
+;     A tuple MUST have exactly as many elements as its schema has fields.
+;     Fewer or more is an error - decoders MUST NOT pad, truncate or
+;     silently skip. A missing value is written "_", never left blank.
 ;
 ; S2. Unquoted token resolution (no scalar hint).
-;       empty slot                      -> null
+;       exactly "_" or "null"           -> null
 ;       exactly "true" / "false"        -> boolean
-;       exactly "null"                  -> null
 ;       matches <number> without fraction/exponent -> integer
 ;       matches <number> with fraction or exponent -> float
 ;       anything else                   -> string
-;     A quoted string is always a string: "true", "null", "42" are strings.
-;     A typed decoder reading an unquoted non-null token into a string
-;     target takes the token text, as if the field were @str (90210 ->
-;     "90210"); an empty slot or null stays null.
+;     A quoted string is always a string: "_", "true", "null", "42" are
+;     strings. A typed decoder reading an unquoted non-null token into a
+;     string target takes the token text, as if the field were @str
+;     (90210 -> "90210"); "_" and null stay null.
 ;
 ; S3. Scalar hints are authoritative.
 ;       @int    value MUST be an integer literal (or null)
 ;       @float  value MUST be an integer or float literal (or null)
 ;       @bool   value MUST be true / false (or null)
 ;       @str    every non-null value is a string: unquoted 42 or true is the
-;               string "42" / "true"; the keyword null and an empty slot
-;               stay null
-;     A value that does not satisfy its hint is an error. A typed decoder
-;     MUST also reject a hint that is incompatible with the target type
-;     (e.g. @str into an integer field).
+;               string "42" / "true"; "_" and null stay null
+;     A value that does not satisfy its hint is an error (007 under @int is
+;     the string "007", so it is an error). A typed decoder MUST also reject
+;     a hint that is incompatible with the target type (e.g. @str into an
+;     integer field).
 ;
 ; S4. Numeric range.
 ;     The grammar does not bound numbers. A decoder MUST report an error when
@@ -185,27 +204,28 @@ cnoend          = %x00-29 / %x2B-2E / %x30-D7FF / %xE000-10FFFF
 ;     form; encoders MUST reject them.
 ;
 ; S5. Escapes.
-;     \uXXXX denotes a UTF-16 code unit as in JSON. A high surrogate
-;     (D800-DBFF) MUST be immediately followed by \u + low surrogate
-;     (DC00-DFFF) and the pair denotes one scalar value. A lone surrogate is
-;     an error. Any escape not listed in <escape> is an error.
+;     Escapes exist only inside quoted strings and follow JSON. \uXXXX
+;     denotes a UTF-16 code unit. A high surrogate (D800-DBFF) MUST be
+;     immediately followed by \u + low surrogate (DC00-DFFF) and the pair
+;     denotes one scalar value. A lone surrogate is an error. Any escape not
+;     listed in <escape> (including \, \( \: \@) is an error, and a "\"
+;     outside a quoted string is an error.
 ;
 ; S6. Field names.
 ;     A quoted field name is compared after unescaping: {"a"} and {a}
 ;     name the same field. No Unicode normalization is applied. Two fields
 ;     with the same (unescaped) name in one schema is an error.
 ;
-; S7. Keyword "null".
-;     An empty slot and the keyword null are the same value. Encoders SHOULD
-;     emit the empty slot (fewer tokens) and MUST emit null where no slot
-;     exists: a top-level null, and an array whose only element is null.
-;     A string whose content is "true", "false" or "null", or that matches
-;     <number>, MUST be quoted by encoders.
+; S7. Null.
+;     "_" and the keyword null are the same value. Encoders MUST emit "_"
+;     and never null. A string whose content is "_", "true", "false" or
+;     "null", or that matches <number>, MUST be quoted by encoders.
 ;
 ; S8. Bindings.
-;     A field whose values contain tuples (nested objects) needs a structural
-;     binding (@{...} or @[{...}]) so field names are known to untyped
-;     decoders. Encoders MUST emit it. Typed decoders MAY accept its absence.
+;     A field whose values contain tuples (nested objects) or maps needs a
+;     structural binding (@{...}, @[{...}] or @[K:V]) so untyped decoders
+;     know the shape. Encoders MUST emit it. Typed decoders MAY accept its
+;     absence.
 ;
 ; S9. Rows.
 ;     "[{schema}]:" followed by no tuple is an empty array. Rows are never
@@ -214,3 +234,21 @@ cnoend          = %x00-29 / %x2B-2E / %x30-D7FF / %xE000-10FFFF
 ; S10. BOM and line endings.
 ;     A decoder MUST skip a single leading U+FEFF. Encoders MUST NOT emit it.
 ;     CR, LF and CRLF are all layout.
+;
+; S11. Maps.
+;     A value is a <map> exactly when its binding is a <map-type> (or, per
+;     S8, a typed decoder's target is a map). Everywhere else "[" opens an
+;     <array> and ":" is ordinary plain-string content, so [a:1] without a
+;     map binding is the array ["a:1"]. A map is never a top-level form.
+;       - "[]" is the empty map.
+;       - Keys are resolved by the key-type (str: token text as for @str;
+;         int: an integer literal) or, when the key-type is omitted, by S2.
+;         A key MUST resolve to a string or an integer: "_", null, true,
+;         false and float keys are errors.
+;       - A plain key never contains ":"; the first ":" after the key
+;         separates key and value. The value may contain ":" freely:
+;         [start:12:30] is start -> "12:30".
+;       - Two entries with the same key (after resolution) are an error.
+;       - Entry order is preserved by the text; it carries no meaning.
+;       - Values follow the value binding like any other element; "_" is a
+;         null value.

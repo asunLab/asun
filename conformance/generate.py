@@ -29,6 +29,8 @@ The canonical JSON value uses these conventions:
   - null       -> null
   - strings    -> JSON string (UTF-8)
   - objects    -> JSON object {fieldName: value, ...} (order = schema order)
+  - maps       -> JSON object {key: value, ...}; integer keys appear as
+                  their decimal text
   - arrays     -> JSON array
 
 Implementations whose native dynamic type cannot represent something
@@ -134,7 +136,20 @@ def gen_bare_values():
     add(f"{cat}.float.expBig",        cat, "scientific notation with positive sign",          "-2.0E+10", -2.0e10)
     add(f"{cat}.bool.true",       cat, "boolean true",       "true",       True)
     add(f"{cat}.bool.false",      cat, "boolean false",      "false",      False)
-    add(f"{cat}.null",            cat, "keyword null",       "null",       None)
+    add(f"{cat}.null",            cat, "_ is null",          "_",          None)
+    add(f"{cat}.nullKeyword",     cat, "keyword null is still accepted", "null", None)
+    add(f"{cat}.string.quoted.underscore", cat, "quoted _ is a string", '"_"', "_")
+    add(f"{cat}.string.underscoreWord", cat, "only the exact token _ is null", "_foo", "_foo")
+    add(f"{cat}.string.doubleUnderscore", cat, "__ is a string", "__", "__")
+    add(f"{cat}.string.underscoreSpaced", cat, "'_ _' is a string", "_ _", "_ _")
+    # Numbers follow JSON: no leading zeros in the integer part.
+    add(f"{cat}.leadingZero.int",    cat, "007 is not a number -> string", "007", "007")
+    add(f"{cat}.leadingZero.neg",    cat, "-007 is not a number -> string", "-007", "-007")
+    add(f"{cat}.leadingZero.double", cat, "00 is not a number -> string", "00", "00")
+    add(f"{cat}.leadingZero.float",  cat, "01.5 is not a number -> string", "01.5", "01.5")
+    add(f"{cat}.leadingZero.exp",    cat, "01e3 is not a number -> string", "01e3", "01e3")
+    add(f"{cat}.zeroFraction",       cat, "0.5 is a number", "0.5", 0.5)
+    add(f"{cat}.zeroExp",            cat, "0e3 is a number", "0e3", 0.0)
     add(f"{cat}.case.TRUE",       cat, "keywords are case-sensitive: TRUE is a string", "TRUE", "TRUE")
     add(f"{cat}.case.Null",       cat, "keywords are case-sensitive: Null is a string", "Null", "Null")
     add(f"{cat}.string.quoted.null", cat, "quoted null is a string", '"null"', "null")
@@ -175,16 +190,18 @@ def gen_escapes():
     add(f"{cat}.bs.cr",        cat, "carriage return",    r'"a\rb"',     'a\rb')
     add(f"{cat}.bs.unicode.bmp",   cat, "unicode BMP",    r'"\u4e2d\u6587"', "中文")
     add(f"{cat}.bs.unicode.ascii", cat, "unicode ascii",  r'"\u0041"',   "A")
-    add(f"{cat}.bs.delim.comma",   cat, "escaped comma in quoted",  r'"a\,b"', "a,b")
-    add(f"{cat}.bs.delim.lparen",  cat, "escaped (",      r'"a\(b"',     "a(b")
-    add(f"{cat}.bs.delim.rparen",  cat, "escaped )",      r'"a\)b"',     "a)b")
-    add(f"{cat}.bs.delim.lbrack",  cat, "escaped [",      r'"a\[b"',     "a[b")
-    add(f"{cat}.bs.delim.rbrack",  cat, "escaped ]",      r'"a\]b"',     "a]b")
+    add(f"{cat}.raw.delims",       cat, "structural chars are raw in quoted", '"a,b(c)[d]{e}:f@g"', "a,b(c)[d]{e}:f@g")
+    add(f"{cat}.raw.slashStar",    cat, "/* inside quotes is content", '"a/*b"', "a/*b")
+    err(f"{cat}.err.delim.comma",  cat, "\\, is not a JSON escape",  r'"a\,b"', "lex.bad_escape")
+    err(f"{cat}.err.delim.lparen", cat, "\\( is not a JSON escape",  r'"a\(b"', "lex.bad_escape")
+    err(f"{cat}.err.delim.rparen", cat, "\\) is not a JSON escape",  r'"a\)b"', "lex.bad_escape")
+    err(f"{cat}.err.delim.lbrack", cat, "\\[ is not a JSON escape",  r'"a\[b"', "lex.bad_escape")
+    err(f"{cat}.err.delim.rbrack", cat, "\\] is not a JSON escape",  r'"a\]b"', "lex.bad_escape")
     add(f"{cat}.bs.slash",         cat, "JSON \\/ escape",  r'"a\/b"',     "a/b")
     add(f"{cat}.bs.backspace",     cat, "\\b escape",       r'"a\bb"',     "a\bb")
     add(f"{cat}.bs.formfeed",      cat, "\\f escape",       r'"a\fb"',     "a\fb")
-    add(f"{cat}.bs.braces",        cat, "escaped { }",    r'"\{\}"',     "{}")
-    add(f"{cat}.bs.colonAt",       cat, "escaped : @",    r'"\:\@"',     ":@")
+    err(f"{cat}.err.braces",       cat, "\\{ \\} are not JSON escapes", r'"\{\}"', "lex.bad_escape")
+    err(f"{cat}.err.colonAt",      cat, "\\: \\@ are not JSON escapes", r'"\:\@"', "lex.bad_escape")
     add(f"{cat}.bs.unicode.upperHex", cat, "uppercase hex",  r'"\u4E2D"',  "中")
     add(f"{cat}.bs.unicode.nul",   cat, "escaped NUL",    r'"a\u0000b"', "a\u0000b")
     add(f"{cat}.bs.unicode.pair",  cat, "surrogate pair", r'"\ud83d\ude00"', "😀")
@@ -198,16 +215,16 @@ def gen_escapes():
     err(f"{cat}.err.rawNul",       cat, "raw NUL inside quotes", '"a\x00b"', "lex.control_char")
     err(f"{cat}.err.unknown",      cat, "unknown escape \\q",  r'"a\qb"', "lex.bad_escape")
 
-    # Plain-string escapes
-    cat2 = "strings.plainEscape"
-    add(f"{cat2}.comma",    cat2, "plain string \\,",   r"a\,b",   "a,b")
-    add(f"{cat2}.lparen",   cat2, "plain string \\(",   r"a\(b",   "a(b")
-    add(f"{cat2}.rparen",   cat2, "plain string \\)",   r"a\)b",   "a)b")
-    add(f"{cat2}.lbrack",   cat2, "plain string \\[",   r"a\[b",   "a[b")
-    add(f"{cat2}.rbrack",   cat2, "plain string \\]",   r"a\]b",   "a]b")
-    add(f"{cat2}.bsbs",     cat2, "plain string \\\\",  r"a\\b",   "a\\b")
-    add(f"{cat2}.slashStar", cat2, "plain string \\/* is not a comment", r"a\/*b", "a/*b")
+    # Plain strings have no escapes: a backslash outside quotes is an error.
+    cat2 = "strings.plainBackslash"
+    err(f"{cat2}.comma",    cat2, "plain string a\\,b",   r"{a}:(a\,b)",   "lex.bad_escape")
+    err(f"{cat2}.lparen",   cat2, "plain string a\\(b",   r"{a}:(a\(b)",   "lex.bad_escape")
+    err(f"{cat2}.rbrack",   cat2, "plain string a\\]b",   r"[a\]b]",       "lex.bad_escape")
+    err(f"{cat2}.bsbs",     cat2, "plain string a\\\\b",  r"a\\b",        "lex.bad_escape")
+    err(f"{cat2}.slashStar", cat2, "plain string a\\/*b", r"a\/*b",        "lex.bad_escape")
+    err(f"{cat2}.lone",     cat2, "lone backslash in a plain string", r"a\b", "lex.bad_escape")
     err(f"{cat2}.trailingBackslash", cat2, "trailing backslash", "{a}:(abc\\)", "lex.bad_escape")
+    add(f"{cat2}.quotedInstead", cat2, "quote the value instead", '{a,b}:("a,b","x\\\\y")', {"a": "a,b", "b": "x\\y"})
     err(f"{cat2}.rawQuote", cat2, "raw quote inside plain string", '{a}:(5" screen)', "lex.raw_quote")
     err(f"{cat2}.rawNewline", cat2, "raw LF inside plain string", "{a}:(a\nb)", "lex.control_char")
     err(f"{cat2}.quotedThenJunk", cat2, "quoted string followed by more text", '{a}:("a"b)', "parse.unexpected")
@@ -231,9 +248,13 @@ def gen_single_object():
         "{x@float,y@float}:(1.5,-2.5)",
         {"x": 1.5, "y": -2.5})
     add(f"{cat}.nullField",
-        cat, "missing -> null",
-        "{name@str,age@int}:(Alice,)",
+        cat, "_ -> null",
+        "{name@str,age@int}:(Alice,_)",
         {"name": "Alice", "age": None})
+    err(f"{cat}.blankField",
+        cat, "a blank slot is an error, write _",
+        "{name@str,age@int}:(Alice,)",
+        "parse.empty_slot")
     add(f"{cat}.emptyString",
         cat, "explicit empty string",
         '{name@str,bio@str}:(Alice,"")',
@@ -266,14 +287,30 @@ def gen_single_object():
         cat, "null keyword in a slot",
         "{a,b}:(null,1)",
         {"a": None, "b": 1})
+    add(f"{cat}.underscoreNull",
+        cat, "_ in a slot",
+        "{a,b}:(_,1)",
+        {"a": None, "b": 1})
+    add(f"{cat}.quotedUnderscore",
+        cat, "quoted _ is a string",
+        '{a,b@str}:("_","_")',
+        {"a": "_", "b": "_"})
     add(f"{cat}.quotedNull",
         cat, "quoted null is a string",
         '{a}:("null")',
         {"a": "null"})
     add(f"{cat}.strHintMakesString",
         cat, "@str: unquoted 42 / true are strings",
-        "{a@str,b@str,c@str}:(42,true,null)",
-        {"a": "42", "b": "true", "c": None})
+        "{a@str,b@str,c@str,d@str}:(42,true,_,null)",
+        {"a": "42", "b": "true", "c": None, "d": None})
+    add(f"{cat}.strHintLeadingZero",
+        cat, "@str: unquoted 007 keeps its zeros",
+        "{zip@str}:(007)",
+        {"zip": "007"})
+    add(f"{cat}.untypedLeadingZero",
+        cat, "no hint: 007 is a string",
+        "{zip}:(001234)",
+        {"zip": "001234"})
     add(f"{cat}.floatHintAcceptsInt",
         cat, "@float accepts an integer literal",
         "{x@float}:(3)",
@@ -287,7 +324,7 @@ def gen_single_object():
         r'{"id uuid","a,b","q\"q",""}:(1,2,3,4)',
         {"id uuid": 1, "a,b": 2, 'q"q': 3, "": 4})
     add(f"{cat}.emptySchema",
-        cat, "zero-field schema matches ()",
+        cat, "zero-field schema matches the zero-element tuple ()",
         "{}:()",
         {})
     add(f"{cat}.untypedArrayBinding",
@@ -389,14 +426,19 @@ def gen_plain_arrays():
     add(f"{cat}.strings", cat, "plain strings",     "[a,b,c]",      ["a", "b", "c"])
     add(f"{cat}.mixed",   cat, "mixed types",       "[1,hello,true,3.14]", [1, "hello", True, 3.14])
     add(f"{cat}.nested",  cat, "nested arrays",     "[[1,2],[3,4]]", [[1, 2], [3, 4]])
-    add(f"{cat}.trailingComma", cat, "comma is a separator: [1,2,3,] ends with null", "[1,2,3,]", [1, 2, 3, None])
+    err(f"{cat}.trailingComma", cat, "no trailing comma", "[1,2,3,]", "parse.empty_slot")
     add(f"{cat}.emptySpaced", cat, "[ ] is empty",      "[ ]",          [])
-    add(f"{cat}.twoNulls",    cat, "[,] is two nulls",  "[,]",          [None, None])
-    add(f"{cat}.singleNull",  cat, "[null] is one null", "[null]",      [None])
-    add(f"{cat}.leadingNull", cat, "[,1] leading null", "[,1]",         [None, 1])
+    err(f"{cat}.twoBlanks",   cat, "[,] has blank elements", "[,]",     "parse.empty_slot")
+    add(f"{cat}.twoNulls",    cat, "[_,_] is two nulls", "[_,_]",       [None, None])
+    add(f"{cat}.singleNull",  cat, "[_] is one null",   "[_]",          [None])
+    add(f"{cat}.singleNullKeyword", cat, "[null] is one null", "[null]", [None])
+    err(f"{cat}.leadingComma", cat, "no leading comma", "[,1]",         "parse.empty_slot")
+    add(f"{cat}.leadingNull", cat, "[_,1] leading null", "[_,1]",       [None, 1])
     add(f"{cat}.singletonString", cat, "single string", "[hello]",   ["hello"])
     add(f"{cat}.boolArray", cat, "bool array",      "[true,false,true]", [True, False, True])
-    add(f"{cat}.sparseNull", cat, "sparse with null",  "[1,,3]",     [1, None, 3])
+    add(f"{cat}.sparseNull", cat, "null in the middle", "[1,_,3]",    [1, None, 3])
+    err(f"{cat}.doubleComma", cat, "[1,,3] has a blank element", "[1,,3]", "parse.empty_slot")
+    add(f"{cat}.colonIsContent", cat, "without a map binding : is content", "[a:1,12:30]", ["a:1", "12:30"])
     add(f"{cat}.size200",  cat, "200-element ints",
         "[" + ",".join(str(i) for i in range(200)) + "]",
         list(range(200)))
@@ -498,37 +540,57 @@ def gen_comments():
 def gen_commas():
     cat = "commas"
     err(f"{cat}.trail",
-        cat, "(1,2,) has three slots",
+        cat, "(1,2,) has a blank element",
         "{a@int,b@int}:(1,2,)",
-        "parse.field_count")
-    add(f"{cat}.trailIsNull",
-        cat, "final empty slot is null",
+        "parse.empty_slot")
+    err(f"{cat}.trailBlank",
+        cat, "(1,) has a blank element",
         "{a@int,b@int}:(1,)",
+        "parse.empty_slot")
+    add(f"{cat}.trailIsNull",
+        cat, "final null is written _",
+        "{a@int,b@int}:(1,_)",
         {"a": 1, "b": None})
-    add(f"{cat}.twoNulls",
-        cat, "(,) is two nulls",
+    err(f"{cat}.onlyComma",
+        cat, "(,) has blank elements",
         "{a@int,b@int}:(,)",
+        "parse.empty_slot")
+    add(f"{cat}.twoNulls",
+        cat, "(_,_) is two nulls",
+        "{a@int,b@int}:(_,_)",
         {"a": None, "b": None})
-    add(f"{cat}.emptyTupleOneNull",
-        cat, "() is one null slot",
+    err(f"{cat}.emptyTupleOneField",
+        cat, "() has zero elements, schema has one",
         "{a@int}:()",
-        {"a": None})
+        "parse.field_count")
     err(f"{cat}.emptyTupleTwoFields",
-        cat, "() has one slot, schema has two",
+        cat, "() has zero elements, schema has two",
         "{a@int,b@int}:()",
         "parse.field_count")
-    add(f"{cat}.consec",
-        cat, "consecutive commas -> null",
+    err(f"{cat}.consec",
+        cat, "consecutive commas are an error",
         "{a@int,b@int,c@int}:(1,,3)",
+        "parse.empty_slot")
+    add(f"{cat}.middleNull",
+        cat, "null in the middle is written _",
+        "{a@int,b@int,c@int}:(1,_,3)",
         {"a": 1, "b": None, "c": 3})
-    err(f"{cat}.consecAndTrail",
-        cat, "(1,2,,) has four slots",
-        "{a@int,b@int,c@int}:(1,2,,)",
-        "parse.field_count")
+    err(f"{cat}.leading",
+        cat, "leading comma is an error",
+        "{a@int,b@int}:(,1)",
+        "parse.empty_slot")
     add(f"{cat}.allNull",
         cat, "all nulls",
-        "{a@int,b@int,c@int}:(,,)",
+        "{a@int,b@int,c@int}:(_,_,_)",
         {"a": None, "b": None, "c": None})
+    add(f"{cat}.spacedNull",
+        cat, "layout around _",
+        "{a@int,b@int}:( _ , 2 )",
+        {"a": None, "b": 2})
+    add(f"{cat}.nestedNull",
+        cat, "_ for a whole nested object or array",
+        "{a@{x,y},b@[int]}:(_,_)",
+        {"a": None, "b": None})
 
 # ---------------------------------------------------------------------------
 # 10. Errors
@@ -557,7 +619,7 @@ def gen_errors():
         "{a@int,b@int}:(1,2,3)",
         "parse.field_count")
     err(f"{cat}.tooFew",
-        cat, "too few values (no trailing comma)",
+        cat, "too few values",
         "{a@int,b@int}:(1)",
         "parse.field_count")
     err(f"{cat}.bareTuple",
@@ -612,6 +674,14 @@ def gen_errors():
         cat, "float literal overflowing to infinity (S4)",
         "1e309",
         "semantic.S4.overflow")
+    err(f"{cat}.intHintLeadingZero",
+        cat, "007 is a string, so @int rejects it (S3)",
+        "{a@int}:(007)",
+        "type.coercion")
+    err(f"{cat}.floatHintLeadingZero",
+        cat, "01.5 is a string, so @float rejects it (S3)",
+        "{a@float}:(01.5)",
+        "type.coercion")
     err(f"{cat}.intHintSpacedDigits",
         cat, "4 2 is the string '4 2', not an int (S3)",
         "{a@int}:(4 2)",
@@ -689,13 +759,13 @@ def gen_string_shapes():
 def gen_optionals():
     cat = "optionals"
     add(f"{cat}.someInt",  cat, "Some(int)",  "{x@int}:(7)",   {"x": 7})
-    add(f"{cat}.noneInt",  cat, "None(int)",  "{x@int}:()",    {"x": None})
+    add(f"{cat}.noneInt",  cat, "None(int)",  "{x@int}:(_)",   {"x": None})
     add(f"{cat}.someStr",  cat, "Some(str)",  "{x@str}:(hi)",  {"x": "hi"})
-    add(f"{cat}.noneStr",  cat, "None(str)",  "{x@str}:()",    {"x": None})
+    add(f"{cat}.noneStr",  cat, "None(str)",  "{x@str}:(_)",   {"x": None})
     add(f"{cat}.emptyStrSome", cat, "explicit empty string is some",
         '{x@str}:("")', {"x": ""})
     add(f"{cat}.middleNone", cat, "middle field is null",
-        "{a@int,b@int,c@int}:(1,,3)",
+        "{a@int,b@int,c@int}:(1,_,3)",
         {"a": 1, "b": None, "c": 3})
 
 # ---------------------------------------------------------------------------
@@ -792,12 +862,124 @@ def gen_null_patterns():
                 vals.append(str(i + 1))
                 expected[field] = i + 1
             else:
-                vals.append("")
+                vals.append("_")
                 expected[field] = None
         schema = ",".join(f"f{i}@int" for i in range(5))
         text = f"{{{schema}}}:({','.join(vals)})"
         add(f"{cat}.m{mask:02d}", cat, f"null-mask {mask:05b}", text, expected)
 
+
+# ---------------------------------------------------------------------------
+# 20. Maps (S11)
+# ---------------------------------------------------------------------------
+
+def gen_maps():
+    cat = "maps"
+    add(f"{cat}.basic", cat, "str -> int map",
+        "{user@str,attrs@[str:int]}:(Alice,[age:30,score:95])",
+        {"user": "Alice", "attrs": {"age": 30, "score": 95}})
+    add(f"{cat}.empty", cat, "[] is the empty map",
+        "{attrs@[str:int]}:([])",
+        {"attrs": {}})
+    add(f"{cat}.single", cat, "one entry",
+        "{attrs@[str:str]}:([lang:zh])",
+        {"attrs": {"lang": "zh"}})
+    add(f"{cat}.spaced", cat, "layout around : and ,",
+        "{attrs@[str:int]}:([ age : 30 , score:95 ])",
+        {"attrs": {"age": 30, "score": 95}})
+    add(f"{cat}.keyWithSpace", cat, "plain key with internal space",
+        "{pop@[str:int]}:([New York:8,Los Angeles:4])",
+        {"pop": {"New York": 8, "Los Angeles": 4}})
+    add(f"{cat}.quotedKey", cat, "a key containing : must be quoted",
+        '{m@[str:int]}:(["12:30":1,"a,b":2])',
+        {"m": {"12:30": 1, "a,b": 2}})
+    add(f"{cat}.valueWithColon", cat, "the first : splits; the value may contain :",
+        "{m@[str:str]}:([start:12:30,url:https://a.com])",
+        {"m": {"start": "12:30", "url": "https://a.com"}})
+    add(f"{cat}.numericStrKey", cat, "@[str:...] keys take the token text",
+        "{m@[str:int]}:([1:10,007:20])",
+        {"m": {"1": 10, "007": 20}})
+    add(f"{cat}.intKey", cat, "int keys (shown as decimal text)",
+        "{m@[int:str]}:([1:one,-2:minus two])",
+        {"m": {"1": "one", "-2": "minus two"}})
+    add(f"{cat}.nullValue", cat, "_ is a null value",
+        "{m@[str:int]}:([a:_,b:2])",
+        {"m": {"a": None, "b": 2}})
+    add(f"{cat}.nullMap", cat, "_ for the whole map",
+        "{m@[str:int]}:(_)",
+        {"m": None})
+    add(f"{cat}.structValue", cat, "struct values",
+        "{pts@[str:{x@int,y@int}]}:([a:(1,2),b:(3,4)])",
+        {"pts": {"a": {"x": 1, "y": 2}, "b": {"x": 3, "y": 4}}})
+    add(f"{cat}.arrayValue", cat, "array values",
+        "{m@[str:[int]]}:([a:[1,2],b:[]])",
+        {"m": {"a": [1, 2], "b": []}})
+    add(f"{cat}.mapValue", cat, "map of maps",
+        "{m@[str:[str:int]]}:([a:[x:1],b:[]])",
+        {"m": {"a": {"x": 1}, "b": {}}})
+    add(f"{cat}.arrayOfMaps", cat, "array of maps",
+        "{m@[[str:int]]}:([[a:1],[b:2,c:3]])",
+        {"m": [{"a": 1}, {"b": 2, "c": 3}]})
+    add(f"{cat}.untyped", cat, "@[:] untyped map: keys and values by S2",
+        "{m@[:]}:([a:1,b:x,1:true])",
+        {"m": {"a": 1, "b": "x", "1": True}})
+    add(f"{cat}.valueTypeOnly", cat, "@[:int] untyped key",
+        "{m@[:int]}:([a:1])",
+        {"m": {"a": 1}})
+    add(f"{cat}.inRows", cat, "maps inside rows",
+        "[{id@int,tags@[str:str]}]:(1,[env:prod]),(2,[])",
+        [{"id": 1, "tags": {"env": "prod"}}, {"id": 2, "tags": {}}])
+    add(f"{cat}.comments", cat, "comments are layout inside maps",
+        "{m@[str:int]}:([a /* k */ : /* v */ 1])",
+        {"m": {"a": 1}})
+    err(f"{cat}.duplicateKey", cat, "duplicate key",
+        "{m@[str:int]}:([a:1,a:2])",
+        "semantic.S11.duplicate_key")
+    err(f"{cat}.duplicateAfterResolve", cat, "1 and \"1\" are the same str key",
+        '{m@[str:int]}:([1:1,"1":2])',
+        "semantic.S11.duplicate_key")
+    err(f"{cat}.nullKey", cat, "_ is not a valid key",
+        "{m@[str:int]}:([_:1])",
+        "semantic.S11.bad_key")
+    err(f"{cat}.boolKeyUntyped", cat, "untyped key true is a boolean, not allowed",
+        "{m@[:]}:([true:1])",
+        "semantic.S11.bad_key")
+    err(f"{cat}.floatKeyUntyped", cat, "untyped key 1.5 is a float, not allowed",
+        "{m@[:]}:([1.5:1])",
+        "semantic.S11.bad_key")
+    err(f"{cat}.intKeyNotInt", cat, "@[int:...] rejects a non-integer key",
+        "{m@[int:str]}:([a:x])",
+        "type.coercion")
+    err(f"{cat}.valueTypeMismatch", cat, "value must satisfy the value type",
+        "{m@[str:int]}:([a:x])",
+        "type.coercion")
+    err(f"{cat}.entryWithoutColon", cat, "a map entry needs key:value",
+        "{m@[str:int]}:([1,2])",
+        "semantic.S11.not_map")
+    err(f"{cat}.blankEntry", cat, "no blank entries",
+        "{m@[str:int]}:([a:1,,b:2])",
+        "parse.empty_slot")
+    err(f"{cat}.trailingComma", cat, "no trailing comma",
+        "{m@[str:int]}:([a:1,])",
+        "parse.empty_slot")
+    err(f"{cat}.missingValue", cat, "a null value is written _",
+        "{m@[str:int]}:([a:])",
+        "semantic.S11.not_map")
+    err(f"{cat}.bareColonKey", cat, "plain key cannot be empty",
+        "{m@[str:int]}:([:1])",
+        "semantic.S11.not_map")
+    err(f"{cat}.mapWithoutBinding", cat, "a map value needs a map binding (S8)",
+        "{m@[]}:([a:(1)])",
+        "semantic.S11.not_map")
+    err(f"{cat}.topLevel", cat, "a map is never a top-level form",
+        "[a:(1)]",
+        "parse.unexpected")
+    err(f"{cat}.badKeyType", cat, "key type must be str or int",
+        "{m@[float:int]}:([])",
+        "parse.bad_type")
+    err(f"{cat}.structKeyType", cat, "key type cannot be a struct",
+        "{m@[{x}:int]}:([])",
+        "parse.bad_type")
 
 # =============================================================================
 # Encode (round-trip) cases
@@ -851,6 +1033,8 @@ def gen_encode_strings_lookalike():
         ("yes",             "string 'yes'",    "yes"),
         ("no",              "string 'no'",     "no"),
         ("bareNull",        "string 'null'",   "null"),
+        ("underscore",      "string '_'",      "_"),
+        ("underscoreWord",  "string '_x'",     "_x"),
         ("capNull",         "string 'Null'",   "Null"),
         ("nilStr",          "string 'nil'",    "nil"),
         ("none",            "string 'None'",   "None"),
@@ -1039,6 +1223,8 @@ def gen_encode_array_of_lookalikes():
         ("floatStrings",    "['1.5','2.5']",                 ["1.5", "2.5"]),
         ("boolStrings",     "['true','false']",              ["true", "false"]),
         ("nullStrings",     "['null','null']",               ["null", "null"]),
+        ("underscoreStrs",  "['_','_']",                     ["_", "_"]),
+        ("nullAndUnderscore", "[null,'_']",                  [None, "_"]),
         ("emptyStrings",    "['','','']",                    ["", "", ""]),
         ("commaStrings",    "['a,b','c,d']",                 ["a,b", "c,d"]),
         ("parenStrings",    "['(1)','(2)']",                 ["(1)", "(2)"]),
@@ -1087,6 +1273,7 @@ def main():
     gen_depth()
     gen_quoted_equiv()
     gen_null_patterns()
+    gen_maps()
 
     # Encode (round-trip) cases.
     gen_encode_strings_lookalike()
@@ -1109,7 +1296,7 @@ def main():
 
     out_path = os.path.join(os.path.dirname(__file__), "cases.json")
     manifest = {
-        "version": 2,  # v2: comma-as-separator, null keyword, comments as layout
+        "version": 3,  # v3: _ null, no blank slots, JSON numbers/escapes, maps
         "spec":    "../docs/SPEC.md",
         "grammar": "GRAMMAR.abnf",
         "count":   len(CASES),
@@ -1128,7 +1315,7 @@ def main():
         enc_seen.add(c["id"])
     enc_path = os.path.join(os.path.dirname(__file__), "encode-cases.json")
     enc_manifest = {
-        "version": 2,
+        "version": 3,
         "spec":    "../docs/SPEC.md",
         "grammar": "GRAMMAR.abnf",
         "count":   len(ENC_CASES),
