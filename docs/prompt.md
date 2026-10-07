@@ -42,7 +42,7 @@ For scalar types (int, str, bool), the `@type` portion is an optional hint (`nam
 
 - Strings do not need quotes unless they need to preserve leading/trailing spaces, or contain structural characters like `, ( ) [ ] { } " \` (there are no backslash escapes outside quotes). `@` and `:` are fine unquoted (`alice@example.com`, `12:30`).
 - Keywords are lowercase and case-sensitive (`true`, `false`, `_`). Quote strings that look like keywords or numbers: `"true"`, `"_"`, `"42"`.
-- Null is written `_`: `(Alice, _, 30)` means the middle field is null. Never leave a position blank.
+- Null is written `_`: `(Alice, _, 30)` means the middle field is null. Never leave a position blank, and never write `null`: it is read as the string "null".
 - Commas only separate values: no leading, trailing or doubled commas. `(1, 2,)` and `(1,,3)` are errors.
 - Comments `/* ... */` may appear between values; `//` comments are not supported.
 

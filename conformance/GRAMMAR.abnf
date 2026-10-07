@@ -87,8 +87,7 @@ element         = scalar / tuple / array / map
 ; ----------------------------------------------------------------------------
 
 scalar          = keyword / number / quoted-string / plain-string
-keyword         = %s"true" / %s"false" / "_" / %s"null"
-                ; "_" is null; decoders also accept "null" (see S7)
+keyword         = %s"true" / %s"false" / "_"      ; "_" is null
 
 ; -- Numbers -----------------------------------------------------------------
 ; Exactly the JSON number grammar (RFC 8259 section 6). A leading "-" must
@@ -174,22 +173,22 @@ cnoend          = %x00-29 / %x2B-2E / %x30-D7FF / %xE000-10FFFF
 ;     silently skip. A missing value is written "_", never left blank.
 ;
 ; S2. Unquoted token resolution (no scalar hint).
-;       exactly "_" or "null"           -> null
+;       exactly "_"                     -> null
 ;       exactly "true" / "false"        -> boolean
 ;       matches <number> without fraction/exponent -> integer
 ;       matches <number> with fraction or exponent -> float
 ;       anything else                   -> string
-;     A quoted string is always a string: "_", "true", "null", "42" are
-;     strings. A typed decoder reading an unquoted non-null token into a
+;     A quoted string is always a string: "_", "true", "42" are strings.
+;     There is no "null" keyword: unquoted null is the string "null". A typed decoder reading an unquoted non-null token into a
 ;     string target takes the token text, as if the field were @str
-;     (90210 -> "90210"); "_" and null stay null.
+;     (90210 -> "90210"); "_" stays null.
 ;
 ; S3. Scalar hints are authoritative.
 ;       @int    value MUST be an integer literal (or null)
 ;       @float  value MUST be an integer or float literal (or null)
 ;       @bool   value MUST be true / false (or null)
 ;       @str    every non-null value is a string: unquoted 42 or true is the
-;               string "42" / "true"; "_" and null stay null
+;               string "42" / "true"; "_" stays null
 ;     A value that does not satisfy its hint is an error (007 under @int is
 ;     the string "007", so it is an error). A typed decoder MUST also reject
 ;     a hint that is incompatible with the target type (e.g. @str into an
@@ -217,9 +216,9 @@ cnoend          = %x00-29 / %x2B-2E / %x30-D7FF / %xE000-10FFFF
 ;     with the same (unescaped) name in one schema is an error.
 ;
 ; S7. Null.
-;     "_" and the keyword null are the same value. Encoders MUST emit "_"
-;     and never null. A string whose content is "_", "true", "false" or
-;     "null", or that matches <number>, MUST be quoted by encoders.
+;     "_" is the only way to write null. A string whose content is "_",
+;     "true" or "false", or that matches <number>, MUST be quoted by
+;     encoders.
 ;
 ; S8. Bindings.
 ;     A field whose values contain tuples (nested objects) or maps needs a
@@ -243,8 +242,8 @@ cnoend          = %x00-29 / %x2B-2E / %x30-D7FF / %xE000-10FFFF
 ;       - "[]" is the empty map.
 ;       - Keys are resolved by the key-type (str: token text as for @str;
 ;         int: an integer literal) or, when the key-type is omitted, by S2.
-;         A key MUST resolve to a string or an integer: "_", null, true,
-;         false and float keys are errors.
+;         A key MUST resolve to a string or an integer: "_", true, false
+;         and float keys are errors.
 ;       - A plain key never contains ":"; the first ":" after the key
 ;         separates key and value. The value may contain ":" freely:
 ;         [start:12:30] is start -> "12:30".

@@ -2,7 +2,7 @@
   "version": 3,
   "spec": "../docs/SPEC.md",
   "grammar": "GRAMMAR.abnf",
-  "count": 413,
+  "count": 415,
   "cases": [
     {
       "id": "primitives.bare.int.zero",
@@ -221,13 +221,13 @@
       "expected": null
     },
     {
-      "id": "primitives.bare.nullKeyword",
+      "id": "primitives.bare.nullWord",
       "category": "primitives.bare",
-      "desc": "keyword null is still accepted",
+      "desc": "null is not a keyword: it is a plain string",
       "input": "null",
       "kind": "ok",
       "schemaDriven": false,
-      "expected": null
+      "expected": "null"
     },
     {
       "id": "primitives.bare.string.quoted.underscore",
@@ -1049,14 +1049,14 @@
       }
     },
     {
-      "id": "objects.single.nullKeyword",
+      "id": "objects.single.nullWord",
       "category": "objects.single",
-      "desc": "null keyword in a slot",
+      "desc": "null in a slot is a plain string",
       "input": "{a,b}:(null,1)",
       "kind": "ok",
       "schemaDriven": true,
       "expected": {
-        "a": null,
+        "a": "null",
         "b": 1
       }
     },
@@ -1106,7 +1106,7 @@
         "a": "42",
         "b": "true",
         "c": null,
-        "d": null
+        "d": "null"
       }
     },
     {
@@ -1809,14 +1809,14 @@
       ]
     },
     {
-      "id": "arrays.plain.singleNullKeyword",
+      "id": "arrays.plain.nullWord",
       "category": "arrays.plain",
-      "desc": "[null] is one null",
+      "desc": "[null] holds the string null",
       "input": "[null]",
       "kind": "ok",
       "schemaDriven": false,
       "expected": [
-        null
+        "null"
       ]
     },
     {
@@ -2644,6 +2644,24 @@
       "kind": "error",
       "schemaDriven": false,
       "errorHint": "semantic.S4.overflow"
+    },
+    {
+      "id": "errors.intHintNullWord",
+      "category": "errors",
+      "desc": "null is a string, so @int rejects it (S3)",
+      "input": "{a@int}:(null)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "type.coercion"
+    },
+    {
+      "id": "errors.boolHintNullWord",
+      "category": "errors",
+      "desc": "null is a string, so @bool rejects it (S3)",
+      "input": "{a@bool}:(null)",
+      "kind": "error",
+      "schemaDriven": true,
+      "errorHint": "type.coercion"
     },
     {
       "id": "errors.intHintLeadingZero",

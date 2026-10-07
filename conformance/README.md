@@ -10,7 +10,7 @@ all language implementations (`asun-rs`, `asun-c`, `asun-cpp`, `asun-go`,
 | Path                  | Purpose                                                          |
 | --------------------- | ---------------------------------------------------------------- |
 | `GRAMMAR.abnf`        | Formal grammar (RFC 5234 + RFC 7405 ABNF, v1.6). Authoritative.  |
-| `cases.json`          | Generated input/output test vectors (413 cases, version 3).      |
+| `cases.json`          | Generated input/output test vectors (415 cases, version 3).      |
 | `encode-cases.json`   | Encode round-trip vectors: `decode(encode(value)) == value`.      |
 | `generate.py`         | Generator for `cases.json`. Re-run after editing.                |
 | `runners/abnf/`       | Checks every case in `cases.json` against `GRAMMAR.abnf`.        |
@@ -101,7 +101,7 @@ python3 conformance/runners/abnf/check.py            # all of cases.json
 python3 conformance/runners/abnf/check.py '{a}:(x)'   # classify ad-hoc inputs
 ```
 
-Current result: 413/413 cases consistent with the grammar.
+Current result: 415/415 cases consistent with the grammar.
 
 ## Reference runner: asun-rs
 

@@ -88,7 +88,7 @@ ASUN's design goes beyond just saving tokens; its deep architectural philosophy 
 
 | Area              | v1.5                                          | v1.6                                                              |
 | ----------------- | --------------------------------------------- | ----------------------------------------------------------------- |
-| Null              | Blank slot or `null`                          | `_`; decoders still accept `null`, encoders always emit `_`; `"_"` is a string |
+| Null              | Blank slot or `null`                          | `_` only; `null` is no longer a keyword (it is the string `"null"`); `"_"` is a string |
 | Empty slots       | `(a,)` = `a, null`; `(,)` = two nulls         | Error: every position holds a value; `()` is zero elements        |
 | Plain strings     | Backslash escapes (`a\,b`)                    | No escapes; a string with `,()[]{}"\` or `/*` must be quoted       |
 | Quoted strings    | JSON escapes + `\,` `\(` `\)` `\[` `\]` `\{` `\}` `\:` `\@` | JSON escapes only                                                 |
@@ -116,12 +116,12 @@ ASUN's design goes beyond just saving tokens; its deep architectural philosophy 
 | Integer         | `42`, `-100`    | JSON integer: `-?(0\|[1-9][0-9]*)`                          |
 | Float           | `3.14`, `1e10`  | JSON number with a fraction and/or exponent                |
 | Boolean         | `true`, `false` | Must be lowercase literals                                 |
-| Null            | `_`             | Decoders also accept the keyword `null`                    |
+| Null            | `_`             | The only null literal; `null` is a plain string            |
 | Empty string    | `""`            | Explicit empty string                                      |
 | Unquoted string | `Hello World`   | Leading/trailing spaces auto-trimmed; no escapes           |
 | Quoted string   | `" Space "`     | Spaces preserved as-is; JSON escaping rules                |
 
-Keywords (`true`, `false`, `_`, `null`) and type names (`int`, `float`, `str`, `bool`) are **case-sensitive**: `TRUE`, `Null` and `@INT` are not keywords or types.
+Keywords (`true`, `false`, `_`) and type names (`int`, `float`, `str`, `bool`) are **case-sensitive**: `TRUE` and `@INT` are not keywords or types. `null` is not a keyword either; it is an ordinary string.
 
 ### 3.1 String Rules
 
@@ -136,7 +136,7 @@ ASUN supports two string forms:
 
 - Preserve leading/trailing spaces: `" hello "`
 - Contains `,` `(` `)` `[` `]` `{` `}` `"` `\` or `/*`: `"a,b"`, `"f(x)"`
-- Force string type: `"true"`, `"_"`, `"null"`, `"123"`
+- Force string type: `"true"`, `"_"`, `"123"`
 
 `001234` is not a JSON number, so it is already the string `"001234"` without quotes.
 - Empty string: `""`
@@ -522,7 +522,7 @@ A map is declared in the schema as `@[K:V]` and written as `[key:value, ...]`:
 
 When parsing a value, the following order is attempted:
 
-1. `_` or `null` → `null`
+1. `_` → `null`
 2. **Boolean** → `true` or `false` (lowercase only)
 3. **Integer** → matches `-?(0|[1-9][0-9]*)`
 4. **Float** → a JSON number with a fraction or an exponent: `-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?`
@@ -544,8 +544,7 @@ Examples:
 | `hello`   | string `"hello"`  |
 | `123abc`  | string `"123abc"` |
 | `007`     | string `"007"`    |
-| `null`    | `null` (accepted; encoders emit `_`) |
-| `"null"`  | string `"null"`   |
+| `null`    | string `"null"`   |
 | `TRUE`    | string `"TRUE"`   |
 
 ### 8.2 Null vs Empty String
@@ -743,7 +742,7 @@ entry       ::= key ":" element
 key         ::= number | quoted_str | plain_str_without_colon
 element     ::= scalar | tuple | array | map
 
-scalar      ::= "true" | "false" | "_" | "null" | number | quoted_str | plain_str
+scalar      ::= "true" | "false" | "_" | number | quoted_str | plain_str
 number      ::= "-"? ("0" | [1-9][0-9]*) ("." [0-9]+)? ([eE] [+-]? [0-9]+)?
 quoted_str  ::= '"' (char_no_ctrl_quote_bs | escape)* '"'
 plain_str   ::= word ([ \t]+ word)*            /* no raw ,()[]{}"\ ctrl, no "/*", no escapes */
@@ -933,7 +932,7 @@ You must follow:
 - Single objects use `{schema}:` prefix; arrays of objects use `[{schema}]:` prefix
 - Number of data items = number of schema fields (strict alignment)
 - Strings generally need no quotes (unless they contain special characters)
-- Null values are written `_`; never leave a position blank
+- Null values are written `_`; never leave a position blank and never write `null` (it would be read as the string "null")
 - Quote any string containing , ( ) [ ] { } " or \
 - Nested objects use parentheses: outer@{inner@type}:(val1,(nested_val))
 
@@ -1112,7 +1111,7 @@ id,name,role,active
 - [ ] Comment handling: support `/* */` block comments
 - [ ] String parsing: support both quoted and unquoted forms
 - [ ] Escape rules: JSON escapes inside quoted strings only; reject `\` in plain strings
-- [ ] Null and blanks: `_` / `null` are null; reject blank positions
+- [ ] Null and blanks: `_` is null; reject blank positions
 - [ ] Maps: parse `[k:v,...]` under `@[K:V]` bindings; reject duplicate keys
 - [ ] Type annotation parsing: recognize `@int`, `@str`, etc.
 - [ ] Schema parsing: recursively parse nested structures

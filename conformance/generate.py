@@ -137,7 +137,7 @@ def gen_bare_values():
     add(f"{cat}.bool.true",       cat, "boolean true",       "true",       True)
     add(f"{cat}.bool.false",      cat, "boolean false",      "false",      False)
     add(f"{cat}.null",            cat, "_ is null",          "_",          None)
-    add(f"{cat}.nullKeyword",     cat, "keyword null is still accepted", "null", None)
+    add(f"{cat}.nullWord",        cat, "null is not a keyword: it is a plain string", "null", "null")
     add(f"{cat}.string.quoted.underscore", cat, "quoted _ is a string", '"_"', "_")
     add(f"{cat}.string.underscoreWord", cat, "only the exact token _ is null", "_foo", "_foo")
     add(f"{cat}.string.doubleUnderscore", cat, "__ is a string", "__", "__")
@@ -283,10 +283,10 @@ def gen_single_object():
         cat, "field name starts with digit",
         "{1st@int,2nd@int}:(10,20)",
         {"1st": 10, "2nd": 20})
-    add(f"{cat}.nullKeyword",
-        cat, "null keyword in a slot",
+    add(f"{cat}.nullWord",
+        cat, "null in a slot is a plain string",
         "{a,b}:(null,1)",
-        {"a": None, "b": 1})
+        {"a": "null", "b": 1})
     add(f"{cat}.underscoreNull",
         cat, "_ in a slot",
         "{a,b}:(_,1)",
@@ -302,7 +302,7 @@ def gen_single_object():
     add(f"{cat}.strHintMakesString",
         cat, "@str: unquoted 42 / true are strings",
         "{a@str,b@str,c@str,d@str}:(42,true,_,null)",
-        {"a": "42", "b": "true", "c": None, "d": None})
+        {"a": "42", "b": "true", "c": None, "d": "null"})
     add(f"{cat}.strHintLeadingZero",
         cat, "@str: unquoted 007 keeps its zeros",
         "{zip@str}:(007)",
@@ -431,7 +431,7 @@ def gen_plain_arrays():
     err(f"{cat}.twoBlanks",   cat, "[,] has blank elements", "[,]",     "parse.empty_slot")
     add(f"{cat}.twoNulls",    cat, "[_,_] is two nulls", "[_,_]",       [None, None])
     add(f"{cat}.singleNull",  cat, "[_] is one null",   "[_]",          [None])
-    add(f"{cat}.singleNullKeyword", cat, "[null] is one null", "[null]", [None])
+    add(f"{cat}.nullWord", cat, "[null] holds the string null", "[null]", ["null"])
     err(f"{cat}.leadingComma", cat, "no leading comma", "[,1]",         "parse.empty_slot")
     add(f"{cat}.leadingNull", cat, "[_,1] leading null", "[_,1]",       [None, 1])
     add(f"{cat}.singletonString", cat, "single string", "[hello]",   ["hello"])
@@ -674,6 +674,14 @@ def gen_errors():
         cat, "float literal overflowing to infinity (S4)",
         "1e309",
         "semantic.S4.overflow")
+    err(f"{cat}.intHintNullWord",
+        cat, "null is a string, so @int rejects it (S3)",
+        "{a@int}:(null)",
+        "type.coercion")
+    err(f"{cat}.boolHintNullWord",
+        cat, "null is a string, so @bool rejects it (S3)",
+        "{a@bool}:(null)",
+        "type.coercion")
     err(f"{cat}.intHintLeadingZero",
         cat, "007 is a string, so @int rejects it (S3)",
         "{a@int}:(007)",
